@@ -65,9 +65,6 @@ def _invoke(
     )
 
 
-# ─── Researcher ────────────────────────────────────────────────────────────────
-
-
 def researcher_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
     query = str(message.payload.get("query", session.query) if message else session.query)
     try:
@@ -95,9 +92,6 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         raw_content=summary,
         citations=cited_sources,
     )
-
-
-# ─── Analyst ──────────────────────────────────────────────────────────────────
 
 
 def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
@@ -160,9 +154,6 @@ def _parse_claims_from_analyst(raw: str) -> list[Claim]:
                     )
                 )
     return claims
-
-
-# ─── Verifier ────────────────────────────────────────────────────────────────
 
 
 def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
@@ -296,9 +287,6 @@ def _parse_verified_claims(raw: str, fallback_claims: list[Claim]) -> list[Claim
     return results
 
 
-# ─── Presenter ────────────────────────────────────────────────────────────────
-
-
 def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
     verifier_result = session.get_agent(AgentRole.VERIFIER)
     researcher_result = session.get_agent(AgentRole.RESEARCHER)
@@ -344,3 +332,26 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
         raw_content=report,
         citations=aggregate_citations(session.agent_results),
     )
+
+
+from a2a_research.agents.registry import (
+    AgentRegistry,
+    AgentSpec,
+    get_agent_handler,
+    get_agent_spec,
+    get_registry,
+    register_agent,
+)
+
+__all__ = [
+    "AgentRegistry",
+    "AgentSpec",
+    "analyst_invoke",
+    "get_agent_handler",
+    "get_agent_spec",
+    "get_registry",
+    "presenter_invoke",
+    "register_agent",
+    "researcher_invoke",
+    "verifier_invoke",
+]

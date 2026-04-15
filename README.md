@@ -1,6 +1,6 @@
 # A2A Research — Local-First 4-Agent Research System
 
-**A research-and-verification pipeline** orchestrated by LangGraph. Four agents — Researcher, Analyst, Verifier, Presenter — communicate through an in-process A2A client/server layer, while the bundled PocketFlow reference runtime powers deterministic report-building helpers. The system ingests a local RAG corpus, decomposes user queries into verifiable claims, checks evidence, and renders a structured markdown report.
+**A research-and-verification pipeline** orchestrated by a modular PocketFlow runtime. Four agents — Researcher, Analyst, Verifier, Presenter — communicate through an in-process A2A client/server layer, with a registry-driven workflow that can be extended with new agents and alternate pipeline orderings without rewriting the orchestration core. The system ingests a local RAG corpus, decomposes user queries into verifiable claims, checks evidence, and renders a structured markdown report.
 
 ---
 
@@ -9,7 +9,7 @@
 ```
 Researcher ──► Analyst ──► Verifier ──► Presenter
     │                                    │
-    └────────── LangGraph StateGraph ───┘
+    └──── PocketFlow AsyncFlow + A2A ───┘
 ```
 
 | Agent | Role | Output |
@@ -19,10 +19,10 @@ Researcher ──► Analyst ──► Verifier ──► Presenter
 | **Verifier** | Assigns SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE verdicts | `verified claims with confidence` |
 | **Presenter** | Renders the final structured markdown report | `markdown report` |
 
-**Orchestration**: LangGraph `StateGraph` with typed `WorkflowState` threaded through all nodes.  
-**A2A Contracts**: In-process `A2AClient` → `A2AServer` dispatch with typed `A2AMessage` / `AgentResult` payloads.  
+**Orchestration**: PocketFlow `AsyncFlow` + `AsyncNode` wrappers in `workflow/`, exposed through a backward-compatible `graph/` shim.  
+**A2A Contracts**: In-process `A2AClient` → `A2AServer` dispatch with typed `A2AMessage` / `AgentResult` payloads, plus extensible envelope / policy / artifact models.  
 **RAG**: ChromaDB with sentence-chunked markdown corpus; semantic similarity retrieval.  
-**PocketFlow**: The bundled `pocketflow_reference` runtime is used for deterministic helper flows such as markdown report assembly.  
+**PocketFlow**: The bundled `pocketflow_reference` runtime powers both deterministic helper flows and the main research workflow runtime.  
 **UI**: Mesop web app (`src/a2a_research/ui/app.py`).
 
 ---
@@ -156,6 +156,22 @@ Presenter ──► LLM synthesis ──► structured markdown report
 
 All LLM calls route through the shared `get_llm()` provider abstraction in `providers.py`. Swapping providers requires only `.env` changes, assuming the relevant optional provider package is installed.
 
+### 2.5. Modular Workflow Runtime
+
+The main execution path now lives in `src/a2a_research/workflow/`:
+
+- `nodes.py` — PocketFlow `ActorNode` wrappers that invoke agents through the A2A layer
+- `builder.py` — declarative workflow builder for assembling an ordered role pipeline
+- `coordinator.py` — orchestration entrypoint for the default four-agent flow
+- `adapter.py` — sync/async compatibility adapter so legacy `graph.get_graph().invoke(...)` callers still work
+- `policy.py` — workflow policy primitives for future routing and constraint logic
+
+The current default pipeline is still linear, but the runtime is now modular enough to:
+
+- add a new agent by registering a new role/handler pair,
+- change the workflow order without replacing the orchestration engine,
+- preserve the existing `from a2a_research.graph import run_research_sync` import path.
+
 ### 3. UI
 
 The Mesop app exposes five sections:
@@ -173,10 +189,11 @@ The Mesop app exposes five sections:
 ```
 src/a2a_research/
 ├── agents/          # Agent invoke functions (researcher_invoke, analyst_invoke, verifier_invoke, presenter_invoke)
-├── a2a/             # In-process A2A contracts (A2AMessage, A2AClient, A2AServer)
-├── graph/           # LangGraph StateGraph wiring; run_research_sync / run_research_async entrypoints
+├── a2a/             # In-process A2A contracts and registry-backed server/client helpers
+├── graph/           # Backward-compatible shim for PocketFlow workflow entrypoints
+├── workflow/        # PocketFlow runtime (builder, actor nodes, coordinator, adapter, policy)
 ├── rag/             # ChromaDB ingestion and semantic retrieval
-├── models/          # Pydantic domain types (ResearchSession, Claim, AgentResult, WorkflowState, …)
+├── models/          # Pydantic domain types (ResearchSession, Claim, AgentResult, WorkflowState, Artifact, Envelope, Policy, …)
 ├── prompts/         # Per-agent system prompts (RESEARCHER_PROMPT, ANALYST_PROMPT, VERIFIER_PROMPT, PRESENTER_PROMPT)
 ├── helpers/         # Deterministic PocketFlow-style helpers (format_claim_verdict, build_markdown_report, …)
 ├── ui/              # Mesop web app

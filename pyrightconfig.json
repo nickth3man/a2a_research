@@ -1,6 +1,12 @@
 {
-  "include": ["src", "tests"],
-  "extraPaths": ["src"],
+  "$schema": "https://raw.githubusercontent.com/microsoft/pyright/main/packages/vscode-pyright/schemas/pyrightconfig.schema.json",
+  "include": [
+    "src",
+    "tests"
+  ],
+  "extraPaths": [
+    "src"
+  ],
   "venvPath": ".",
-  "typeCheckingMode": "basic"
+  "reportMissingImports": true
 }

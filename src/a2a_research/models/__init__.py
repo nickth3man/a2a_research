@@ -142,6 +142,19 @@ def get_agent_card(role: AgentRole) -> AgentCard:
     return AGENT_CARDS[role]
 
 
+# ─── Artifact / Envelope / Policy ─────────────────────────────────────────
+
+from a2a_research.models.artifact import (
+    Artifact,
+    ArtifactKind,
+    DataArtifact,
+    StreamArtifact,
+    TextArtifact,
+    wrap_in_artifact,
+)
+from a2a_research.models.envelope import A2AEnvelope
+from a2a_research.models.policy import PolicyEffect, WorkflowPolicy
+
 # ─── RAG Domain Objects ───────────────────────────────────────────────────────
 
 

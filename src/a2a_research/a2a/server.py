@@ -1,26 +1,16 @@
-"""In-process A2A contract layer used by the LangGraph orchestration path."""
+"""A2A registry helpers — bridges agents/registry.py to the A2A server layer."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
-from a2a_research.models import (
-    A2AMessage,
-    AgentCard,
-    AgentResult,
-    AgentRole,
-    AgentStatus,
-    get_agent_card,
-)
+from a2a_research.models import A2AMessage, AgentCard, AgentResult, AgentRole, AgentStatus
 
 if TYPE_CHECKING:
     from a2a_research.models import ResearchSession
 
 
 AgentHandler = Callable[["ResearchSession", A2AMessage], AgentResult]
-
-
-_SERVER_REGISTRY: dict[AgentRole, "A2AServer"] | None = None
 
 
 class A2AServer:
@@ -32,7 +22,11 @@ class A2AServer:
     ) -> None:
         self.role = agent_role
         self.handler = handler
-        self.card = card or get_agent_card(agent_role)
+        self.card = card or AgentCard(
+            name=agent_role.value.title(),
+            role=agent_role,
+            description=f"A2A server for {agent_role.value}",
+        )
 
     def task_handler(self, message: A2AMessage, session: "ResearchSession") -> AgentResult:
         if message.recipient != self.role:
@@ -53,6 +47,9 @@ class A2AServer:
         return self.handler(session, message)
 
 
+_SERVER_REGISTRY: dict[AgentRole, A2AServer] | None = None
+
+
 def _build_server_registry() -> dict[AgentRole, A2AServer]:
     from a2a_research.agents import (
         analyst_invoke,
@@ -60,6 +57,7 @@ def _build_server_registry() -> dict[AgentRole, A2AServer]:
         researcher_invoke,
         verifier_invoke,
     )
+    from a2a_research.models import get_agent_card
 
     handler_map: dict[AgentRole, AgentHandler] = {
         AgentRole.RESEARCHER: researcher_invoke,
@@ -78,6 +76,22 @@ def get_server_registry() -> dict[AgentRole, A2AServer]:
     if _SERVER_REGISTRY is None:
         _SERVER_REGISTRY = _build_server_registry()
     return _SERVER_REGISTRY
+
+
+def register_a2a_agent(
+    role: AgentRole,
+    handler: AgentHandler,
+    card: AgentCard | None = None,
+) -> None:
+    from a2a_research.models import get_agent_card
+
+    registry = get_server_registry()
+    registry[role] = A2AServer(role, handler, card or get_agent_card(role))
+
+
+def get_a2a_handler(role: AgentRole) -> AgentHandler | None:
+    server = get_server_registry().get(role)
+    return server.handler if server else None
 
 
 class A2AClient:
@@ -102,33 +116,3 @@ class A2AClient:
                 message=f"No A2A server registered for {message.recipient.value}",
             )
         return server.task_handler(message, session)
-
-
-def register_a2a_agent(
-    role: AgentRole,
-    handler: AgentHandler,
-    card: AgentCard | None = None,
-) -> None:
-    registry = get_server_registry()
-    registry[role] = A2AServer(role, handler, card or get_agent_card(role))
-
-
-def get_a2a_handler(role: AgentRole) -> AgentHandler | None:
-    server = get_server_registry().get(role)
-    return server.handler if server else None
-
-
-__all__ = [
-    "A2AClient",
-    "A2AMessage",
-    "A2AServer",
-    "AgentCard",
-    "AgentHandler",
-    "AgentResult",
-    "AgentRole",
-    "AgentStatus",
-    "get_agent_card",
-    "get_a2a_handler",
-    "get_server_registry",
-    "register_a2a_agent",
-]
