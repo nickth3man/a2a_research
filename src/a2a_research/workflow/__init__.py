@@ -2,18 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
-from pocketflow_reference.pocketflow_source import AsyncFlow, AsyncNode
+from pocketflow import AsyncFlow, AsyncNode
 
-from ..models import AgentRole, ResearchSession
+from ..models import AgentRole, ResearchSession  # noqa: TC001
+from ..models.policy import PolicyEffect, WorkflowPolicy
 from .adapter import SyncWorkflowAdapter
 from .builder import get_workflow
 from .coordinator import run_coordinator
-from .entrypoints import run_workflow_sync
+from .entrypoints import (
+    get_workflow_for_roles,
+    run_workflow_sync,
+)
+from .entrypoints import (
+    run_workflow as run_workflow,
+)
+from .entrypoints import (
+    run_workflow_async as run_workflow_async,
+)
 from .nodes import ActorNode, create_actor_node
-from .policy import PipelineOrderPolicy, PolicyEffect, WorkflowPolicy
-
+from .policy import PipelineOrderPolicy
 
 __all__ = [
     "ActorNode",
@@ -37,47 +47,15 @@ __all__ = [
 
 def create_pocketflow_workflow(
     roles: list[AgentRole] | None = None,
-):
-    if roles is None:
-        roles = [
-            AgentRole.RESEARCHER,
-            AgentRole.ANALYST,
-            AgentRole.VERIFIER,
-            AgentRole.PRESENTER,
-        ]
-
-    flow, shared = get_workflow()
+) -> tuple[SyncWorkflowAdapter, dict[str, Any]]:
+    flow, shared = get_workflow_for_roles(roles) if roles else get_workflow()
     return SyncWorkflowAdapter(flow, shared), shared
 
 
-async def run_workflow(
-    query: str,
-    roles: list[AgentRole] | None = None,
-) -> ResearchSession:
-    session = ResearchSession(query=query)
-    adapter, shared = create_pocketflow_workflow(roles)
-    shared["session"] = session
-    await adapter.run_async(shared)
-    return shared["session"]
-
-
-async def run_workflow_async(
-    query: str,
-    roles: list[AgentRole] | None = None,
-) -> ResearchSession:
-    return await run_workflow(query, roles)
-
-
 def run_research_sync(query: str) -> ResearchSession:
-    import asyncio
-
     return asyncio.run(run_workflow(query))
 
 
-async def run_coordinator_async(session: ResearchSession) -> ResearchSession:
-    return await run_coordinator(session)
-
-
-def get_graph():
+def get_graph() -> SyncWorkflowAdapter:
     adapter, _ = create_pocketflow_workflow()
     return adapter

@@ -19,7 +19,7 @@ Researcher ──► Analyst ──► Verifier ──► Presenter
 | **Verifier** | Assigns SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE verdicts | `verified claims with confidence` |
 | **Presenter** | Renders the final structured markdown report | `markdown report` |
 
-**Orchestration**: PocketFlow `AsyncFlow` + `AsyncNode` wrappers in `workflow/`, exposed through a backward-compatible `graph/` shim.  
+**Orchestration**: PocketFlow `AsyncFlow` + `AsyncNode` wrappers in `workflow/`.  
 **A2A Contracts**: In-process `A2AClient` → `A2AServer` dispatch with typed `A2AMessage` / `AgentResult` payloads, plus extensible envelope / policy / artifact models.  
 **RAG**: ChromaDB with sentence-chunked markdown corpus; semantic similarity retrieval.  
 **PocketFlow**: The bundled `pocketflow_reference` runtime powers both deterministic helper flows and the main research workflow runtime.  
@@ -30,26 +30,23 @@ Researcher ──► Analyst ──► Verifier ──► Presenter
 ## Quick Start
 
 ```bash
-# 1. Create and activate virtual environment
-python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+# 1. Install dependencies with uv
+uv pip install -e .
 
-# 2. Install dependencies
-pip install -e ".[dev]"
-
-# 3. Configure credentials
+# 2. Configure credentials
 # macOS/Linux: cp .env.example .env
 # Windows PowerShell: Copy-Item .env.example .env
 # Edit .env — set LLM_API_KEY and any provider-specific values
 
-# 4. Ingest the RAG corpus (one-time; idempotent — safe to re-run)
-python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"
+# 3. Ingest the RAG corpus (one-time; idempotent — safe to re-run)
+uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"
 
-# 5. Start the Mesop UI
-mesop src/a2a_research/ui/app.py
+# 4. Start the Mesop UI
+uv run mesop src/a2a_research/ui/app.py
 # Opens at http://localhost:32123
 
 # Run tests (no API key required for unit tests)
-pytest
+uv run pytest
 ```
 
 ---
@@ -163,14 +160,14 @@ The main execution path now lives in `src/a2a_research/workflow/`:
 - `nodes.py` — PocketFlow `ActorNode` wrappers that invoke agents through the A2A layer
 - `builder.py` — declarative workflow builder for assembling an ordered role pipeline
 - `coordinator.py` — orchestration entrypoint for the default four-agent flow
-- `adapter.py` — sync/async compatibility adapter so legacy `graph.get_graph().invoke(...)` callers still work
+- `adapter.py` — sync/async compatibility adapter providing `invoke()` / `ainvoke()` interfaces
 - `policy.py` — workflow policy primitives for future routing and constraint logic
 
 The current default pipeline is still linear, but the runtime is now modular enough to:
 
 - add a new agent by registering a new role/handler pair,
 - change the workflow order without replacing the orchestration engine,
-- preserve the existing `from a2a_research.graph import run_research_sync` import path.
+- use the stable `from a2a_research.workflow import run_research_sync` import path.
 
 ### 3. UI
 
@@ -190,7 +187,6 @@ The Mesop app exposes five sections:
 src/a2a_research/
 ├── agents/          # Agent invoke functions (researcher_invoke, analyst_invoke, verifier_invoke, presenter_invoke)
 ├── a2a/             # In-process A2A contracts and registry-backed server/client helpers
-├── graph/           # Backward-compatible shim for PocketFlow workflow entrypoints
 ├── workflow/        # PocketFlow runtime (builder, actor nodes, coordinator, adapter, policy)
 ├── rag/             # ChromaDB ingestion and semantic retrieval
 ├── models/          # Pydantic domain types (ResearchSession, Claim, AgentResult, WorkflowState, Artifact, Envelope, Policy, …)
@@ -213,21 +209,17 @@ tests/              # Pytest suite (no API key required for unit tests)
 
 ```bash
 # Ingest corpus (already done on first install)
-python -c "from a2a_research.rag import ingest_corpus; print(ingest_corpus())"
+uv run python -c "from a2a_research.rag import ingest_corpus; print(ingest_corpus())"
 
 # Start UI
-mesop src/a2a_research/ui/app.py
+uv run mesop src/a2a_research/ui/app.py
 # Open http://localhost:32123
-
-# Example query: "What is RAG and how does it reduce hallucinations?"
-# Click "Run Research" — watch each agent turn green
-# Review verified claims, sources, and final report
 ```
 
 ### Programmatic Use
 
 ```python
-from a2a_research.graph import run_research_sync
+from a2a_research.workflow import run_research_sync
 from a2a_research.models import AgentRole
 
 session = run_research_sync("What is RAG and how does it reduce hallucinations?")
@@ -244,19 +236,38 @@ for claim in session.get_agent(AgentRole.VERIFIER).claims:
 
 ## Development
 
-```bash
-ruff check src/ tests/      # lint
-ruff format src/ tests/      # format
-mypy src/                    # type check (strict py311)
-pytest                       # run test suite
-```
-
-### Installing Optional Provider Packages
+Use the provided Makefile for common tasks:
 
 ```bash
-pip install langchain-anthropic    # Anthropic models
-pip install langchain-google-genai  # Google models
-pip install langchain-ollama        # Ollama local models
+make install       # Install package with uv
+make test          # Run pytest suite with coverage
+make lint          # Run ruff linter
+make format        # Run ruff formatter
+make typecheck     # Run mypy (strict py311)
+make typecheck-ty  # Run ty type checker
+make check         # Run lint + format check + typecheck + ty
+make mesop         # Start the Mesop UI dev server
+make ingest        # Ingest the RAG corpus into ChromaDB
 ```
 
-If you stay on the default OpenAI-compatible path, `langchain-openai` is already installed through the base project dependencies.
+You can also run tools directly:
+
+```bash
+uv run ruff check src/ tests/     # lint
+uv run ruff format src/ tests/    # format
+uv run mypy src/                  # type check (strict py311)
+uv run ty check src/              # type check with ty
+uv run pytest                     # run test suite
+```
+
+### Pre-commit Hooks
+
+Install pre-commit hooks to catch issues before pushing:
+
+```bash
+pre-commit install
+```
+
+### CI/CD
+
+GitHub Actions runs linting, formatting checks, type checking, and tests on every push and pull request to `main`. See `.github/workflows/ci.yml` for details.

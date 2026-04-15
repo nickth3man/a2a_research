@@ -2,24 +2,13 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from pydantic import Field
 
-from pydantic import BaseModel
-
-
-class PolicyEffect(str, Enum):
-    ALLOW = "allow"
-    DENY = "deny"
-
-
-class WorkflowPolicy(BaseModel):
-    name: str
-    effect: PolicyEffect = PolicyEffect.ALLOW
-    description: str = ""
+from a2a_research.models.policy import WorkflowPolicy
 
 
 class PipelineOrderPolicy(WorkflowPolicy):
-    required_sequence: list[str] = []
+    required_sequence: list[str] = Field(default_factory=list)
 
     def validate_transition(self, from_role: str | None, to_role: str | None) -> bool:
         return True

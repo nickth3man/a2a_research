@@ -1,7 +1,10 @@
+from collections.abc import Callable
+from typing import Any
+
 import mesop as me
 
 from a2a_research.helpers import format_claim_verdict, format_confidence
-from a2a_research.models import AgentRole, AgentStatus, Claim, ResearchSession
+from a2a_research.models import AgentResult, AgentRole, AgentStatus, Claim, ResearchSession
 
 AGENT_LABELS = {
     AgentRole.RESEARCHER: "Researcher",
@@ -39,9 +42,10 @@ def _verdict_bg(verdict: str) -> str:
 
 
 @me.component
-def agent_timeline_card(session: ResearchSession):
-    with me.box(style=me.Style(margin=me.Margin(bottom=16))):
-        with me.box(
+def agent_timeline_card(session: ResearchSession) -> None:
+    with (
+        me.box(style=me.Style(margin=me.Margin(bottom=16))),
+        me.box(
             style=me.Style(
                 background="#fff",
                 border_radius=10,
@@ -54,15 +58,14 @@ def agent_timeline_card(session: ResearchSession):
                 ),
                 padding=me.Padding(top=16, right=16, bottom=16, left=16),
             )
-        ):
-            me.text(
-                "Agent Pipeline", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12))
-            )
-            for role in ALL_ROLES:
-                _render_agent_row(role, session.get_agent(role))
+        ),
+    ):
+        me.text("Agent Pipeline", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12)))
+        for role in ALL_ROLES:
+            _render_agent_row(role, session.get_agent(role))
 
 
-def _render_agent_row(role: AgentRole, result):
+def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
     color = _status_color(result.status)
     label = AGENT_LABELS.get(role, role.value)
     icon_map = {
@@ -107,10 +110,11 @@ def _render_agent_row(role: AgentRole, result):
 
 
 @me.component
-def claims_panel(session: ResearchSession):
+def claims_panel(session: ResearchSession) -> None:
     claims = session.get_agent(AgentRole.VERIFIER).claims
-    with me.box(style=me.Style(margin=me.Margin(bottom=20))):
-        with me.box(
+    with (
+        me.box(style=me.Style(margin=me.Margin(bottom=20))),
+        me.box(
             style=me.Style(
                 background="#fff",
                 border_radius=10,
@@ -123,20 +127,17 @@ def claims_panel(session: ResearchSession):
                 ),
                 padding=me.Padding(top=16, right=16, bottom=16, left=16),
             )
-        ):
-            me.text(
-                "Verified Claims", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12))
-            )
-            if not claims:
-                me.text(
-                    "No verified claims yet — run a query first.", style=me.Style(color="#6b7280")
-                )
-                return
-            for claim in claims:
-                _render_claim(claim)
+        ),
+    ):
+        me.text("Verified Claims", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12)))
+        if not claims:
+            me.text("No verified claims yet — run a query first.", style=me.Style(color="#6b7280"))
+            return
+        for claim in claims:
+            _render_claim(claim)
 
 
-def _render_claim(claim: Claim):
+def _render_claim(claim: Claim) -> None:
     v_color = _verdict_color(claim.verdict.value)
     v_bg = _verdict_bg(claim.verdict.value)
     badge = format_claim_verdict(claim.verdict)
@@ -206,13 +207,14 @@ def _render_claim(claim: Claim):
 
 
 @me.component
-def sources_panel(session: ResearchSession):
+def sources_panel(session: ResearchSession) -> None:
     researcher = session.get_agent(AgentRole.RESEARCHER)
     verifier = session.get_agent(AgentRole.VERIFIER)
     all_citations = list(dict.fromkeys(researcher.citations + verifier.citations))
 
-    with me.box(style=me.Style(margin=me.Margin(bottom=20))):
-        with me.box(
+    with (
+        me.box(style=me.Style(margin=me.Margin(bottom=20))),
+        me.box(
             style=me.Style(
                 background="#fff",
                 border_radius=10,
@@ -225,48 +227,50 @@ def sources_panel(session: ResearchSession):
                 ),
                 padding=me.Padding(top=16, right=16, bottom=16, left=16),
             )
-        ):
-            me.text(
-                "Sources & Citations",
-                type="subtitle-1",
-                style=me.Style(margin=me.Margin(bottom=12)),
-            )
-            if not all_citations:
-                me.text("No sources cited yet.", style=me.Style(color="#6b7280"))
-                return
+        ),
+    ):
+        me.text(
+            "Sources & Citations",
+            type="subtitle-1",
+            style=me.Style(margin=me.Margin(bottom=12)),
+        )
+        if not all_citations:
+            me.text("No sources cited yet.", style=me.Style(color="#6b7280"))
+            return
 
-            for i, src in enumerate(all_citations, 1):
-                src_display = src.replace("_", " ").replace("-", " ").title()
-                with me.box(
+        for i, src in enumerate(all_citations, 1):
+            src_display = src.replace("_", " ").replace("-", " ").title()
+            with me.box(
+                style=me.Style(
+                    display="flex",
+                    align_items="center",
+                    gap=8,
+                    background="#f3f4f6",
+                    border_radius=6,
+                    padding=me.Padding(top=8, right=8, bottom=8, left=8),
+                    margin=me.Margin(bottom=4),
+                )
+            ):
+                me.text(
+                    str(i),
                     style=me.Style(
-                        display="flex",
-                        align_items="center",
-                        gap=8,
-                        background="#f3f4f6",
-                        border_radius=6,
-                        padding=me.Padding(top=8, right=8, bottom=8, left=8),
-                        margin=me.Margin(bottom=4),
-                    )
-                ):
-                    me.text(
-                        str(i),
-                        style=me.Style(
-                            background="#6b7280",
-                            color="#fff",
-                            font_size="11px",
-                            width=20,
-                            height=20,
-                            border_radius=10,
-                            text_align="center",
-                        ),
-                    )
-                    me.text(src_display, style=me.Style(font_size="13px", flex=1))
+                        background="#6b7280",
+                        color="#fff",
+                        font_size="11px",
+                        width=20,
+                        height=20,
+                        border_radius=10,
+                        text_align="center",
+                    ),
+                )
+                me.text(src_display, style=me.Style(font_size="13px", flex=1))
 
 
 @me.component
-def report_panel(session: ResearchSession):
-    with me.box(style=me.Style(margin=me.Margin(bottom=20))):
-        with me.box(
+def report_panel(session: ResearchSession) -> None:
+    with (
+        me.box(style=me.Style(margin=me.Margin(bottom=20))),
+        me.box(
             style=me.Style(
                 background="#fff",
                 border_radius=10,
@@ -279,32 +283,37 @@ def report_panel(session: ResearchSession):
                 ),
                 padding=me.Padding(top=20, right=20, bottom=20, left=20),
             )
-        ):
-            me.text("Final Report", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12)))
-            if not session.final_report:
-                me.text(
-                    "Report not ready — complete the pipeline first.",
-                    style=me.Style(color="#6b7280"),
-                )
-                return
-            me.markdown(
-                session.final_report,
-                style=me.Style(
-                    background="#fafafa",
-                    border=me.Border(
-                        top=me.BorderSide(width=1, color="#e5e7eb"),
-                        right=me.BorderSide(width=1, color="#e5e7eb"),
-                        bottom=me.BorderSide(width=1, color="#e5e7eb"),
-                        left=me.BorderSide(width=1, color="#e5e7eb"),
-                    ),
-                    border_radius=6,
-                    padding=me.Padding(top=16, right=16, bottom=16, left=16),
-                ),
+        ),
+    ):
+        me.text("Final Report", type="subtitle-1", style=me.Style(margin=me.Margin(bottom=12)))
+        if not session.final_report:
+            me.text(
+                "Report not ready — complete the pipeline first.",
+                style=me.Style(color="#6b7280"),
             )
+            return
+        me.markdown(
+            session.final_report,
+            style=me.Style(
+                background="#fafafa",
+                border=me.Border(
+                    top=me.BorderSide(width=1, color="#e5e7eb"),
+                    right=me.BorderSide(width=1, color="#e5e7eb"),
+                    bottom=me.BorderSide(width=1, color="#e5e7eb"),
+                    left=me.BorderSide(width=1, color="#e5e7eb"),
+                ),
+                border_radius=6,
+                padding=me.Padding(top=16, right=16, bottom=16, left=16),
+            ),
+        )
 
 
 @me.component
-def query_input_card(on_submit, on_query_input, query_text: str):
+def query_input_card(
+    on_submit: Callable[[Any], Any],
+    on_query_input: Callable[[Any], Any],
+    query_text: str,
+) -> None:
     with me.box(
         style=me.Style(
             background="#fff",
@@ -343,7 +352,7 @@ def query_input_card(on_submit, on_query_input, query_text: str):
 
 
 @me.component
-def error_banner(error: str):
+def error_banner(error: str) -> None:
     with me.box(
         style=me.Style(
             background="#fef2f2",
@@ -367,7 +376,7 @@ def error_banner(error: str):
 
 
 @me.component
-def loading_card(session: ResearchSession):
+def loading_card(session: ResearchSession) -> None:
     with me.box(
         style=me.Style(
             text_align="center",

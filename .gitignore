@@ -6,24 +6,43 @@ __pycache__/
 dist/
 build/
 *.egg
+*.whl
+pip-wheel-metadata/
+*.manifest
+*.spec
+.Python
 
 # Virtual environments
 .venv/
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
 
 # Environment
 .env
+.env.local
+.env.*.local
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# MyPy / Ruff
+# MyPy / Ruff / Pyright
 .mypy_cache/
 .ruff_cache/
+.pytype/
+.pytest_cache/
+
+# Test / Coverage
+.coverage
+coverage.xml
+*.cover
+.hypothesis/
 
 # ChromaDB local data
 data/chroma/
@@ -31,3 +50,12 @@ data/chroma/
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Local development notes
+*.local.md
+notes/

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..models import ResearchSession, WorkflowState
 from .builder import get_workflow
+
+if TYPE_CHECKING:
+    from ..models import ResearchSession, WorkflowState
 
 
 class SyncWorkflowAdapter:
@@ -14,7 +16,7 @@ class SyncWorkflowAdapter:
 
     def __init__(
         self,
-        flow,
+        flow: Any,
         shared: dict[str, Any],
     ) -> None:
         self._flow = flow
@@ -50,6 +52,6 @@ class SyncWorkflowAdapter:
         await self._flow.run_async(shared)
 
 
-def get_graph():
+def get_graph() -> SyncWorkflowAdapter:
     flow, shared = get_workflow()
     return SyncWorkflowAdapter(flow, shared)

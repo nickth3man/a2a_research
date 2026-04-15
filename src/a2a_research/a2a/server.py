@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from a2a_research.models import A2AMessage, AgentCard, AgentResult, AgentRole, AgentStatus
 
@@ -28,7 +29,7 @@ class A2AServer:
             description=f"A2A server for {agent_role.value}",
         )
 
-    def task_handler(self, message: A2AMessage, session: "ResearchSession") -> AgentResult:
+    def task_handler(self, message: A2AMessage, session: ResearchSession) -> AgentResult:
         if message.recipient != self.role:
             return AgentResult(
                 role=self.role,
@@ -98,7 +99,7 @@ class A2AClient:
     def __init__(self, agent_role: AgentRole) -> None:
         self.role = agent_role
 
-    def send(self, message: A2AMessage, session: "ResearchSession") -> AgentResult:
+    def send(self, message: A2AMessage, session: ResearchSession) -> AgentResult:
         if message.sender != self.role:
             return AgentResult(
                 role=message.recipient,

@@ -15,7 +15,7 @@ from a2a_research.ui.components import (
 
 
 @me.page(path="/", title="A2A Research — Multi-Agent Research System")
-def main_page():
+def main_page() -> None:
     state: AppState = me.state(AppState)
 
     with me.box(
@@ -56,7 +56,7 @@ class AppState:
     error: str | None = None
 
 
-def _render_header():
+def _render_header() -> None:
     with me.box(
         style=me.Style(
             border=me.Border(
@@ -73,7 +73,7 @@ def _render_header():
         )
 
 
-def _render_instructions():
+def _render_instructions() -> None:
     with me.box(
         style=me.Style(
             background="#eff6ff",
@@ -96,7 +96,7 @@ def _render_instructions():
         )
 
 
-def _render_empty_state():
+def _render_empty_state() -> None:
     with me.box(
         style=me.Style(
             text_align="center",
@@ -118,7 +118,7 @@ def _render_empty_state():
         )
 
 
-def _render_results(session: ResearchSession):
+def _render_results(session: ResearchSession) -> None:
     agent_timeline_card(session)
     claims_panel(session)
     sources_panel(session)
@@ -134,12 +134,12 @@ def _has_results(session: ResearchSession) -> bool:
     ) or bool(session.final_report)
 
 
-def _on_query_input(e: me.InputEvent):
+def _on_query_input(e: me.InputEvent) -> None:
     state: AppState = me.state(AppState)
     state.query_text = e.value
 
 
-async def _on_submit(e: me.ClickEvent):
+async def _on_submit(e: me.ClickEvent) -> None:
     state: AppState = me.state(AppState)
     query_text = state.query_text.strip()
 
@@ -152,7 +152,7 @@ async def _on_submit(e: me.ClickEvent):
     state.session = ResearchSession(query=query_text)
 
     try:
-        from a2a_research.graph import run_research_sync
+        from a2a_research.workflow import run_research_sync
 
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, run_research_sync, query_text)

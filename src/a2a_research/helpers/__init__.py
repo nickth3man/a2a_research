@@ -6,8 +6,6 @@ import json
 import re
 from typing import Any, cast
 
-from pocketflow_reference.pocketflow_source import Flow, Node
-
 from a2a_research.models import (
     AgentResult,
     AgentRole,
@@ -16,6 +14,7 @@ from a2a_research.models import (
     ResearchSession,
     Verdict,
 )
+from pocketflow import Flow, Node
 
 
 class _ReportHeaderNode(Node):
@@ -23,7 +22,7 @@ class _ReportHeaderNode(Node):
         return shared["session"]
 
     def exec(self, prep_res: Any) -> Any:
-        session = cast(ResearchSession, prep_res)
+        session = cast("ResearchSession", prep_res)
         return f"# Research Report\n**Query:** {session.query}\n\n---\n\n## Verified Claims\n\n"
 
     def post(self, shared: dict[str, Any], prep_res: Any, exec_res: Any) -> Any:
@@ -37,7 +36,7 @@ class _ClaimsSectionNode(Node):
         return session.get_agent(AgentRole.VERIFIER).claims
 
     def exec(self, prep_res: Any) -> Any:
-        claims = cast(list[Claim], prep_res)
+        claims = cast("list[Claim]", prep_res)
         return format_claims_section(claims)
 
     def post(self, shared: dict[str, Any], prep_res: Any, exec_res: Any) -> Any:
@@ -51,7 +50,7 @@ class _SummaryNode(Node):
         return list(shared.get("claims", []))
 
     def exec(self, prep_res: Any) -> Any:
-        claims = cast(list[Claim], prep_res)
+        claims = cast("list[Claim]", prep_res)
         supported = sum(1 for c in claims if c.verdict == Verdict.SUPPORTED)
         refuted = sum(1 for c in claims if c.verdict == Verdict.REFUTED)
         inconclusive = len(claims) - supported - refuted

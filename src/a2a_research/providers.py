@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from importlib import import_module
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 from a2a_research.settings import settings
 
-if TYPE_CHECKING:
-    from langchain_core.language_models import BaseChatModel
+
+@dataclass
+class ChatResponse:
+    """Simple response wrapper compatible with the existing agent interface."""
+
+    content: str
+
+
+class ChatModel(ABC):
+    """Abstract chat model providing a uniform invoke interface."""
+
+    @abstractmethod
+    def invoke(self, messages: list[dict[str, str]]) -> ChatResponse: ...
 
 
 @dataclass
@@ -23,7 +34,7 @@ class ModelCapabilities:
 
 class LLMProvider(ABC):
     @abstractmethod
-    def get_model(self) -> BaseChatModel: ...
+    def get_model(self) -> ChatModel: ...
 
     @abstractmethod
     def get_capabilities(self) -> ModelCapabilities: ...
@@ -48,6 +59,30 @@ def _load_attr(module_name: str, attr_name: str, install_hint: str) -> Any:
         raise ImportError(msg) from exc
 
 
+class _OpenAIChatModel(ChatModel):
+    def __init__(
+        self,
+        model: str,
+        api_key: str,
+        base_url: str | None = None,
+    ) -> None:
+        openai = _load_attr("openai", "OpenAI", "pip install openai")
+        kwargs: dict[str, Any] = {"api_key": api_key}
+        if base_url:
+            kwargs["base_url"] = base_url
+        self._client = openai(**kwargs)
+        self._model = model
+
+    def invoke(self, messages: list[dict[str, str]]) -> ChatResponse:
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            temperature=0.3,
+        )
+        content = response.choices[0].message.content or ""
+        return ChatResponse(content=content)
+
+
 class OpenAIProvider(LLMProvider):
     def __init__(
         self,
@@ -59,24 +94,44 @@ class OpenAIProvider(LLMProvider):
         self.api_key = api_key or settings.llm.api_key
         self.base_url = base_url or settings.llm.base_url
 
-    def get_model(self) -> BaseChatModel:
-        chat_open_ai = _load_attr(
-            "langchain_openai",
-            "ChatOpenAI",
-            "pip install langchain-openai",
+    def get_model(self) -> ChatModel:
+        return _OpenAIChatModel(
+            model=self.model,
+            api_key=self.api_key,
+            base_url=self.base_url or None,
         )
-
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "api_key": self.api_key,
-            "temperature": 0.3,
-        }
-        if self.base_url:
-            kwargs["base_url"] = self.base_url
-        return cast("BaseChatModel", chat_open_ai(**kwargs))
 
     def get_capabilities(self) -> ModelCapabilities:
         return ModelCapabilities()
+
+
+class _AnthropicChatModel(ChatModel):
+    def __init__(self, model: str, api_key: str) -> None:
+        anthropic = _load_attr("anthropic", "Anthropic", "pip install anthropic")
+        self._client = anthropic(api_key=api_key)
+        self._model = model
+
+    def invoke(self, messages: list[dict[str, str]]) -> ChatResponse:
+        system_msg = ""
+        chat_messages: list[dict[str, str]] = []
+        for msg in messages:
+            if msg["role"] == "system":
+                system_msg = msg["content"]
+            else:
+                chat_messages.append(msg)
+
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": chat_messages,
+            "max_tokens": 4096,
+            "temperature": 0.3,
+        }
+        if system_msg:
+            kwargs["system"] = system_msg
+
+        response = self._client.messages.create(**kwargs)
+        text = response.content[0].text if response.content else ""
+        return ChatResponse(content=text)
 
 
 class AnthropicProvider(LLMProvider):
@@ -84,25 +139,29 @@ class AnthropicProvider(LLMProvider):
         self.model = model or settings.llm.model
         self.api_key = api_key or settings.llm.api_key
 
-    def get_model(self) -> BaseChatModel:
-        chat_anthropic = _load_attr(
-            "langchain_anthropic",
-            "ChatAnthropic",
-            "pip install langchain-anthropic",
-        )
-
-        return cast(
-            "BaseChatModel",
-            chat_anthropic(
-                model=self.model,
-                api_key=self.api_key,
-                temperature=0.3,
-                max_tokens=4096,
-            ),
-        )
+    def get_model(self) -> ChatModel:
+        return _AnthropicChatModel(model=self.model, api_key=self.api_key)
 
     def get_capabilities(self) -> ModelCapabilities:
         return ModelCapabilities()
+
+
+class _GoogleChatModel(ChatModel):
+    def __init__(self, model: str, api_key: str) -> None:
+        genai = _load_attr("google.genai", "Client", "pip install google-genai")
+        self._client = genai(api_key=api_key)
+        self._model = model
+
+    def invoke(self, messages: list[dict[str, str]]) -> ChatResponse:
+        contents = []
+        for msg in messages:
+            contents.append({"role": msg["role"], "parts": [{"text": msg["content"]}]})
+
+        response = self._client.models.generate_content(
+            model=self._model,
+            contents=contents,
+        )
+        return ChatResponse(content=response.text or "")
 
 
 class GoogleProvider(LLMProvider):
@@ -110,25 +169,26 @@ class GoogleProvider(LLMProvider):
         self.model = model or settings.llm.model
         self.api_key = api_key or settings.llm.api_key
 
-    def get_model(self) -> BaseChatModel:
-        chat_google = _load_attr(
-            "langchain_google_genai",
-            "ChatGoogleGenerativeAI",
-            "pip install langchain-google-genai",
-        )
-
-        return cast(
-            "BaseChatModel",
-            chat_google(
-                model=self.model,
-                api_key=self.api_key,
-                temperature=0.3,
-                max_output_tokens=4096,
-            ),
-        )
+    def get_model(self) -> ChatModel:
+        return _GoogleChatModel(model=self.model, api_key=self.api_key)
 
     def get_capabilities(self) -> ModelCapabilities:
         return ModelCapabilities(supports_function_calling=False)
+
+
+class _OllamaChatModel(ChatModel):
+    def __init__(self, model: str, base_url: str) -> None:
+        self._ollama = _load_attr("ollama", "chat", "pip install ollama")
+        self._model = model
+        self._base_url = base_url
+
+    def invoke(self, messages: list[dict[str, str]]) -> ChatResponse:
+        response = self._ollama(
+            model=self._model,
+            messages=messages,
+            options={"temperature": 0.3},
+        )
+        return ChatResponse(content=response["message"]["content"])
 
 
 class OllamaProvider(LLMProvider):
@@ -136,17 +196,8 @@ class OllamaProvider(LLMProvider):
         self.model = model or settings.llm.model
         self.base_url = base_url or (settings.llm.base_url or "http://localhost:11434")
 
-    def get_model(self) -> BaseChatModel:
-        chat_ollama = _load_attr(
-            "langchain_ollama",
-            "ChatOllama",
-            "pip install langchain-ollama",
-        )
-
-        return cast(
-            "BaseChatModel",
-            chat_ollama(model=self.model, base_url=self.base_url, temperature=0.3),
-        )
+    def get_model(self) -> ChatModel:
+        return _OllamaChatModel(model=self.model, base_url=self.base_url)
 
     def get_capabilities(self) -> ModelCapabilities:
         return ModelCapabilities(
@@ -157,12 +208,13 @@ class OllamaProvider(LLMProvider):
 
 class EmbeddingProvider(ABC):
     @abstractmethod
-    def get_embeddings(self) -> Any: ...
+    def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
+
+    @abstractmethod
+    def embed_query(self, text: str) -> list[float]: ...
 
 
 class OpenAIEmbeddings(EmbeddingProvider):
-    _instance: Any = field(default=None)
-
     def __init__(
         self,
         model: str | None = None,
@@ -172,42 +224,41 @@ class OpenAIEmbeddings(EmbeddingProvider):
         self.model = model or settings.embedding.model
         self.api_key = api_key or settings.embedding.api_key or settings.llm.api_key
         base = base_url or settings.embedding.base_url or settings.llm.base_url
-        self._base = base
-        self._instance: Any = None
+        self._base_url = base
 
-    def get_embeddings(self) -> Any:
-        if self._instance is None:
-            openai_embeddings_cls = _load_attr(
-                "langchain_openai",
-                "OpenAIEmbeddings",
-                "pip install langchain-openai",
-            )
+        openai = _load_attr("openai", "OpenAI", "pip install openai")
+        kwargs: dict[str, Any] = {"api_key": self.api_key}
+        if self._base_url:
+            kwargs["base_url"] = self._base_url
+        self._client = openai(**kwargs)
 
-            self._instance = openai_embeddings_cls(
-                model=self.model,
-                api_key=self.api_key,
-                base_url=self._base if self._base else None,
-            )
-        return self._instance
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        response = self._client.embeddings.create(input=texts, model=self.model)
+        return [item.embedding for item in response.data]
+
+    def embed_query(self, text: str) -> list[float]:
+        response = self._client.embeddings.create(input=[text], model=self.model)
+        return cast("list[float]", response.data[0].embedding)
 
 
 class OllamaEmbeddings(EmbeddingProvider):
-    _instance: Any = field(default=None)
+    def __init__(
+        self,
+        model: str | None = None,
+        base_url: str | None = None,
+    ):
+        self.model = model or settings.embedding.model
+        self.base_url = base_url or settings.embedding.base_url or "http://localhost:11434"
+        self._embeddings = _load_attr("ollama", "embeddings", "pip install ollama")
 
-    def __init__(self, base_url: str | None = None):
-        self.base = base_url or settings.embedding.base_url or "http://localhost:11434"
-        self._instance: Any = None
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return [
+            cast("list[float]", self._embeddings(model=self.model, prompt=text)["embedding"])
+            for text in texts
+        ]
 
-    def get_embeddings(self) -> Any:
-        if self._instance is None:
-            ollama_embeddings_cls = _load_attr(
-                "langchain_ollama",
-                "OllamaEmbeddings",
-                "pip install langchain-ollama",
-            )
-
-            self._instance = ollama_embeddings_cls(base_url=self.base)
-        return self._instance
+    def embed_query(self, text: str) -> list[float]:
+        return cast("list[float]", self._embeddings(model=self.model, prompt=text)["embedding"])
 
 
 _PROVIDER_MAP: dict[str, type[LLMProvider]] = {
@@ -245,15 +296,15 @@ _llm_provider: LLMProvider | None = None
 _embedding_provider: EmbeddingProvider | None = None
 
 
-def get_llm() -> BaseChatModel:
+def get_llm() -> ChatModel:
     global _llm_provider
     if _llm_provider is None:
         _llm_provider = get_llm_provider()
     return _llm_provider.get_model()
 
 
-def get_embedder() -> Any:
+def get_embedder() -> EmbeddingProvider:
     global _embedding_provider
     if _embedding_provider is None:
         _embedding_provider = get_embedding_provider()
-    return _embedding_provider.get_embeddings()
+    return _embedding_provider

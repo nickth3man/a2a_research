@@ -9,13 +9,13 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from enum import Enum
-from typing import Any, Generic, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
 
-class ArtifactKind(str, Enum):
+class ArtifactKind(StrEnum):
     """Discriminator for artifact concrete types."""
 
     TEXT = "text"

@@ -1,10 +1,9 @@
-"""Focused workflow tests for graph orchestration and presenter contract handling."""
+"""Focused workflow tests for orchestration and presenter contract handling."""
 
 from __future__ import annotations
 
 from unittest.mock import patch
 
-from a2a_research.graph import get_graph, run_research_sync
 from a2a_research.models import (
     AgentRole,
     DocumentChunk,
@@ -12,6 +11,7 @@ from a2a_research.models import (
     RetrievedChunk,
     WorkflowState,
 )
+from a2a_research.workflow import get_graph, run_research_sync
 
 
 def _fake_chunks() -> list[RetrievedChunk]:
@@ -53,7 +53,7 @@ def test_run_research_sync_returns_markdown_report_from_presenter_json() -> None
     assert session.get_agent(AgentRole.VERIFIER).claims[0].sources == ["rag_accuracy"]
 
 
-def test_graph_state_records_a2a_message_handoffs() -> None:
+def test_workflow_state_records_a2a_message_handoffs() -> None:
     responses = [
         '{"research_summary": "RAG uses retrieval."}',
         '{"atomic_claims": [{"id": "c1", "text": "RAG uses retrieval."}]}',

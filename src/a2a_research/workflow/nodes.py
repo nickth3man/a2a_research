@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from pocketflow_reference.pocketflow_source import AsyncNode
+from pocketflow import AsyncNode
 
 from ..models import (
     A2AMessage,
@@ -13,9 +13,6 @@ from ..models import (
     AgentStatus,
     ResearchSession,
 )
-
-if TYPE_CHECKING:
-    from a2a_research.a2a.server import A2AServer
 
 
 class ActorNode(AsyncNode):

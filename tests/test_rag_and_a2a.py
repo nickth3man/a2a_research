@@ -105,16 +105,16 @@ class TestA2AClient:
 class TestRAGWithMocks:
     def test_ingest_with_mocked_embeddings(self):
         mock_embedder = MagicMock()
-        # Corpus has 4 files producing ~14 chunks; match that count
-        mock_embedder.embed_documents.return_value = [[0.1] * 1536] * 14
+        # Corpus has 4 files producing ~15 chunks; match that count
+        mock_embedder.embed_documents.return_value = [[0.1] * 1536] * 15
 
         with patch("a2a_research.providers.get_embedder", return_value=mock_embedder):
             from a2a_research.rag import _get_collection, ingest_corpus
 
             count = ingest_corpus(force=True)
-            assert count == 14
+            assert count == 15
             coll = _get_collection()
-            assert coll.count() == 14
+            assert coll.count() == 15
 
     def test_retrieve_returns_chunks_with_mock(self):
         mock_embedder = MagicMock()

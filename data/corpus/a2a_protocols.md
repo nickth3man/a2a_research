@@ -16,4 +16,4 @@ The three primary patterns are:
 2. **Pipeline**: Agents form a sequential chain where each agent's output feeds the next.
 3. **Peer-to-peer**: Agents negotiate directly without a central coordinator.
 
-For research and claim verification tasks, the orchestrator-worker pattern with LangGraph state management provides the best balance of control and flexibility. Each agent operates as a LangGraph node with typed state channels for inter-agent communication.
+For research and claim verification tasks, the orchestrator-worker pattern with PocketFlow state management provides the best balance of control and flexibility. Each agent operates as a PocketFlow node with typed state passed through a shared store for inter-agent communication.

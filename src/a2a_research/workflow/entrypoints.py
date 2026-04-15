@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
+
 from ..models import AgentRole, ResearchSession
 from .builder import get_workflow
 from .coordinator import run_coordinator
@@ -29,6 +31,13 @@ def run_workflow_sync(
     return asyncio.run(run_workflow(query, roles))
 
 
+async def run_workflow_async(
+    query: str,
+    roles: list[AgentRole] | None = None,
+) -> ResearchSession:
+    return await run_workflow(query, roles)
+
+
 async def run_workflow_from_session(
     session: ResearchSession,
     roles: list[AgentRole] | None = None,
@@ -36,7 +45,7 @@ async def run_workflow_from_session(
     return await run_coordinator(session)
 
 
-def get_workflow_for_roles(roles: list[AgentRole]):
+def get_workflow_for_roles(roles: list[AgentRole]) -> tuple[Any, dict[str, Any]]:
     from .builder import build_workflow
 
     return build_workflow(roles)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pocketflow_reference.pocketflow_source import AsyncFlow
+from pocketflow import AsyncFlow
 
 from ..models import AgentRole, ResearchSession
 from .nodes import create_actor_node

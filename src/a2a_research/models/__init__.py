@@ -4,7 +4,7 @@ Single source of truth for all domain types used by:
 - models/     (shared types)
 - agents/     (agent I/O schemas)
 - rag/        (chunk & retrieval types)
-- graph/      (LangGraph state)
+- workflow/   (PocketFlow runtime state)
 - a2a/        (in-process message contracts)
 - ui/         (Mesop frontend)
 """
@@ -12,35 +12,61 @@ Single source of truth for all domain types used by:
 from __future__ import annotations
 
 import uuid
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from a2a_research.models.artifact import (
+    Artifact as Artifact,
+)
+from a2a_research.models.artifact import (
+    ArtifactKind as ArtifactKind,
+)
+from a2a_research.models.artifact import (
+    DataArtifact as DataArtifact,
+)
+from a2a_research.models.artifact import (
+    StreamArtifact as StreamArtifact,
+)
+from a2a_research.models.artifact import (
+    TextArtifact as TextArtifact,
+)
+from a2a_research.models.artifact import (
+    wrap_in_artifact as wrap_in_artifact,
+)
+from a2a_research.models.envelope import A2AEnvelope as A2AEnvelope
+from a2a_research.models.policy import (
+    PolicyEffect as PolicyEffect,
+)
+from a2a_research.models.policy import (
+    WorkflowPolicy as WorkflowPolicy,
+)
+
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
 
-class Verdict(str, Enum):
+class Verdict(StrEnum):
     SUPPORTED = "SUPPORTED"
     REFUTED = "REFUTED"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 
 
-class AgentRole(str, Enum):
+class AgentRole(StrEnum):
     RESEARCHER = "researcher"
     ANALYST = "analyst"
     VERIFIER = "verifier"
     PRESENTER = "presenter"
 
 
-class AgentStatus(str, Enum):
+class AgentStatus(StrEnum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     SUBMITTED = "submitted"
     WORKING = "working"
     COMPLETED = "completed"
@@ -141,19 +167,6 @@ AGENT_CARDS: dict[AgentRole, AgentCard] = {
 def get_agent_card(role: AgentRole) -> AgentCard:
     return AGENT_CARDS[role]
 
-
-# ─── Artifact / Envelope / Policy ─────────────────────────────────────────
-
-from a2a_research.models.artifact import (
-    Artifact,
-    ArtifactKind,
-    DataArtifact,
-    StreamArtifact,
-    TextArtifact,
-    wrap_in_artifact,
-)
-from a2a_research.models.envelope import A2AEnvelope
-from a2a_research.models.policy import PolicyEffect, WorkflowPolicy
 
 # ─── RAG Domain Objects ───────────────────────────────────────────────────────
 

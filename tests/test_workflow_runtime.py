@@ -15,12 +15,11 @@ from a2a_research.workflow import (
     ActorNode,
     create_actor_node,
     create_pocketflow_workflow,
+    get_graph,
     get_workflow,
     run_research_sync,
     run_workflow,
-    run_workflow_async,
 )
-from a2a_research.graph import get_graph
 
 
 def _fake_chunks() -> list[RetrievedChunk]:
@@ -110,7 +109,7 @@ class TestWorkflowRun:
         }
 
 
-class TestGraphBackwardCompat:
+class TestWorkflowAdapter:
     def test_get_graph_returns_invokeable_adapter(self):
         adapter = get_graph()
         assert hasattr(adapter, "invoke")
@@ -161,6 +160,6 @@ class TestActorNode:
         shared = {}
         try:
             await node.prep_async(shared)
-            assert False, "Expected ValueError"
+            raise AssertionError("Expected ValueError")
         except ValueError as e:
             assert "session" in str(e)

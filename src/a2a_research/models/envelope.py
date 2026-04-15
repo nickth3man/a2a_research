@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from a2a_research.models import A2AMessage
+if TYPE_CHECKING:
+    from a2a_research.models import A2AMessage
 
 
 class A2AEnvelope(BaseModel):

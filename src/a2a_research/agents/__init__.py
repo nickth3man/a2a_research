@@ -9,7 +9,26 @@ Each agent:
 from __future__ import annotations
 
 import json
+import re
 
+from a2a_research.agents.registry import (
+    AgentRegistry as AgentRegistry,
+)
+from a2a_research.agents.registry import (
+    AgentSpec as AgentSpec,
+)
+from a2a_research.agents.registry import (
+    get_agent_handler as get_agent_handler,
+)
+from a2a_research.agents.registry import (
+    get_agent_spec as get_agent_spec,
+)
+from a2a_research.agents.registry import (
+    get_registry as get_registry,
+)
+from a2a_research.agents.registry import (
+    register_agent as register_agent,
+)
 from a2a_research.helpers import (
     aggregate_citations,
     build_markdown_report,
@@ -118,8 +137,6 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
 
 
 def _parse_claims_from_analyst(raw: str) -> list[Claim]:
-    import re
-
     claims = extract_claims_from_llm_output(raw)
     if claims:
         return claims
@@ -195,8 +212,6 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
 
 
 def _parse_verified_claims(raw: str, fallback_claims: list[Claim]) -> list[Claim]:
-    import re
-
     try:
         data = json.loads(raw) if raw.strip().startswith("{") else {}
     except Exception:
@@ -333,15 +348,6 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
         citations=aggregate_citations(session.agent_results),
     )
 
-
-from a2a_research.agents.registry import (
-    AgentRegistry,
-    AgentSpec,
-    get_agent_handler,
-    get_agent_spec,
-    get_registry,
-    register_agent,
-)
 
 __all__ = [
     "AgentRegistry",
