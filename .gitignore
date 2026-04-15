@@ -20,10 +20,16 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment
+# uv
+uv.lock
+
+# Environment / secrets
 .env
 .env.local
 .env.*.local
+*.pem
+*.key
+*.p12
 
 # IDE
 .vscode/
@@ -31,16 +37,21 @@ venv.bak/
 *.swp
 *.swo
 *~
+.cursor/
 
-# MyPy / Ruff / Pyright
+# MyPy / Ruff / Pyright / ty
 .mypy_cache/
 .ruff_cache/
 .pytype/
 .pytest_cache/
+pyrightconfig.json
 
 # Test / Coverage
 .coverage
+.coverage.*
 coverage.xml
+coverage.json
+htmlcov/
 *.cover
 .hypothesis/
 
@@ -49,13 +60,25 @@ data/chroma/
 
 # OS
 .DS_Store
+.DS_Store?
 Thumbs.db
 desktop.ini
+ehthumbs.db
 
 # Logs
 *.log
 logs/
 
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
 # Local development notes
 *.local.md
 notes/
+
+# Misc artefacts
+*.tmp
+*.bak
+*.orig
+*.rej
