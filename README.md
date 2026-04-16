@@ -30,8 +30,8 @@ Researcher ──► Analyst ──► Verifier ──► Presenter
 ## Quick Start
 
 ```bash
-# 1. Install dependencies with uv
-uv pip install -e .
+# 1. Install dependencies with uv (use make dev to also activate pre-commit hooks)
+uv sync --all-groups
 
 # 2. Configure credentials
 # macOS/Linux: cp .env.example .env
@@ -244,8 +244,10 @@ print(session.error)
 Use the provided Makefile for common tasks:
 
 ```bash
-make install       # Install package with uv
+make install       # Install package + all dependency groups with uv
+make dev           # Full dev setup: install + activate pre-commit hooks
 make test          # Run pytest suite with coverage
+make watch         # Run pytest in watch mode (TDD)
 make lint          # Run ruff linter
 make format        # Run ruff formatter
 make typecheck     # Run mypy (strict py311)

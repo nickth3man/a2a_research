@@ -6,8 +6,44 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  lint-and-test:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install lint dependencies
+        run: uv sync --group lint
+
+      - name: Lint with Ruff
+        run: uv run ruff check src/ tests/
+
+      - name: Check formatting with Ruff
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check with mypy
+        run: uv run mypy src/
+
+      - name: Type check with ty
+        run: uv run ty check src/
+
+      - name: Verify lockfile is up to date
+        run: uv lock --check
+
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -25,20 +61,8 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv pip install -e .
-
-      - name: Lint with Ruff
-        run: uv run ruff check src/ tests/
-
-      - name: Check formatting with Ruff
-        run: uv run ruff format --check src/ tests/
-
-      - name: Type check with mypy
-        run: uv run mypy src/
-
-      - name: Type check with ty
-        run: uv run ty check src/
+      - name: Install test dependencies
+        run: uv sync --group test
 
       - name: Run tests
         run: uv run pytest --cov-report=xml
@@ -48,5 +72,6 @@ jobs:
         uses: codecov/codecov-action@v4
         with:
           files: ./coverage.xml
-          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
           verbose: true

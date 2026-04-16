@@ -5,57 +5,79 @@ Thank you for your interest in contributing! This document outlines the developm
 ## Development Setup
 
 1. **Clone the repository**
-2. **Create a virtual environment** (recommended)
-3. **Install in development mode**:
+2. **Install [uv](https://docs.astral.sh/uv/getting-started/installation/)** (the project's package manager)
+3. **Run the full dev setup** (installs the package + all dev dependencies + pre-commit hooks):
    ```bash
-   make install
-   # or
-   pip install -e ".[dev]"
+   make dev
    ```
+   This runs `uv sync --all-groups` to install runtime + `test` + `lint` dependency groups, then activates pre-commit hooks.
 4. **Copy the environment template**:
    ```bash
    cp .env.example .env
    # Edit .env and set your API keys
    ```
 
+### Installing specific dependency groups
+
+The project uses [PEP 735 dependency groups](https://peps.python.org/pep-0735/) to keep runtime and dev dependencies separate:
+
+| Group | Contents | Install command |
+|-------|----------|-----------------|
+| _(runtime)_ | Core package deps | `uv sync` |
+| `test` | pytest, hypothesis, coverage | `uv sync --group test` |
+| `lint` | ruff, mypy, ty, pre-commit | `uv sync --group lint` |
+| `dev` | all of the above | `uv sync --all-groups` |
+
 ## Code Quality
 
 We use the following tools to maintain code quality:
 
 - **Ruff** — linting and formatting (`make lint`, `make format`)
-- **mypy** — static type checking (`make typecheck`)
+- **mypy** — static type checking in strict mode (`make typecheck`)
+- **ty** — additional type checking (`make typecheck-ty`)
 - **pytest** — testing framework (`make test`)
+
+Run all checks at once:
+
+```bash
+make check
+```
 
 ### Pre-commit Hooks
 
-We recommend installing pre-commit hooks to catch issues before pushing:
+Pre-commit hooks are installed automatically by `make dev`. To install or reinstall them manually:
 
 ```bash
-pip install pre-commit
-pre-commit install
+uv run pre-commit install
 ```
 
-This will run linting, formatting, and basic checks on every commit.
+Hooks run ruff (lint + format), mypy, and ty on every commit.
 
 ## Running Tests
 
-All tests should pass without requiring an API key (we mock LLM calls in unit tests):
+All tests pass without requiring an API key (LLM calls are mocked):
 
 ```bash
-pytest
+make test
 ```
 
-For coverage reporting:
+For TDD with automatic re-runs on file changes:
 
 ```bash
-pytest --cov=src/a2a_research
+make watch
+```
+
+For coverage reporting only:
+
+```bash
+uv run pytest --cov=src/a2a_research
 ```
 
 ## Project Conventions
 
 - **Python 3.11+** is required
 - **Type annotations** are required for all public functions
-- **mypy strict mode** is enforced
+- **mypy strict mode** is enforced (see `mypy.ini`)
 - **Docstrings** should be concise; module-level docstrings are fine, but avoid redundant inline comments
 - Follow the existing **feature-based structure** under `src/a2a_research/`
 
@@ -75,7 +97,7 @@ pytest --cov=src/a2a_research
 - **`ui/`** — Mesop web application
 - **`models/`** — Shared Pydantic domain types
 
-If you add a new agent, you must:
+If you add a new agent, you must register it in **four** places:
 1. Register its handler in `a2a/__init__.py`
 2. Add its role to `models/__init__.py` (if new)
 3. Add prompts to `prompts/__init__.py`

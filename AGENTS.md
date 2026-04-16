@@ -9,8 +9,11 @@ High-signal guidance for working in this repo. If a fact is obvious from filenam
 Use `uv` for everything. The project is managed with `pyproject.toml` + `uv.lock`.
 
 ```bash
-# Install
-uv pip install -e .
+# Full dev setup (install + pre-commit hooks)
+make dev
+
+# Or install only (no hooks):
+uv sync --all-groups
 
 # Verification pipeline (run these in order)
 make check        # lint + format-check + mypy + ty
@@ -32,7 +35,6 @@ uv run pytest
 ## Source layout & entrypoints
 
 - Package root: `src/a2a_research/`
-- **Ignore the stale nested directory `src/a2a_research/src/`** — it is not part of the build and should not be edited.
 - Main modules:
   - `workflow/` — PocketFlow runtime (`run_research_sync` is the stable public entrypoint)
   - `a2a/` — In-process A2A registry, server, and client facades
@@ -72,6 +74,12 @@ If you add an agent role, you must register it in **four** places:
 - UI tests rely on fixtures in `tests/conftest.py` that stub Mesop’s component runtime.
 - Run a single test file: `uv run pytest tests/test_workflow.py`
 - Run a single test: `uv run pytest tests/test_workflow.py::test_name -v`
+
+---
+
+## Debugging
+
+When investigating runtime errors or unexpected agent behaviour, read `/logs` first — it contains the most recent application output and is the fastest way to locate the failing component before diving into source.
 
 ---
 

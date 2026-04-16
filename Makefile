@@ -1,9 +1,11 @@
-.PHONY: help install test lint format typecheck typecheck-ty clean mesop ingest check
+.PHONY: help install dev test watch lint format typecheck typecheck-ty clean mesop ingest check
 
 help:
 	@echo "Available targets:"
 	@echo "  install      - Install package with uv"
+	@echo "  dev          - Full dev setup: install package + activate pre-commit hooks"
 	@echo "  test         - Run pytest suite with coverage"
+	@echo "  watch        - Run pytest in watch mode (re-runs on file changes)"
 	@echo "  lint         - Run ruff linter"
 	@echo "  format       - Run ruff formatter"
 	@echo "  typecheck    - Run mypy type checker"
@@ -14,10 +16,17 @@ help:
 	@echo "  ingest       - Ingest the RAG corpus into ChromaDB"
 
 install:
-	uv pip install -e .
+	uv sync --all-groups
+
+dev: install
+	uv run pre-commit install
+	@echo "Dev environment ready. Run 'make test' to verify."
 
 test:
 	uv run pytest
+
+watch:
+	uv run pytest --tb=short -q --no-header -p no:warnings -f
 
 lint:
 	uv run ruff check src/ tests/
