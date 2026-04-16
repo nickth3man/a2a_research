@@ -3,7 +3,8 @@
 import mesop as me
 
 from a2a_research.helpers import format_claim_verdict, format_confidence
-from a2a_research.models import AgentRole, Claim, ResearchSession
+from a2a_research.models import Claim, ResearchSession
+from a2a_research.ui.data_access import get_verified_claims
 from a2a_research.ui.primitives import card_box, verdict_badge_text
 from a2a_research.ui.tokens import (
     BORDER_WIDTH,
@@ -21,8 +22,9 @@ from a2a_research.ui.tokens import (
 
 
 @me.component
-def claims_panel(session: ResearchSession) -> None:
-    claims = session.get_agent(AgentRole.VERIFIER).claims
+def PanelClaims(session: ResearchSession) -> None:  # noqa: N802
+    """Display verified claims with verdict badges and evidence."""
+    claims = get_verified_claims(session)
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_MD):
         me.text("Verified Claims", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
         if not claims:

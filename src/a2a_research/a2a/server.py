@@ -100,6 +100,11 @@ def get_a2a_handler(role: AgentRole) -> AgentHandler | None:
     return server.handler if server else None
 
 
+def reset_server_registry() -> None:
+    global _SERVER_REGISTRY
+    _SERVER_REGISTRY = None
+
+
 class A2AClient:
     def __init__(self, agent_role: AgentRole) -> None:
         self.role = agent_role

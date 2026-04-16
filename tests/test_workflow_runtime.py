@@ -111,6 +111,15 @@ class TestWorkflowRun:
             AgentRole.PRESENTER,
         }
 
+    async def test_run_workflow_reuses_researcher_retrieval_for_verifier(self):
+        with (
+            patch("a2a_research.agents._call_llm", side_effect=_responses()),
+            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()) as retrieve_mock,
+        ):
+            session = await run_workflow("What is RAG?")
+        assert session.retrieved_chunks
+        assert retrieve_mock.call_count == 1
+
 
 class TestWorkflowAdapter:
     def test_get_graph_returns_invokeable_adapter(self):

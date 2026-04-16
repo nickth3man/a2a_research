@@ -17,3 +17,11 @@ def has_results(session: ResearchSession) -> bool:
         r.status in (AgentStatus.COMPLETED, AgentStatus.FAILED)
         for r in session.agent_results.values()
     ) or bool(session.final_report)
+
+
+def has_progress(session: ResearchSession) -> bool:
+    return bool(session.agent_results)
+
+
+def get_session_error(session: ResearchSession) -> str | None:
+    return session.error

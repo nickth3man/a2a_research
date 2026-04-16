@@ -1,4 +1,4 @@
-"""Extra entrypoint coverage (exceptions and coordinator wrapper)."""
+"""Extra entrypoint coverage (exceptions and role-aware session wrapper)."""
 
 from __future__ import annotations
 
@@ -26,18 +26,22 @@ async def test_run_workflow_reraises_after_flow_failure() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_workflow_from_session_delegates() -> None:
+async def test_run_workflow_from_session_uses_role_aware_flow() -> None:
     out = ResearchSession(query="done")
+    flow = MagicMock()
+    flow.run_async = AsyncMock(
+        side_effect=lambda shared: shared.__setitem__("session", out)
+    )
     with patch(
-        "a2a_research.workflow.entrypoints.run_coordinator",
-        new_callable=AsyncMock,
-        return_value=out,
-    ) as rc:
+        "a2a_research.workflow.entrypoints.get_workflow_for_roles",
+        return_value=(flow, {}),
+    ) as gw:
         from a2a_research.workflow.entrypoints import run_workflow_from_session
 
-        s = ResearchSession(query="start")
-        result = await run_workflow_from_session(s)
-    rc.assert_awaited_once_with(s)
+        s = ResearchSession(query="start", roles=[AgentRole.RESEARCHER])
+        result = await run_workflow_from_session(s, [AgentRole.RESEARCHER])
+    gw.assert_called_once_with([AgentRole.RESEARCHER])
+    flow.run_async.assert_awaited_once()
     assert result is out
 
 

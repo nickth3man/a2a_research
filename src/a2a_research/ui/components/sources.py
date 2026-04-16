@@ -2,7 +2,9 @@
 
 import mesop as me
 
-from a2a_research.models import AgentRole, ResearchSession
+from a2a_research.models import ResearchSession
+from a2a_research.ui.data_access import get_all_citations
+from a2a_research.ui.formatting import format_source_display
 from a2a_research.ui.primitives import card_box
 from a2a_research.ui.tokens import (
     FONT_SIZE_TINY,
@@ -14,10 +16,9 @@ from a2a_research.ui.tokens import (
 
 
 @me.component
-def sources_panel(session: ResearchSession) -> None:
-    researcher = session.get_agent(AgentRole.RESEARCHER)
-    verifier = session.get_agent(AgentRole.VERIFIER)
-    all_citations = list(dict.fromkeys(researcher.citations + verifier.citations))
+def PanelSources(session: ResearchSession) -> None:  # noqa: N802
+    """Display aggregated sources and citations from all agents."""
+    all_citations = get_all_citations(session)
 
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_MD):
         me.text(
@@ -30,7 +31,7 @@ def sources_panel(session: ResearchSession) -> None:
             return
 
         for i, src in enumerate(all_citations, 1):
-            src_display = src.replace("_", " ").replace("-", " ").title()
+            src_display = format_source_display(src)
             with me.box(
                 style=me.Style(
                     display="flex",

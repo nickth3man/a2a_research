@@ -3,78 +3,43 @@
 import mesop as me
 
 from a2a_research.ui.tokens import (
-    BORDER_WIDTH,
-    CARD_RADIUS,
-    EMPTY_STATE_BG,
-    EMPTY_STATE_BORDER,
+    EMPTY_STATE_STYLE,
     FONT_SIZE_BODY,
     FONT_SIZE_SUBTITLE,
-    HEADER_BORDER_COLOR,
-    HEADER_BORDER_WIDTH,
-    INSTRUCTIONS_BG,
-    INSTRUCTIONS_BORDER,
-    SECTION_MARGIN_BOTTOM_MD,
+    HEADER_STYLE,
+    INSTRUCTIONS_STYLE,
     TEXT_MUTED,
 )
 
 
-def render_header() -> None:
-    with me.box(
-        style=me.Style(
-            border=me.Border(
-                bottom=me.BorderSide(width=HEADER_BORDER_WIDTH, color=HEADER_BORDER_COLOR),
-            ),
-            padding=me.Padding(bottom=16),
-            margin=me.Margin(bottom=24),
-        )
-    ):
+@me.component
+def PageHeader() -> None:  # noqa: N802
+    """Render the page header with title and subtitle."""
+    with me.box(style=HEADER_STYLE):
         me.text("A2A Research System", type="headline-4")
         me.text(
-            "Local-first 4-agent pipeline: Researcher → Analyst → Verifier → Presenter",
+            "Local-first 4-agent pipeline: Researcher \u2192 Analyst \u2192 Verifier \u2192 Presenter",
             style=me.Style(font_size=FONT_SIZE_BODY, color=TEXT_MUTED, margin=me.Margin(top=4)),
         )
 
 
-def render_instructions() -> None:
-    with me.box(
-        style=me.Style(
-            background=INSTRUCTIONS_BG,
-            border=me.Border(
-                top=me.BorderSide(width=BORDER_WIDTH, color=INSTRUCTIONS_BORDER),
-                right=me.BorderSide(width=BORDER_WIDTH, color=INSTRUCTIONS_BORDER),
-                bottom=me.BorderSide(width=BORDER_WIDTH, color=INSTRUCTIONS_BORDER),
-                left=me.BorderSide(width=BORDER_WIDTH, color=INSTRUCTIONS_BORDER),
-            ),
-            border_radius=8,
-            padding=me.Padding(top=14, right=14, bottom=14, left=14),
-            margin=me.Margin(bottom=24),
-        )
-    ):
+@me.component
+def PageInstructions() -> None:  # noqa: N802
+    """Render the instructions banner explaining how the system works."""
+    with me.box(style=INSTRUCTIONS_STYLE):
         me.markdown(
             "**How it works:** Enter a research query to start a session. "
             "The pipeline retrieves documents from the RAG corpus, decomposes claims, "
-            "verifies evidence, and renders a final markdown report — "
+            "verifies evidence, and renders a final markdown report \u2014 "
             "all via in-process A2A-shaped agent contracts.",
         )
 
 
-def render_empty_state() -> None:
-    with me.box(
-        style=me.Style(
-            text_align="center",
-            background=EMPTY_STATE_BG,
-            border=me.Border(
-                top=me.BorderSide(width=BORDER_WIDTH, color=EMPTY_STATE_BORDER),
-                right=me.BorderSide(width=BORDER_WIDTH, color=EMPTY_STATE_BORDER),
-                bottom=me.BorderSide(width=BORDER_WIDTH, color=EMPTY_STATE_BORDER),
-                left=me.BorderSide(width=BORDER_WIDTH, color=EMPTY_STATE_BORDER),
-            ),
-            border_radius=CARD_RADIUS,
-            padding=me.Padding(top=48, right=24, bottom=48, left=24),
-            margin=me.Margin(bottom=SECTION_MARGIN_BOTTOM_MD),
-        )
-    ):
+@me.component
+def PageEmptyState() -> None:  # noqa: N802
+    """Render the empty state when no session is active."""
+    with me.box(style=EMPTY_STATE_STYLE):
         me.text(
-            "No active session — enter a query above to begin.",
+            "No active session \u2014 enter a query above to begin.",
             style=me.Style(color=TEXT_MUTED, font_size=FONT_SIZE_SUBTITLE),
         )

@@ -10,12 +10,16 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from importlib import import_module
 from time import perf_counter
-from typing import Any, cast
+from typing import Any, TypeVar, cast
+
+from pydantic import BaseModel, ValidationError
 
 from a2a_research.app_logging import get_logger
+from a2a_research.helpers import parse_json_safely
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
+StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
 
 class ProviderRequestError(RuntimeError):
@@ -54,6 +58,19 @@ class LLMProvider(ABC):
 
     @abstractmethod
     def get_capabilities(self) -> ModelCapabilities: ...
+
+
+def parse_structured_response(
+    content: str, schema: type[StructuredOutputT]
+) -> StructuredOutputT | None:
+    """Parse provider output into a Pydantic schema when valid JSON is available."""
+    data = parse_json_safely(content)
+    if not data:
+        return None
+    try:
+        return schema.model_validate(data)
+    except ValidationError:
+        return None
 
 
 def _load_attr(module_name: str, attr_name: str, install_hint: str) -> Any:
@@ -506,3 +523,9 @@ def get_embedder() -> EmbeddingProvider:
     if _embedding_provider is None:
         _embedding_provider = get_embedding_provider()
     return _embedding_provider
+
+
+def reset_provider_singletons() -> None:
+    global _embedding_provider, _llm_provider
+    _llm_provider = None
+    _embedding_provider = None

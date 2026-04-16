@@ -50,9 +50,14 @@ from a2a_research.models import (
     AgentResult,
     AgentRole,
     AgentStatus,
+    AnalystOutput,
     Claim,
+    PresenterOutput,
+    ResearcherOutput,
     ResearchSession,
+    RetrievedChunk,
     Verdict,
+    VerifierOutput,
 )
 from a2a_research.prompts import (
     ANALYST_PROMPT,
@@ -60,7 +65,7 @@ from a2a_research.prompts import (
     RESEARCHER_PROMPT,
     VERIFIER_PROMPT,
 )
-from a2a_research.providers import ProviderRequestError, get_llm
+from a2a_research.providers import ProviderRequestError, get_llm, parse_structured_response
 from a2a_research.rag import get_source_title, retrieve
 
 logger = get_logger(__name__)
@@ -153,10 +158,13 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
 
     user_ctx += "\nProduce your research summary based on the above chunks."
     try:
-        raw = _call_llm(
-            RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher"
+        raw = _call_llm(RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher")
+        structured = parse_structured_response(raw, ResearcherOutput)
+        summary = (
+            structured.research_summary.strip()
+            if structured and structured.research_summary.strip()
+            else extract_research_summary(raw)
         )
-        summary = extract_research_summary(raw)
         status = AgentStatus.COMPLETED
         completion_message = None
     except ProviderRequestError as exc:
@@ -169,6 +177,13 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         )
 
     cited_sources = list({rc.chunk.source for rc in chunks})
+    session.retrieved_chunks = chunks
+    session.source_titles.update(
+        {
+            rc.chunk.source: str(rc.chunk.metadata.get("title") or rc.chunk.source)
+            for rc in chunks
+        }
+    )
     logger.info(
         "Researcher completed session_id=%s chunks=%s unique_sources=%s",
         session.id,
@@ -227,6 +242,13 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
 
 
 def _parse_claims_from_analyst(raw: str) -> list[Claim]:
+    structured = parse_structured_response(raw, AnalystOutput)
+    if structured and structured.atomic_claims:
+        return [
+            claim.model_copy(update={"id": normalize_claim_id(claim.id, f"clm_{i}")})
+            for i, claim in enumerate(structured.atomic_claims)
+        ]
+
     claims = extract_claims_from_llm_output(raw)
     if claims:
         return claims
@@ -273,11 +295,18 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
     query = str(message.payload.get("query", session.query) if message else session.query)
 
     logger.info("Verifier start session_id=%s input_claims=%s", session.id, len(claims))
-    try:
-        chunks = retrieve(query, n_results=10)
-    except Exception:
-        logger.exception("Verifier RAG retrieval failed session_id=%s", session.id)
-        chunks = []
+    payload_chunks = message.payload.get("retrieved_chunks") if message else None
+    if isinstance(payload_chunks, list):
+        chunks = [RetrievedChunk.model_validate(item) for item in payload_chunks]
+    elif session.retrieved_chunks:
+        chunks = session.retrieved_chunks
+    else:
+        try:
+            chunks = retrieve(query, n_results=10)
+        except Exception:
+            logger.exception("Verifier RAG retrieval failed session_id=%s", session.id)
+            chunks = []
+    session.retrieved_chunks = chunks
 
     evidence_ctx = ""
     for rc in chunks:
@@ -323,6 +352,13 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
 
 
 def _parse_verified_claims(raw: str, fallback_claims: list[Claim]) -> list[Claim]:
+    structured = parse_structured_response(raw, VerifierOutput)
+    if structured and structured.verified_claims:
+        return [
+            claim.model_copy(update={"id": normalize_claim_id(claim.id, f"clm_{i}")})
+            for i, claim in enumerate(structured.verified_claims)
+        ]
+
     try:
         data = json.loads(raw) if raw.strip().startswith("{") else {}
     except Exception:
@@ -446,7 +482,12 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
     logger.info("Presenter start session_id=%s verified_claims=%s", session.id, len(claims))
     try:
         raw = _call_llm(PRESENTER_PROMPT, user_ctx, stage="presenter")
-        report = extract_report_markdown(raw)
+        structured = parse_structured_response(raw, PresenterOutput)
+        report = (
+            structured.report.strip()
+            if structured and structured.report.strip()
+            else extract_report_markdown(raw)
+        )
         result_message = "Report ready."
         if not report or report.lstrip().startswith("{"):
             session.agent_results[AgentRole.VERIFIER] = verifier_result.model_copy(

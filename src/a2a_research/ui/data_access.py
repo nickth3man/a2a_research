@@ -4,13 +4,7 @@ This module decouples UI components from the agent pipeline structure by providi
 data accessor functions that handle the details of which agents provide which data.
 """
 
-from a2a_research.models import (
-    AGENT_CARDS,
-    AgentCard,
-    AgentRole,
-    Claim,
-    ResearchSession,
-)
+from a2a_research.models import AGENT_CARDS, AgentRole, Claim, ResearchSession, default_roles
 
 
 def get_all_citations(session: ResearchSession) -> list[str]:
@@ -56,10 +50,11 @@ def get_agent_label(role: AgentRole) -> str:
     return card.name if card else role.value
 
 
-def get_all_roles() -> list[AgentRole]:
-    """Get all agent roles in pipeline order.
+def get_all_roles(session: ResearchSession | None = None) -> list[AgentRole]:
+    """Get agent roles in session pipeline order.
 
-    Returns:
-        List of all agent roles from AGENT_CARDS.
+    Falls back to the default pipeline when the session has not been initialized.
     """
-    return list(AGENT_CARDS.keys())
+    if session and session.roles:
+        return session.roles
+    return default_roles()

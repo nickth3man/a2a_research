@@ -17,25 +17,25 @@ import mesop as me
 from a2a_research.app_logging import get_logger, setup_logging
 from a2a_research.models import ResearchSession
 from a2a_research.ui.components import (
-    agent_timeline_card,
-    claims_panel,
-    error_banner,
-    loading_card,
-    query_input_card,
-    render_empty_state,
-    render_header,
-    render_instructions,
-    report_panel,
-    sources_panel,
+    BannerError,
+    CardLoading,
+    CardQueryInput,
+    CardTimeline,
+    PageEmptyState,
+    PageHeader,
+    PageInstructions,
+    PanelClaims,
+    PanelReport,
+    PanelSources,
 )
-from a2a_research.ui.session_state import has_results
+from a2a_research.ui.session_state import get_session_error, has_progress, has_results
 from a2a_research.ui.tokens import PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
 
 setup_logging()
 logger = get_logger(__name__)
 
 
-@me.page(path="/", title="A2A Research — Multi-Agent Research System")
+@me.page(path="/", title="A2A Research \u2014 Multi-Agent Research System")
 def main_page() -> None:
     state: AppState = me.state(AppState)
 
@@ -47,21 +47,25 @@ def main_page() -> None:
             font_family=PAGE_FONT_FAMILY,
         )
     ):
-        render_header()
-        render_instructions()
+        PageHeader()
+        PageInstructions()
 
-        if state.error:
-            error_banner(state.error)
+        session_error = get_session_error(state.session)
+        if session_error:
+            BannerError(session_error)
 
         if state.loading:
-            loading_card(state.session)
+            CardLoading()
+            CardTimeline(state.session)
         else:
             if has_results(state.session):
                 _render_results(state.session)
+            elif has_progress(state.session):
+                CardTimeline(state.session)
             else:
-                render_empty_state()
+                PageEmptyState()
 
-        query_input_card(
+        CardQueryInput(
             on_submit=_on_submit,
             on_query_input=_on_query_input,
             submit_disabled=int(state.loading),
@@ -75,14 +79,13 @@ class AppState:
     # (Union types like ResearchSession | None are skipped and break deserialization).
     session: ResearchSession = field(default_factory=ResearchSession)
     loading: bool = False
-    error: str | None = None
 
 
 def _render_results(session: ResearchSession) -> None:
-    agent_timeline_card(session)
-    claims_panel(session)
-    sources_panel(session)
-    report_panel(session)
+    CardTimeline(session)
+    PanelClaims(session)
+    PanelSources(session)
+    PanelReport(session)
 
 
 def _on_query_input(e: me.InputEvent) -> None:
@@ -96,7 +99,10 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     query_text = state.query_text.strip()
 
     if not query_text:
-        state.error = "Enter a research query before running the pipeline."
+        state.session = ResearchSession(
+            query=query_text,
+            error="Enter a research query before running the pipeline.",
+        )
         yield
         return
 
@@ -104,8 +110,8 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
         return
 
     state.loading = True
-    state.error = None
     state.session = ResearchSession(query=query_text)
+    state.session.ensure_agent_results()
     logger.info("UI submit query=%r session_id=%s", query_text, state.session.id)
     yield
 
@@ -120,7 +126,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             len(result.final_report),
         )
     except Exception as exc:
-        state.error = str(exc)
+        state.session.error = str(exc)
         logger.exception("UI submit failed query=%r", query_text)
     finally:
         state.loading = False

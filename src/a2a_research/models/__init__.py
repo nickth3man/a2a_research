@@ -109,15 +109,31 @@ class AgentResult(BaseModel):
     citations: list[str] = Field(default_factory=list)
 
 
+def default_roles() -> list[AgentRole]:
+    return [
+        AgentRole.RESEARCHER,
+        AgentRole.ANALYST,
+        AgentRole.VERIFIER,
+        AgentRole.PRESENTER,
+    ]
+
+
 class ResearchSession(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     query: str = ""
+    roles: list[AgentRole] = Field(default_factory=default_roles)
     agent_results: dict[AgentRole, AgentResult] = Field(default_factory=dict)
+    retrieved_chunks: list[RetrievedChunk] = Field(default_factory=list)
     final_report: str = ""
     error: str | None = None
+    source_titles: dict[str, str] = Field(default_factory=dict)
 
     def get_agent(self, role: AgentRole) -> AgentResult:
         return self.agent_results.get(role, AgentResult(role=role))
+
+    def ensure_agent_results(self) -> None:
+        for role in self.roles:
+            self.agent_results.setdefault(role, AgentResult(role=role))
 
 
 # ─── A2A Message Contract ─────────────────────────────────────────────────────

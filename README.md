@@ -39,7 +39,7 @@ uv pip install -e .
 # Edit .env — set LLM_API_KEY and any provider-specific values
 
 # 3. Ingest the RAG corpus (one-time; idempotent — safe to re-run)
-uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"
+uv run python -c "from a2a_research.rag import ensure_corpus_ingested; print(f'Ingested {ensure_corpus_ingested()} chunks')"
 
 # 4. Start the Mesop UI
 uv run mesop src/a2a_research/ui/app.py
@@ -179,6 +179,8 @@ The Mesop app exposes five sections:
 - **Sources panel** — deduplicated citation list with index numbers
 - **Final report** — rendered markdown output from the Presenter agent
 
+UI state now treats `ResearchSession` as the source of truth for progress and errors, so partially initialized sessions can render the timeline safely without being mistaken for final results.
+
 ---
 
 ## Project Structure
@@ -230,6 +232,9 @@ print(session.final_report)
 # Structured verified claims from Verifier
 for claim in session.get_agent(AgentRole.VERIFIER).claims:
     print(f"{claim.verdict.value} ({claim.confidence:.0%}): {claim.text}")
+
+# Progress and failures live on the session too
+print(session.error)
 ```
 
 ---

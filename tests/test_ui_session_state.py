@@ -6,7 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
-from a2a_research.ui.session_state import has_results
+from a2a_research.ui.session_state import get_session_error, has_progress, has_results
 
 
 class TestHasResults:
@@ -70,6 +70,15 @@ class TestHasResults:
             },
         )
         assert has_results(s) is False
+
+    def test_has_progress_tracks_seeded_pipeline_state(self) -> None:
+        s = ResearchSession(query="q")
+        s.ensure_agent_results()
+        assert has_progress(s) is True
+
+    def test_get_session_error_uses_session_as_source_of_truth(self) -> None:
+        s = ResearchSession(query="q", error="boom")
+        assert get_session_error(s) == "boom"
 
 
 class TestResearchSessionJsonRoundTrip:

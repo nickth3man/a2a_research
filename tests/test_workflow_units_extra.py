@@ -94,7 +94,14 @@ async def test_actor_prep_async_requires_session() -> None:
 async def test_actor_exec_async_missing_handler() -> None:
     node = ActorNode(AgentRole.RESEARCHER)
     session = ResearchSession(query="q")
-    with patch("a2a_research.a2a.server.get_a2a_handler", return_value=None):
+    with patch(
+        "a2a_research.a2a.server.A2AClient.send",
+        return_value=AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.FAILED,
+            message="No handler registered for researcher",
+        ),
+    ):
         result = await node.exec_async({"session": session})
     assert result.status == AgentStatus.FAILED
     assert "handler" in result.message.lower()
@@ -102,13 +109,13 @@ async def test_actor_exec_async_missing_handler() -> None:
 
 @pytest.mark.asyncio
 async def test_actor_exec_async_handler_raises() -> None:
-    def boom(_session: ResearchSession, _msg: object) -> AgentResult:
+    def boom(_message: object, _session: ResearchSession) -> AgentResult:
         raise RuntimeError("agent boom")
 
     node = ActorNode(AgentRole.RESEARCHER)
     session = ResearchSession(query="q")
     with (
-        patch("a2a_research.a2a.server.get_a2a_handler", return_value=boom),
+        patch("a2a_research.a2a.server.A2AClient.send", side_effect=boom),
         pytest.raises(RuntimeError, match="agent boom"),
     ):
         await node.exec_async({"session": session})
@@ -168,7 +175,7 @@ async def test_actor_build_payload_branches() -> None:
         claims=[Claim(text="v", verdict=Verdict.SUPPORTED)],
     )
 
-    def handler(_s: ResearchSession, _m: object) -> AgentResult:
+    def handler(_m: object, _s: ResearchSession) -> AgentResult:
         return AgentResult(role=AgentRole.ANALYST, status=AgentStatus.COMPLETED)
 
     for role in (
@@ -178,5 +185,5 @@ async def test_actor_build_payload_branches() -> None:
         AgentRole.PRESENTER,
     ):
         node = ActorNode(role)
-        with patch("a2a_research.a2a.server.get_a2a_handler", return_value=handler):
+        with patch("a2a_research.a2a.server.A2AClient.send", side_effect=handler):
             await node.exec_async({"session": session})

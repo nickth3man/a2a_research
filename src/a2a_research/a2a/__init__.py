@@ -21,6 +21,9 @@ from a2a_research.a2a.server import (
 from a2a_research.a2a.server import (
     register_a2a_agent as register_a2a_agent,
 )
+from a2a_research.a2a.server import (
+    reset_server_registry as reset_server_registry,
+)
 from a2a_research.models import (
     A2AMessage as A2AMessage,
 )
@@ -52,4 +55,5 @@ __all__ = [
     "get_agent_card",
     "get_server_registry",
     "register_a2a_agent",
+    "reset_server_registry",
 ]

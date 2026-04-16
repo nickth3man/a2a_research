@@ -11,6 +11,7 @@ and returns ranked :class:`~a2a_research.models.RetrievedChunk` values with scor
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -116,6 +117,11 @@ def _load_corpus_files() -> dict[str, str]:
     return contents
 
 
+def ensure_corpus_ingested(*, force: bool = False) -> int:
+    """Prepare the vector store outside request-time retrieval when desired."""
+    return ingest_corpus(force=force)
+
+
 def ingest_corpus(force: bool = False) -> int:
     """Ingest corpus files into ChromaDB. Idempotent — skip if already populated."""
     collection = _get_collection()
@@ -168,7 +174,7 @@ def retrieve(
     collection = _get_collection()
     if collection.count() == 0:
         logger.info("RAG retrieve query=%r collection_empty=true", query)
-        ingest_corpus()
+        ensure_corpus_ingested()
 
     embedder = get_embedder()
     started_at = perf_counter()
@@ -238,6 +244,7 @@ def retrieve(
     return retrieved
 
 
+@lru_cache(maxsize=256)
 def get_source_title(source_key: str) -> str:
     """Look up a human-readable title for a source key."""
     corpus = _load_corpus_files()
@@ -246,3 +253,10 @@ def get_source_title(source_key: str) -> str:
         if match:
             return match.group(1).strip()
     return source_key.replace("_", " ").title()
+
+
+def reset_rag_singletons() -> None:
+    global _chroma_client, _collection
+    _chroma_client = None
+    _collection = None
+    get_source_title.cache_clear()

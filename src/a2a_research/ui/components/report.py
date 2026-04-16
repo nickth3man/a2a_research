@@ -17,12 +17,13 @@ from a2a_research.ui.tokens import (
 
 
 @me.component
-def report_panel(session: ResearchSession) -> None:
+def PanelReport(session: ResearchSession) -> None:  # noqa: N802
+    """Display the final research report in a markdown panel."""
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_MD, padding=CARD_PADDING_LARGE):
         me.text("Final Report", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
         if not session.final_report:
             me.text(
-                "Report not ready — complete the pipeline first.",
+                "Report not ready \u2014 complete the pipeline first.",
                 style=me.Style(color=TEXT_MUTED),
             )
             return

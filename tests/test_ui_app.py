@@ -19,14 +19,13 @@ async def test_on_submit_empty_query_sets_error() -> None:
 
     st = SimpleNamespace(
         query_text="   ",
-        error=None,
         loading=False,
         session=ResearchSession(),
     )
     with patch.object(app_mod.me, "state", return_value=st):
         await _drain_on_submit(app_mod)
-    assert st.error is not None
-    assert "query" in st.error.lower()
+    assert st.session.error is not None
+    assert "query" in st.session.error.lower()
 
 
 async def test_on_submit_success_updates_session() -> None:
@@ -44,7 +43,6 @@ async def test_on_submit_success_updates_session() -> None:
     )
     st = SimpleNamespace(
         query_text="Q",
-        error=None,
         loading=False,
         session=ResearchSession(),
     )
@@ -60,7 +58,7 @@ async def test_on_submit_success_updates_session() -> None:
         await _drain_on_submit(app_mod)
 
     assert st.loading is False
-    assert st.error is None
+    assert st.session.error is None
     assert st.session.final_report == "# Hello"
 
 
@@ -69,7 +67,6 @@ async def test_on_submit_exception_sets_error() -> None:
 
     st = SimpleNamespace(
         query_text="Q",
-        error=None,
         loading=False,
         session=ResearchSession(),
     )
@@ -85,7 +82,7 @@ async def test_on_submit_exception_sets_error() -> None:
         await _drain_on_submit(app_mod)
 
     assert st.loading is False
-    assert "LLM down" in (st.error or "")
+    assert "LLM down" in (st.session.error or "")
 
 
 async def test_on_submit_success_yields_twice() -> None:
@@ -95,7 +92,6 @@ async def test_on_submit_success_yields_twice() -> None:
     done = ResearchSession(query="Q", final_report="x")
     st = SimpleNamespace(
         query_text="Q",
-        error=None,
         loading=False,
         session=ResearchSession(),
     )
@@ -119,7 +115,6 @@ async def test_on_submit_skips_when_already_loading() -> None:
 
     st = SimpleNamespace(
         query_text="Q",
-        error=None,
         loading=True,
         session=ResearchSession(query="Q"),
     )
@@ -139,7 +134,7 @@ async def test_on_submit_skips_when_already_loading() -> None:
 def test_on_query_input_updates_state() -> None:
     from a2a_research.ui import app as app_mod
 
-    st = SimpleNamespace(query_text="", session=ResearchSession(), loading=False, error=None)
+    st = SimpleNamespace(query_text="", session=ResearchSession(), loading=False)
     ev = SimpleNamespace(value="  hello ")
     with patch.object(app_mod.me, "state", return_value=st):
         app_mod._on_query_input(ev)

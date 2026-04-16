@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import mesop as me
 
@@ -17,22 +17,24 @@ from a2a_research.ui.tokens import (
     build_default_border,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 @contextmanager
 def card_box(*, margin_bottom: int, padding: me.Padding | None = None) -> Iterator[None]:
     """Standard white card: outer margin wrapper + inner elevated surface."""
     pad = padding if padding is not None else CARD_PADDING
-    with me.box(style=me.Style(margin=me.Margin(bottom=margin_bottom))):
-        with me.box(
-            style=me.Style(
-                background=CARD_BACKGROUND,
-                border_radius=CARD_RADIUS,
-                box_shadow=CARD_SHADOW,
-                border=build_default_border(),
-                padding=pad,
-            )
-        ):
-            yield
+    with me.box(style=me.Style(margin=me.Margin(bottom=margin_bottom))), me.box(
+        style=me.Style(
+            background=CARD_BACKGROUND,
+            border_radius=CARD_RADIUS,
+            box_shadow=CARD_SHADOW,
+            border=build_default_border(),
+            padding=pad,
+        )
+    ):
+        yield
 
 
 def query_input_card_style() -> me.Style:

@@ -13,7 +13,7 @@ from a2a_research.models import (
 
 
 def test_agent_timeline_card_renders_rows(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import agent_timeline_card
+    from a2a_research.ui.components import CardTimeline
 
     session = ResearchSession(query="q")
     session.agent_results[AgentRole.RESEARCHER] = AgentResult(
@@ -21,17 +21,17 @@ def test_agent_timeline_card_renders_rows(stub_mesop_component_runtime: None) ->
         status=AgentStatus.COMPLETED,
         message="Retrieved 3 chunks",
     )
-    agent_timeline_card(session)
+    CardTimeline(session)
 
 
 def test_claims_panel_empty(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import claims_panel
+    from a2a_research.ui.components import PanelClaims
 
-    claims_panel(ResearchSession(query="q"))
+    PanelClaims(ResearchSession(query="q"))
 
 
 def test_claims_panel_with_claim(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import claims_panel
+    from a2a_research.ui.components import PanelClaims
 
     session = ResearchSession(query="q")
     session.agent_results[AgentRole.VERIFIER] = AgentResult(
@@ -47,50 +47,50 @@ def test_claims_panel_with_claim(stub_mesop_component_runtime: None) -> None:
             )
         ],
     )
-    claims_panel(session)
+    PanelClaims(session)
 
 
 def test_sources_panel_empty_and_with_citations(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import sources_panel
+    from a2a_research.ui.components import PanelSources
 
-    sources_panel(ResearchSession(query="q"))
+    PanelSources(ResearchSession(query="q"))
     session = ResearchSession(query="q")
     session.agent_results[AgentRole.RESEARCHER] = AgentResult(
         role=AgentRole.RESEARCHER,
         status=AgentStatus.COMPLETED,
         citations=["rag_accuracy"],
     )
-    sources_panel(session)
+    PanelSources(session)
 
 
 def test_report_panel_empty_and_markdown(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import report_panel
+    from a2a_research.ui.components import PanelReport
 
-    report_panel(ResearchSession(query="q"))
-    report_panel(ResearchSession(query="q", final_report="# Title"))
+    PanelReport(ResearchSession(query="q"))
+    PanelReport(ResearchSession(query="q", final_report="# Title"))
 
 
 def test_error_banner_truncates(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import error_banner
+    from a2a_research.ui.components import BannerError
 
-    error_banner("x" * 500)
+    BannerError("x" * 500)
 
 
 def test_error_banner_short_message_no_ellipsis(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui import components as comp_mod
+    from a2a_research.ui.components.banners import _error_banner_message
 
-    assert comp_mod._error_banner_message("short") == "Pipeline error: short"
-    assert not comp_mod._error_banner_message("short").endswith("…")
+    assert _error_banner_message("short") == "Pipeline error: short"
+    assert not _error_banner_message("short").endswith("\u2026")
 
 
 def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import loading_card
+    from a2a_research.ui.components import CardLoading
 
-    loading_card(ResearchSession(query="q"))
+    CardLoading()
 
 
 def test_query_input_card(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.ui.components import query_input_card
+    from a2a_research.ui.components import CardQueryInput
 
     def on_submit() -> None:
         return None
@@ -98,7 +98,7 @@ def test_query_input_card(stub_mesop_component_runtime: None) -> None:
     def on_input() -> None:
         return None
 
-    query_input_card(
+    CardQueryInput(
         on_submit=on_submit,
         on_query_input=on_input,
     )

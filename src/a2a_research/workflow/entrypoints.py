@@ -14,46 +14,44 @@ from time import perf_counter
 from typing import Any
 
 from ..app_logging import get_logger
-from ..models import AgentRole, ResearchSession
+from ..models import AgentRole, ResearchSession, default_roles
 from .builder import get_workflow
-from .coordinator import run_coordinator
 
 logger = get_logger(__name__)
+
+
+def _normalize_roles(roles: list[AgentRole] | None) -> list[AgentRole] | None:
+    if roles is None:
+        return None
+    deduped: list[AgentRole] = []
+    for role in roles:
+        if role not in deduped:
+            deduped.append(role)
+    return deduped
 
 
 async def run_workflow(
     query: str,
     roles: list[AgentRole] | None = None,
 ) -> ResearchSession:
-    session = ResearchSession(query=query)
+    normalized_roles = _normalize_roles(roles)
+    session = ResearchSession(query=query, roles=normalized_roles or default_roles())
+    session.ensure_agent_results()
     logger.info(
         "Workflow start session_id=%s query=%r roles=%s",
         session.id,
         query,
-        [role.value for role in roles] if roles else "default",
+        [role.value for role in normalized_roles] if normalized_roles else "default",
     )
     started_at = perf_counter()
 
-    flow, shared = get_workflow() if roles is None else get_workflow_for_roles(roles)
-    shared["session"] = session
-
     try:
-        await flow.run_async(shared)
-    except Exception:
+        return await run_workflow_from_session(session, normalized_roles)
+    except Exception as exc:
         elapsed_ms = (perf_counter() - started_at) * 1000
+        session.error = str(exc)
         logger.exception("Workflow failed session_id=%s elapsed_ms=%.1f", session.id, elapsed_ms)
         raise
-
-    elapsed_ms = (perf_counter() - started_at) * 1000
-    logger.info(
-        "Workflow completed session_id=%s elapsed_ms=%.1f agents=%s final_report_chars=%s",
-        session.id,
-        elapsed_ms,
-        [role.value for role in shared["session"].agent_results],
-        len(shared["session"].final_report),
-    )
-
-    return shared["session"]
 
 
 def run_workflow_sync(
@@ -74,10 +72,27 @@ async def run_workflow_from_session(
     session: ResearchSession,
     roles: list[AgentRole] | None = None,
 ) -> ResearchSession:
-    return await run_coordinator(session)
+    explicit_roles = _normalize_roles(roles)
+    normalized_roles = explicit_roles or _normalize_roles(session.roles) or default_roles()
+    session.roles = normalized_roles
+    session.ensure_agent_results()
+    use_default_flow = explicit_roles is None and normalized_roles == default_roles()
+    flow, shared = get_workflow() if use_default_flow else get_workflow_for_roles(normalized_roles)
+    shared["session"] = session
+    await flow.run_async(shared)
+    result: ResearchSession = shared["session"]
+    logger.info(
+        "Workflow completed session_id=%s agents=%s final_report_chars=%s error=%r",
+        result.id,
+        [role.value for role in result.agent_results],
+        len(result.final_report),
+        result.error,
+    )
+    return result
 
 
 def get_workflow_for_roles(roles: list[AgentRole]) -> tuple[Any, dict[str, Any]]:
     from .builder import build_workflow
 
-    return build_workflow(roles)
+    normalized_roles = _normalize_roles(roles) or []
+    return build_workflow(normalized_roles)

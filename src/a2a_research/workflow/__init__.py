@@ -14,8 +14,6 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from pocketflow import AsyncFlow, AsyncNode
-
 from ..models import AgentRole, ResearchSession  # noqa: TC001
 from ..models.policy import PolicyEffect, WorkflowPolicy
 from .adapter import SyncWorkflowAdapter
@@ -36,8 +34,6 @@ from .policy import PipelineOrderPolicy
 
 __all__ = [
     "ActorNode",
-    "AsyncFlow",
-    "AsyncNode",
     "PipelineOrderPolicy",
     "PolicyEffect",
     "SyncWorkflowAdapter",

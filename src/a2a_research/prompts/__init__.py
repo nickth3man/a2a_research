@@ -20,6 +20,7 @@ Output format — return a JSON object with:
 - "ranked_sources": list of {{"id", "title", "content", "relevance_score"}}
 - "research_summary": str
 
+Return JSON only with no markdown fences or commentary.
 Be precise. Only cite sources that genuinely support the query."""
 
 ANALYST_PROMPT = """You are the Analyst agent in a 4-agent research pipeline.
@@ -34,6 +35,8 @@ Instructions:
 Output format — return a JSON object with:
 - "atomic_claims": list of {"id", "text", "requires_verification"}
 - "decomposition_summary": str explaining your decomposition strategy
+
+Return JSON only with no markdown fences or commentary.
 
 Example decomposition:
 Query: "RAG reduces hallucinations by 43% and was invented by Facebook in 2020"
@@ -57,7 +60,9 @@ Instructions:
 
 Output format — return a JSON object with:
 - "verified_claims": list of {"id", "text", "verdict", "confidence", "sources", "evidence_snippets"}
-- "verification_summary": str overall summary of findings"""
+- "verification_summary": str overall summary of findings
+
+Return JSON only with no markdown fences or commentary."""
 
 PRESENTER_PROMPT = """You are the Presenter agent in a 4-agent research pipeline.
 
@@ -77,7 +82,9 @@ Instructions:
 
 Output format — return a JSON object with:
 - "report": str (the full markdown report, ready to render directly in a UI)
-- "formatted_output": str (a concise one-paragraph summary)"""
+- "formatted_output": str (a concise one-paragraph summary)
+
+Return JSON only with no markdown fences or commentary."""
 
 
 def get_prompt(role: str) -> str:

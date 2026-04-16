@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from time import perf_counter
 from typing import Any
 
@@ -46,6 +47,12 @@ class ActorNode(AsyncNode):
 
     async def exec_async(self, prep_res: dict[str, Any]) -> AgentResult:
         session: ResearchSession = prep_res["session"]
+        session.ensure_agent_results()
+        session.agent_results[self.role] = AgentResult(
+            role=self.role,
+            status=AgentStatus.RUNNING,
+            message=f"{self.role.value.title()} is running.",
+        )
         payload = self._build_payload(self.role, session)
         logger.info(
             "Agent step start session_id=%s role=%s payload_keys=%s",
@@ -55,28 +62,16 @@ class ActorNode(AsyncNode):
         )
         started_at = perf_counter()
 
-        from ..a2a.server import get_a2a_handler
-
-        handler = get_a2a_handler(self.role)
-        if handler is None:
-            logger.error(
-                "Agent step missing handler session_id=%s role=%s",
-                session.id,
-                self.role.value,
-            )
-            return AgentResult(
-                role=self.role,
-                status=AgentStatus.FAILED,
-                message=f"No handler registered for {self.role.value}",
-            )
+        from ..a2a.server import A2AClient
 
         message = A2AMessage(
             sender=self._sender_for_role(self.role),
             recipient=self.role,
             payload=payload,
         )
+        client = A2AClient(message.sender)
         try:
-            result = handler(session, message)
+            result = await asyncio.to_thread(client.send, message, session)
         except Exception:
             elapsed_ms = (perf_counter() - started_at) * 1000
             logger.exception(
@@ -105,6 +100,7 @@ class ActorNode(AsyncNode):
     ) -> str:
         session: ResearchSession = prep_res["session"]
         session.agent_results[self.role] = exec_res
+        session.error = exec_res.message if exec_res.status == AgentStatus.FAILED else None
 
         message = A2AMessage(
             sender=self._sender_for_role(self.role),
@@ -135,12 +131,14 @@ class ActorNode(AsyncNode):
             return {
                 "research_summary": researcher.raw_content,
                 "citations": researcher.citations,
+                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
             }
         if role == AgentRole.VERIFIER:
             analyst = session.get_agent(AgentRole.ANALYST)
             return {
                 "claims": [c.model_dump() for c in analyst.claims],
                 "query": session.query,
+                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
             }
         if role == AgentRole.PRESENTER:
             verifier = session.get_agent(AgentRole.VERIFIER)

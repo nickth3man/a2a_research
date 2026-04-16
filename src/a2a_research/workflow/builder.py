@@ -10,7 +10,7 @@ from typing import Any
 
 from pocketflow import AsyncFlow
 
-from ..models import AgentRole
+from ..models import AgentRole, default_roles
 from .nodes import ActorNode, create_actor_node
 
 
@@ -18,12 +18,10 @@ def build_workflow(
     roles: list[AgentRole] | None = None,
 ) -> tuple[AsyncFlow[Any, Any], dict[str, Any]]:
     if roles is None:
-        roles = [
-            AgentRole.RESEARCHER,
-            AgentRole.ANALYST,
-            AgentRole.VERIFIER,
-            AgentRole.PRESENTER,
-        ]
+        roles = default_roles()
+    if not roles:
+        msg = "Workflow requires at least one role."
+        raise ValueError(msg)
 
     nodes: dict[AgentRole, ActorNode] = {}
     for role in roles:

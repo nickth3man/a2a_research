@@ -3,6 +3,7 @@
 import mesop as me
 
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.ui.data_access import get_agent_label, get_all_roles
 from a2a_research.ui.primitives import card_box
 from a2a_research.ui.tokens import (
     AGENT_ROW_BG_IDLE,
@@ -18,26 +19,19 @@ from a2a_research.ui.tokens import (
     status_color,
 )
 
-AGENT_LABELS = {
-    AgentRole.RESEARCHER: "Researcher",
-    AgentRole.ANALYST: "Analyst",
-    AgentRole.VERIFIER: "Verifier",
-    AgentRole.PRESENTER: "Presenter",
-}
-ALL_ROLES = [AgentRole.RESEARCHER, AgentRole.ANALYST, AgentRole.VERIFIER, AgentRole.PRESENTER]
-
 
 @me.component
-def agent_timeline_card(session: ResearchSession) -> None:
+def CardTimeline(session: ResearchSession) -> None:  # noqa: N802
+    """Display the agent pipeline timeline with status for each agent."""
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_SM):
         me.text("Agent Pipeline", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
-        for role in ALL_ROLES:
+        for role in get_all_roles(session):
             _render_agent_row(role, session.get_agent(role))
 
 
 def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
     color = status_color(result.status)
-    label = AGENT_LABELS.get(role, role.value)
+    label = get_agent_label(role)
     icon_map = {
         AgentStatus.COMPLETED: "\u2713",
         AgentStatus.RUNNING: "\u25b8",

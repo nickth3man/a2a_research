@@ -10,12 +10,13 @@ from a2a_research.ui.tokens import SUBTITLE_MARGIN_BOTTOM
 
 
 @me.component
-def query_input_card(
+def CardQueryInput(  # noqa: N802
     on_submit: Callable[[Any], Any],
     on_query_input: Callable[[Any], Any],
     *,
     submit_disabled: int = 0,
 ) -> None:
+    """Render the query input card with textarea and submit button."""
     with me.box(style=query_input_card_style()):
         me.text(
             "Research Query",
@@ -23,7 +24,7 @@ def query_input_card(
             style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM),
         )
         me.textarea(
-            label="Enter your research question…",
+            label="Enter your research question\u2026",
             key="query",
             rows=3,
             on_input=on_query_input,
