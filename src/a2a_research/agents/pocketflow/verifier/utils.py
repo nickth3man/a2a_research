@@ -23,9 +23,7 @@ def build_payload(session: ResearchSession) -> dict[str, Any]:
     return {
         "claims": [c.model_dump() for c in analyst.claims],
         "query": session.query,
-        "retrieved_chunks": [
-            chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
-        ],
+        "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
     }
 
 
