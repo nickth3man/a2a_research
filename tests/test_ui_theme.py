@@ -17,7 +17,7 @@ class TestStatusColor:
         assert status_color(AgentStatus.FAILED) == "#dc2626"
 
     def test_pending_default(self) -> None:
-        assert status_color(AgentStatus.PENDING) == "#9ca3af"
+        assert status_color(AgentStatus.PENDING) == "#6b7280"
 
 
 class TestVerdictColors:

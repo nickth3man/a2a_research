@@ -14,7 +14,9 @@ from time import perf_counter
 from typing import Any
 
 from ..app_logging import get_logger
-from ..models import AgentRole, ResearchSession, default_roles
+from ..models import AgentRole, AgentStatus, ResearchSession, default_roles
+from ..progress import ProgressQueue, create_progress_reporter
+from ..settings import settings
 from .builder import get_workflow
 
 logger = get_logger(__name__)
@@ -33,6 +35,8 @@ def _normalize_roles(roles: list[AgentRole] | None) -> list[AgentRole] | None:
 async def run_workflow(
     query: str,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
     normalized_roles = _normalize_roles(roles)
     session = ResearchSession(query=query, roles=normalized_roles or default_roles())
@@ -46,7 +50,12 @@ async def run_workflow(
     started_at = perf_counter()
 
     try:
-        return await run_workflow_from_session(session, normalized_roles)
+        return await run_workflow_from_session(
+            session,
+            normalized_roles,
+            progress_queue=progress_queue,
+            granularity=granularity,
+        )
     except Exception as exc:
         elapsed_ms = (perf_counter() - started_at) * 1000
         session.error = str(exc)
@@ -58,19 +67,33 @@ def run_workflow_sync(
     query: str,
     roles: list[AgentRole] | None = None,
 ) -> ResearchSession:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        msg = (
+            "run_workflow_sync cannot be called from a running event loop. "
+            "Use run_workflow_async instead."
+        )
+        raise RuntimeError(msg)
     return asyncio.run(run_workflow(query, roles))
 
 
 async def run_workflow_async(
     query: str,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
-    return await run_workflow(query, roles)
+    return await run_workflow(query, roles, progress_queue=progress_queue, granularity=granularity)
 
 
 async def run_workflow_from_session(
     session: ResearchSession,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
     explicit_roles = _normalize_roles(roles)
     normalized_roles = explicit_roles or _normalize_roles(session.roles) or default_roles()
@@ -79,7 +102,26 @@ async def run_workflow_from_session(
     use_default_flow = explicit_roles is None and normalized_roles == default_roles()
     flow, shared = get_workflow() if use_default_flow else get_workflow_for_roles(normalized_roles)
     shared["session"] = session
-    await flow.run_async(shared)
+    if progress_queue is not None:
+        shared["progress_reporter"] = create_progress_reporter(
+            asyncio.get_running_loop(), progress_queue
+        )
+        shared["progress_granularity"] = granularity
+    try:
+        await asyncio.wait_for(flow.run_async(shared), timeout=settings.workflow_timeout)
+    except TimeoutError:
+        timed_out_session: ResearchSession = shared["session"]
+        timed_out_session.error = f"Workflow timed out after {settings.workflow_timeout:.1f}s. Partial results are shown below."
+        for agent_result in timed_out_session.agent_results.values():
+            if agent_result.status == AgentStatus.RUNNING:
+                agent_result.status = AgentStatus.FAILED
+                agent_result.message = "Timed out while running."
+        logger.warning(
+            "Workflow timed out session_id=%s timeout_s=%.1f",
+            timed_out_session.id,
+            settings.workflow_timeout,
+        )
+        return timed_out_session
     result: ResearchSession = shared["session"]
     logger.info(
         "Workflow completed session_id=%s agents=%s final_report_chars=%s error=%r",

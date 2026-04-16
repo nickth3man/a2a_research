@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from a2a_research.models import AgentRole, ResearchSession
+from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
 
 
 @pytest.mark.asyncio
@@ -29,9 +30,7 @@ async def test_run_workflow_reraises_after_flow_failure() -> None:
 async def test_run_workflow_from_session_uses_role_aware_flow() -> None:
     out = ResearchSession(query="done")
     flow = MagicMock()
-    flow.run_async = AsyncMock(
-        side_effect=lambda shared: shared.__setitem__("session", out)
-    )
+    flow.run_async = AsyncMock(side_effect=lambda shared: shared.__setitem__("session", out))
     with patch(
         "a2a_research.workflow.entrypoints.get_workflow_for_roles",
         return_value=(flow, {}),
@@ -43,6 +42,35 @@ async def test_run_workflow_from_session_uses_role_aware_flow() -> None:
     gw.assert_called_once_with([AgentRole.RESEARCHER])
     flow.run_async.assert_awaited_once()
     assert result is out
+
+
+@pytest.mark.asyncio
+async def test_run_workflow_from_session_returns_partial_session_on_timeout() -> None:
+    shared: dict = {}
+
+    async def slow_run_async(shared_state: dict) -> None:
+        session: ResearchSession = shared_state["session"]
+        session.agent_results[AgentRole.RESEARCHER] = AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.COMPLETED,
+            message="Retrieved 3 chunks",
+        )
+        await asyncio.sleep(0.02)
+
+    flow = MagicMock()
+    flow.run_async = AsyncMock(side_effect=slow_run_async)
+
+    with (
+        patch("a2a_research.workflow.entrypoints.get_workflow", return_value=(flow, shared)),
+        patch("a2a_research.workflow.entrypoints.settings.workflow_timeout", 0.001),
+    ):
+        from a2a_research.workflow.entrypoints import run_workflow_from_session
+
+        result = await run_workflow_from_session(ResearchSession(query="start"))
+
+    assert result.error is not None
+    assert "timed out" in result.error.lower()
+    assert result.get_agent(AgentRole.RESEARCHER).status == AgentStatus.COMPLETED
 
 
 def test_get_workflow_for_roles_imports_builder() -> None:
@@ -78,5 +106,10 @@ async def test_run_workflow_async_awaits_run_workflow() -> None:
         from a2a_research.workflow.entrypoints import run_workflow_async
 
         out = await run_workflow_async("async", [AgentRole.RESEARCHER])
-    rw.assert_awaited_once_with("async", [AgentRole.RESEARCHER])
+    rw.assert_awaited_once_with(
+        "async",
+        [AgentRole.RESEARCHER],
+        progress_queue=None,
+        granularity=1,
+    )
     assert out is session

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from a2a_research.a2a import A2AClient, A2AServer
+from a2a_research.a2a import A2AClient
 from a2a_research.models import (
     A2AMessage,
     AgentResult,
@@ -46,51 +46,28 @@ class TestRAGHelpers:
 
     def test_get_source_title_existing(self):
         title = get_source_title("a2a_protocols")
-        assert isinstance(title, str)
-        assert len(title) > 0
+        assert title and title != "a2a_protocols"
+        assert title.startswith("A") or title[0].isupper()
 
-    def test_get_source_title_unknown(self):
-        title = get_source_title("nonexistent_source_xyz")
-        assert isinstance(title, str)
+    def test_get_source_title_unknown_uses_title_case_fallback(self):
+        """Unknown source keys must fall back to ``key.replace('_', ' ').title()``.
+        This is the contract the presenter relies on when a source has no markdown file."""
+        assert get_source_title("nonexistent_source_xyz") == "Nonexistent Source Xyz"
+        assert get_source_title("foo-bar") == "Foo-Bar"
 
 
-class TestA2AClient:
-    def test_a2a_message_creation(self):
-        msg = A2AMessage(
-            sender=AgentRole.RESEARCHER,
-            recipient=AgentRole.ANALYST,
-            task_id="task_1",
-            payload={"query": "What is RAG?"},
-        )
-        assert msg.sender == AgentRole.RESEARCHER
-        assert msg.recipient == AgentRole.ANALYST
-        assert msg.task_id == "task_1"
-        assert msg.payload["query"] == "What is RAG?"
+class TestA2ADispatch:
+    def test_client_send_routes_to_registered_recipient_handler(self):
+        """A2AClient.send must invoke the handler registered for the recipient role,
+        not the sender's own handler."""
+        raw = '{"atomic_claims": [{"id": "c1", "text": "RAG uses retrieval augmentation."}]}'
 
-    def test_a2a_message_auto_id(self):
-        msg = A2AMessage(sender=AgentRole.ANALYST, recipient=AgentRole.VERIFIER)
-        assert msg.task_id is not None
-        assert len(msg.task_id) > 0
-
-    def test_a2a_client_role(self):
-        client = A2AClient(AgentRole.RESEARCHER)
-        assert client.role == AgentRole.RESEARCHER
-
-    def test_a2a_server_role(self):
-        server = A2AServer(AgentRole.VERIFIER)
-        assert server.role == AgentRole.VERIFIER
-
-    def test_a2a_client_dispatches_to_analyst(self):
-        mock_response = MagicMock()
-        mock_response.content = '{"atomic_claims": [{"id": "c1", "text": "Test claim"}]}'
-
-        with patch("a2a_research.agents._call_llm", return_value=mock_response.content):
-            client = A2AClient(AgentRole.RESEARCHER)
-            session = ResearchSession(query="Test query")
+        with patch("a2a_research.agents._call_llm", return_value=raw):
+            session = ResearchSession(query="What is RAG?")
             session.agent_results[AgentRole.RESEARCHER] = AgentResult(
                 role=AgentRole.RESEARCHER,
                 status=AgentStatus.COMPLETED,
-                raw_content="RAG is a technique.",
+                raw_content="RAG is retrieval augmented generation.",
                 citations=["doc1"],
             )
             msg = A2AMessage(
@@ -98,8 +75,12 @@ class TestA2AClient:
                 recipient=AgentRole.ANALYST,
                 payload={},
             )
-            result = client.send(msg, session)
-            assert result.role == AgentRole.ANALYST
+            result = A2AClient(AgentRole.RESEARCHER).send(msg, session)
+
+        assert result.role == AgentRole.ANALYST
+        assert result.status == AgentStatus.COMPLETED
+        assert len(result.claims) == 1
+        assert result.claims[0].text.startswith("RAG uses retrieval")
 
 
 # Default embedding model (perplexity/pplx-embed-v1-4b) uses 2560-dimensional vectors.
@@ -143,14 +124,34 @@ class TestRAGWithMocks:
             "distances": [[0.1, 0.5, 0.9]],
         }
 
+        mock_client = MagicMock(name="chroma_client")
+        mock_collection = MagicMock(name="chroma_collection")
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_collection.count.return_value = 5
+        mock_collection.query.return_value = {
+            "documents": [["RAG is effective.", "RAG uses embeddings.", "RAG is from Facebook."]],
+            "metadatas": [
+                [
+                    {"source": "rag_accuracy", "chunk_index": 0, "title": "RAG Study"},
+                    {"source": "a2a_protocols", "chunk_index": 1, "title": "A2A Protocols"},
+                    {
+                        "source": "claim_verification",
+                        "chunk_index": 0,
+                        "title": "Claim Verification",
+                    },
+                ]
+            ],
+            "distances": [[0.1, 0.5, 0.9]],
+        }
+
         with (
-            patch("a2a_research.rag._chroma_client", mock_coll),
-            patch("a2a_research.rag._collection", mock_coll),
+            patch("a2a_research.rag._chroma_client", mock_client),
+            patch("a2a_research.rag._collection", mock_collection),
             patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
         ):
-            from a2a_research.rag import RetrievedChunk, retrieve
+            from a2a_research.rag import RetrievedChunk, retrieve_chunks
 
-            chunks = retrieve("Is RAG effective?", n_results=3)
+            chunks = retrieve_chunks("Is RAG effective?", n_results=3)
             assert len(chunks) == 3
             assert all(isinstance(rc, RetrievedChunk) for rc in chunks)
             assert all(0.0 <= rc.score <= 1.0 for rc in chunks)
@@ -172,10 +173,37 @@ class TestRAGWithMocks:
             patch("a2a_research.rag._collection", mock_coll),
             patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
         ):
-            from a2a_research.rag import retrieve
+            from a2a_research.rag import retrieve_chunks
 
-            chunks = retrieve("Does not exist xyz abc", n_results=5)
+            chunks = retrieve_chunks("Does not exist xyz abc", n_results=5)
             assert len(chunks) == 0
+
+    def test_retrieve_on_empty_collection_triggers_ingest(self):
+        """When the collection reports ``count() == 0`` the retrieval path must call
+        ``ensure_corpus_ingested`` before issuing the query so first-run UX works."""
+        mock_embedder = MagicMock()
+        mock_embedder.embed_query.return_value = [0.1] * _EMBED_DIM
+
+        cold_collection = MagicMock()
+        cold_collection.count.return_value = 0
+        cold_collection.query.return_value = {
+            "documents": [["hit"]],
+            "metadatas": [[{"source": "rag_accuracy", "chunk_index": 0, "title": "RAG"}]],
+            "distances": [[0.1]],
+        }
+
+        with (
+            patch("a2a_research.rag._collection", cold_collection),
+            patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
+            patch("a2a_research.rag.ensure_corpus_ingested") as ensure_ingested,
+        ):
+            from a2a_research.rag import retrieve_chunks
+
+            chunks = retrieve_chunks("q", n_results=1)
+
+        ensure_ingested.assert_called_once()
+        assert len(chunks) == 1
+        assert chunks[0].chunk.source == "rag_accuracy"
 
     def test_retrieve_recovers_from_dimension_mismatch(self):
         class DimensionMismatchError(Exception):
@@ -205,9 +233,9 @@ class TestRAGWithMocks:
             ) as reset_collection,
             patch("a2a_research.rag.ingest_corpus") as ingest_corpus,
         ):
-            from a2a_research.rag import retrieve
+            from a2a_research.rag import retrieve_chunks
 
-            chunks = retrieve("Is RAG effective?", n_results=1)
+            chunks = retrieve_chunks("Is RAG effective?", n_results=1)
 
         assert len(chunks) == 1
         reset_collection.assert_called_once()

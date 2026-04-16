@@ -20,9 +20,6 @@ ENV/
 env.bak/
 venv.bak/
 
-# uv
-uv.lock
-
 # Environment / secrets
 .env
 .env.local
@@ -44,7 +41,24 @@ uv.lock
 .ruff_cache/
 .pytype/
 .pytest_cache/
-pyrightconfig.json
+
+# uv
+.uv-cache/
+uv-cache/
+
+# Additional IDEs
+.fleet/
+.zed/
+.vs/
+
+# Additional tool artifacts
+.tox/
+.nox/
+.dmypy.json
+
+# Windows
+*.stackdump
+*.lnk
 
 # Test / Coverage
 .coverage
@@ -68,6 +82,9 @@ ehthumbs.db
 # Logs
 *.log
 logs/
+
+# Mesop dev server (local stdout capture)
+.mesop-server.out
 
 # Jupyter
 .ipynb_checkpoints/

@@ -40,7 +40,7 @@ def test_run_research_sync_returns_markdown_report_from_presenter_json() -> None
 
     with (
         patch("a2a_research.agents._call_llm", side_effect=responses),
-        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+        patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
     ):
         session = run_research_sync("How does RAG work?")
 
@@ -64,7 +64,7 @@ def test_workflow_state_records_a2a_message_handoffs() -> None:
 
     with (
         patch("a2a_research.agents._call_llm", side_effect=responses),
-        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+        patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
     ):
         initial_state = WorkflowState(session=ResearchSession(query="What is RAG?"))
         final_state = get_graph().invoke(initial_state)
@@ -88,7 +88,7 @@ def test_run_research_sync_falls_back_when_analyst_is_rate_limited() -> None:
 
     with (
         patch("a2a_research.agents._call_llm", side_effect=responses),
-        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+        patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
     ):
         session = run_research_sync("How does RAG work?")
 
@@ -109,7 +109,7 @@ def test_run_research_sync_falls_back_when_presenter_is_rate_limited() -> None:
 
     with (
         patch("a2a_research.agents._call_llm", side_effect=responses),
-        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+        patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
     ):
         session = run_research_sync("What is RAG?")
 

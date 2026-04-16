@@ -10,9 +10,15 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=1000"]
       - id: check-merge-conflict
+      - id: check-ast
+      - id: debug-statements
+      - id: check-case-conflict
+      - id: mixed-line-ending
+      - id: detect-private-key
+      - id: fix-byte-order-marker
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
+    rev: v0.15.10
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -30,6 +36,7 @@ repos:
         files: ^src/
         pass_filenames: false
         args: ["src/"]
+        verbose: true
       - id: ty
         name: ty
         entry: uv run ty check
@@ -38,3 +45,4 @@ repos:
         files: ^src/
         pass_filenames: false
         args: ["src/"]
+        verbose: true

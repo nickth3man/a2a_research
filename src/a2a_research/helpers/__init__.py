@@ -80,7 +80,7 @@ class _SummaryNode(Node):
         return "default"
 
 
-def make_result(
+def create_result(
     role: AgentRole,
     status: AgentStatus,
     message: str,

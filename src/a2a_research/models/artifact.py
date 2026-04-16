@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from abc import ABC, abstractmethod
 from enum import StrEnum
-from typing import Any, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -21,9 +21,6 @@ class ArtifactKind(StrEnum):
     TEXT = "text"
     DATA = "data"
     STREAM = "stream"
-
-
-T = TypeVar("T", bound=BaseModel)
 
 
 class Artifact(BaseModel, ABC):

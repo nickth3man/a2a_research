@@ -20,6 +20,14 @@ from a2a_research.app_logging import get_logger
 from a2a_research.models import DocumentChunk, RetrievedChunk
 from a2a_research.settings import settings
 
+__all__ = [
+    "ensure_corpus_ingested",
+    "get_source_title",
+    "ingest_corpus",
+    "reset_rag_singletons",
+    "retrieve_chunks",
+]
+
 _CORPUS_DIR = Path(__file__).resolve().parents[3] / "data" / "corpus"
 logger = get_logger(__name__)
 
@@ -85,16 +93,16 @@ def _query_collection(
     )
 
 
-def _chunk_text(
-    text: str, size: int = settings.rag.size, overlap: int = settings.rag.overlap
-) -> list[str]:
-    overlap_chars = min(overlap, size // 4)
-    if len(text) <= size:
+def _chunk_text(text: str, size: int | None = None, overlap: int | None = None) -> list[str]:
+    _size = size if size is not None else settings.rag.size
+    _overlap = overlap if overlap is not None else settings.rag.overlap
+    overlap_chars = min(_overlap, _size // 4)
+    if len(text) <= _size:
         return [text] if text.strip() else []
     chunks: list[str] = []
     start = 0
     while start < len(text):
-        end = start + size
+        end = start + _size
         chunk = text[start:end]
         sentences = re.split(r"(?<=[.!?])\s+", chunk)
         if len(sentences) > 1 and sentences[-1]:
@@ -164,7 +172,7 @@ def ingest_corpus(force: bool = False) -> int:
     return len(ids)
 
 
-def retrieve(
+def retrieve_chunks(
     query: str,
     n_results: int = 10,
 ) -> list[RetrievedChunk]:

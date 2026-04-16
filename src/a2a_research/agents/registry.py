@@ -64,7 +64,7 @@ class AgentRegistry:
         spec = self._specs.get(role)
         return spec.handler if spec else None
 
-    def all_roles(self) -> list[AgentRole]:
+    def get_all_roles(self) -> list[AgentRole]:
         return list(self._specs.keys())
 
     def __contains__(self, role: AgentRole) -> bool:

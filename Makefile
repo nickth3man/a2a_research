@@ -1,45 +1,53 @@
-.PHONY: help install test lint format typecheck typecheck-ty clean mesop ingest check
+.DEFAULT_GOAL := help
+.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop ingest htmlcov
 
-help:
-	@echo "Available targets:"
-	@echo "  install      - Install package with uv"
-	@echo "  test         - Run pytest suite with coverage"
-	@echo "  lint         - Run ruff linter"
-	@echo "  format       - Run ruff formatter"
-	@echo "  typecheck    - Run mypy type checker"
-	@echo "  typecheck-ty - Run ty type checker"
-	@echo "  check        - Run lint, format check, typecheck, and typecheck-ty"
-	@echo "  clean        - Remove build artifacts and cache directories"
-	@echo "  mesop        - Start Mesop UI (MESOP_STATE_SESSION_BACKEND=memory for stable dev state sync)"
-	@echo "  ingest       - Ingest the RAG corpus into ChromaDB"
+help: ## Show this help
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install:
-	uv pip install -e .
+install: ## Install package with uv
+	uv sync --all-groups
 
-test:
+dev: install ## Full dev setup: install + activate pre-commit hooks
+	uv run pre-commit install
+	@echo "Dev environment ready. Run 'make test' to verify."
+
+test: ## Run pytest suite with coverage
 	uv run pytest
 
-lint:
+watch: ## Run pytest in watch mode (re-runs on file changes)
+	uv run pytest --tb=short -q --no-header -p no:warnings -f
+
+lint: ## Run ruff linter
 	uv run ruff check src/ tests/
 
-format:
+format: ## Format code with ruff
 	uv run ruff format src/ tests/
 
-typecheck:
-	uv run mypy src/
-
-typecheck-ty:
-	uv run ty check src/
-
-check: lint typecheck typecheck-ty
-	@echo "Running format check..."
+format-check: ## Check formatting without modifying files
 	uv run ruff format --check src/ tests/
 
-clean:
-	rm -rf build/ dist/ *.egg-info .mypy_cache .ruff_cache .pytest_cache src/a2a_research/__pycache__ src/a2a_research/*/__pycache__ tests/__pycache__
+typecheck: ## Run mypy type checker
+	uv run mypy src/
 
-mesop:
-	MESOP_STATE_SESSION_BACKEND=memory uv run mesop src/a2a_research/ui/app.py
+typecheck-ty: ## Run ty type checker
+	uv run ty check src/
 
-ingest:
+check: lint typecheck typecheck-ty format-check ## Run all quality checks (no tests)
+
+all: test check ## Run tests + all quality checks (CI-ready)
+	@echo "[OK] All checks complete"
+
+clean: ## Remove build artifacts and cache directories
+	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/__pycache__')]"
+	python -c "import shutil; [shutil.rmtree(d, ignore_errors=True) for d in ['build', 'dist', '.mypy_cache', '.ruff_cache', '.pytest_cache', 'htmlcov']]"
+	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('*.egg-info') if p.is_dir()]"
+
+mesop: ## Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
+	export MESOP_STATE_SESSION_BACKEND=memory && uv run mesop src/a2a_research/ui/app.py
+
+ingest: ## Ingest the RAG corpus into ChromaDB
 	uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"
+
+htmlcov: ## Generate HTML coverage report
+	uv run pytest --cov=src/a2a_research --cov-report=html
+	@echo "HTML coverage report generated in htmlcov/index.html"

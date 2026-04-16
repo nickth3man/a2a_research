@@ -84,18 +84,37 @@ def test_error_banner_short_message_no_ellipsis(stub_mesop_component_runtime: No
 
 
 def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
+    from a2a_research.models import ResearchSession
     from a2a_research.ui.components import CardLoading
 
-    CardLoading()
+    CardLoading(
+        progress_pct=0.4,
+        progress_step_label="Step 2 of 4",
+        progress_substep_label="Calling LLM…",
+        session=ResearchSession(query="Q"),
+        granularity=2,
+        running_substeps=["Calling LLM…"],
+    )
+
+
+def test_report_panel_renders_without_html_iframe(stub_mesop_component_runtime: None) -> None:
+    from unittest.mock import patch
+
+    from a2a_research.ui.components import PanelReport
+
+    with patch("a2a_research.ui.components.report.me.html") as html_mock:
+        PanelReport(ResearchSession(query="q", final_report="# Title"))
+
+    html_mock.assert_not_called()
 
 
 def test_query_input_card(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import CardQueryInput
 
-    def on_submit() -> None:
+    def on_submit(_event: object) -> None:
         return None
 
-    def on_input() -> None:
+    def on_input(_event: object) -> None:
         return None
 
     CardQueryInput(

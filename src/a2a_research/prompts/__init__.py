@@ -87,6 +87,15 @@ Output format — return a JSON object with:
 Return JSON only with no markdown fences or commentary."""
 
 
+__all__ = [
+    "ANALYST_PROMPT",
+    "PRESENTER_PROMPT",
+    "RESEARCHER_PROMPT",
+    "VERIFIER_PROMPT",
+    "get_prompt",
+]
+
+
 def get_prompt(role: str) -> str:
     """Load prompt template by agent role name."""
 

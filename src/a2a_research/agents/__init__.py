@@ -15,7 +15,10 @@ from __future__ import annotations
 import json
 import re
 from time import perf_counter
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from a2a_research.agents.registry import (
     AgentRegistry as AgentRegistry,
@@ -59,6 +62,12 @@ from a2a_research.models import (
     Verdict,
     VerifierOutput,
 )
+from a2a_research.progress import (
+    ProgressEvent,
+    ProgressGranularity,
+    ProgressPhase,
+    ProgressReporter,
+)
 from a2a_research.prompts import (
     ANALYST_PROMPT,
     PRESENTER_PROMPT,
@@ -66,9 +75,65 @@ from a2a_research.prompts import (
     VERIFIER_PROMPT,
 )
 from a2a_research.providers import ProviderRequestError, get_llm, parse_structured_response
-from a2a_research.rag import get_source_title, retrieve
+from a2a_research.rag import get_source_title, retrieve_chunks
 
 logger = get_logger(__name__)
+
+
+def _sanitize_query(query: str) -> str:
+    """Sanitize user query before interpolation into prompts."""
+    query = query.strip()
+    query = " ".join(query.split())
+    if len(query) > 10000:
+        logger.warning("Query truncated from %d to 10000 characters", len(query))
+        return query[:10000]
+    return query
+
+
+def _extract_progress_context(
+    message: A2AMessage | None,
+) -> tuple[ProgressReporter | None, int, int, int]:
+    """Extract (reporter, step_index, total_steps, granularity) from a message payload."""
+    if message is None:
+        return None, 0, 4, 1
+    reporter: ProgressReporter | None = getattr(message, "_progress_reporter", None)
+    ctx: dict[str, Any] = message.payload.get("progress_context") or {}
+    return (
+        reporter,
+        int(ctx.get("step_index", 0)),
+        int(ctx.get("total_steps", 4)),
+        int(ctx.get("granularity", 1)),
+    )
+
+
+def _create_substep_emitter(
+    reporter: ProgressReporter | None,
+    role: AgentRole,
+    step_index: int,
+    total_steps: int,
+    granularity: int,
+    substep_total: int,
+) -> Callable[..., None]:
+    """Return a callable that emits a STEP_SUBSTEP event when granularity allows it."""
+
+    def emit(label: str, substep_index: int, min_granularity: int = 2, detail: str = "") -> None:
+        if reporter is None or granularity < min_granularity:
+            return
+        reporter(
+            ProgressEvent(
+                phase=ProgressPhase.STEP_SUBSTEP,
+                role=role,
+                step_index=step_index,
+                total_steps=total_steps,
+                substep_label=label,
+                substep_index=substep_index,
+                substep_total=substep_total,
+                granularity=ProgressGranularity(min(granularity, 3)),
+                detail=detail,
+            )
+        )
+
+    return emit
 
 
 def _call_llm(system_prompt: str, user_content: str, *, stage: str) -> str:
@@ -92,10 +157,10 @@ def _call_llm(system_prompt: str, user_content: str, *, stage: str) -> str:
         raise
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.info("LLM stage=%s completed elapsed_ms=%.1f", stage, elapsed_ms)
-    return str(response.content) if hasattr(response, "content") else str(response)
+    return (response.content or "") if hasattr(response, "content") else str(response)
 
 
-def _invoke(
+def _create_agent_result(
     role: AgentRole,
     status: AgentStatus,
     message: str,
@@ -140,13 +205,25 @@ def _fallback_verified_claims(claims: list[Claim], reason: str) -> list[Claim]:
 
 
 def researcher_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
-    query = str(message.payload.get("query", session.query) if message else session.query)
+    query = _sanitize_query(
+        str(message.payload.get("query", session.query) if message else session.query)
+    )
+    reporter, step_index, total_steps, granularity = _extract_progress_context(message)
+    emit = _create_substep_emitter(
+        reporter, AgentRole.RESEARCHER, step_index, total_steps, granularity, 4
+    )
     logger.info("Researcher start session_id=%s query=%r", session.id, query)
+    emit("Embedding query…", 0)
     try:
-        chunks = retrieve(query, n_results=10)
+        chunks = retrieve_chunks(query, n_results=10)
     except Exception as exc:
         logger.exception("Researcher RAG retrieval failed session_id=%s", session.id)
-        return _invoke(AgentRole.RESEARCHER, AgentStatus.FAILED, f"RAG retrieval failed: {exc}")
+        return _create_agent_result(
+            AgentRole.RESEARCHER, AgentStatus.FAILED, f"RAG retrieval failed: {exc}"
+        )
+
+    chunk_detail = f"{len(chunks)} chunks found" if granularity >= 3 else ""
+    emit("Querying ChromaDB…", 1, detail=chunk_detail)
 
     max_sources = 10
     user_ctx = f"Research query: {query}\n\nRelevant corpus chunks (id, source, score, content):\n"
@@ -157,8 +234,12 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         )
 
     user_ctx += "\nProduce your research summary based on the above chunks."
+    emit("Calling LLM…", 2)
     try:
-        raw = _call_llm(RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher")
+        raw = _call_llm(
+            RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher"
+        )
+        emit("Parsing result…", 3)
         structured = parse_structured_response(raw, ResearcherOutput)
         summary = (
             structured.research_summary.strip()
@@ -179,10 +260,7 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
     cited_sources = list({rc.chunk.source for rc in chunks})
     session.retrieved_chunks = chunks
     session.source_titles.update(
-        {
-            rc.chunk.source: str(rc.chunk.metadata.get("title") or rc.chunk.source)
-            for rc in chunks
-        }
+        {rc.chunk.source: str(rc.chunk.metadata.get("title") or rc.chunk.source) for rc in chunks}
     )
     logger.info(
         "Researcher completed session_id=%s chunks=%s unique_sources=%s",
@@ -190,7 +268,7 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         len(chunks),
         len(cited_sources),
     )
-    return _invoke(
+    return _create_agent_result(
         AgentRole.RESEARCHER,
         status,
         completion_message or f"Retrieved {len(chunks)} chunks from {len(cited_sources)} sources.",
@@ -206,20 +284,36 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
         if message
         else researcher_result.raw_content
     )
+    query = _sanitize_query(session.query)
     user_ctx = (
         f"Research summary from Researcher:\n{research_summary}\n\n"
-        f"Original query: {session.query}\n\n"
+        f"Original query: {query}\n\n"
         "Decompose the query into atomic verifiable claims."
     )
+    reporter, step_index, total_steps, granularity = _extract_progress_context(message)
+    emit = _create_substep_emitter(
+        reporter, AgentRole.ANALYST, step_index, total_steps, granularity, 2
+    )
     logger.info("Analyst start session_id=%s", session.id)
+    emit("Calling LLM…", 0)
     try:
         raw = _call_llm(ANALYST_PROMPT, user_ctx, stage="analyst")
         claims = _parse_claims_from_analyst(raw)
+        emit(
+            "Parsing claims…",
+            1,
+            detail=f"{len(claims)} claims extracted" if granularity >= 3 else "",
+        )
         status = AgentStatus.COMPLETED
         completion_message = f"Decomposed into {len(claims)} atomic claims."
     except ProviderRequestError as exc:
         raw = ""
         claims = _parse_claims_from_analyst(research_summary)
+        emit(
+            "Parsing claims…",
+            1,
+            detail=f"{len(claims)} claims extracted" if granularity >= 3 else "",
+        )
         status = AgentStatus.COMPLETED if claims else AgentStatus.FAILED
         completion_message = (
             f"Decomposed into {len(claims)} atomic claims via fallback after provider error."
@@ -232,7 +326,7 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
             len(claims),
         )
     logger.info("Analyst completed session_id=%s claim_count=%s", session.id, len(claims))
-    return _invoke(
+    return _create_agent_result(
         AgentRole.ANALYST,
         status,
         completion_message,
@@ -292,20 +386,36 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         claims = [Claim.model_validate(item) for item in message.payload["claims"]]
     else:
         claims = analyst_result.claims
-    query = str(message.payload.get("query", session.query) if message else session.query)
+    query = _sanitize_query(
+        str(message.payload.get("query", session.query) if message else session.query)
+    )
+
+    reporter, step_index, total_steps, granularity = _extract_progress_context(message)
+    emit = _create_substep_emitter(
+        reporter, AgentRole.VERIFIER, step_index, total_steps, granularity, 4
+    )
 
     logger.info("Verifier start session_id=%s input_claims=%s", session.id, len(claims))
     payload_chunks = message.payload.get("retrieved_chunks") if message else None
     if isinstance(payload_chunks, list):
         chunks = [RetrievedChunk.model_validate(item) for item in payload_chunks]
+        emit("Loading evidence corpus…", 0)
+        chunk_detail = f"{len(chunks)} chunks" if granularity >= 3 else ""
+        emit("Evidence ready…", 1, detail=chunk_detail)
     elif session.retrieved_chunks:
         chunks = session.retrieved_chunks
+        emit("Using session evidence…", 0)
+        chunk_detail = f"{len(chunks)} chunks" if granularity >= 3 else ""
+        emit("Evidence ready…", 1, detail=chunk_detail)
     else:
+        emit("Embedding query…", 0)
         try:
-            chunks = retrieve(query, n_results=10)
+            chunks = retrieve_chunks(query, n_results=10)
         except Exception:
             logger.exception("Verifier RAG retrieval failed session_id=%s", session.id)
             chunks = []
+        chunk_detail = f"{len(chunks)} chunks" if granularity >= 3 else ""
+        emit("Querying ChromaDB…", 1, detail=chunk_detail)
     session.retrieved_chunks = chunks
 
     evidence_ctx = ""
@@ -319,13 +429,24 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         f"Evidence from corpus:\n{evidence_ctx}\n\n"
         "Assign verdicts and confidence scores to each claim."
     )
+    emit("Calling LLM…", 2)
     try:
         raw = _call_llm(VERIFIER_PROMPT, user_ctx, stage="verifier")
         verified = _parse_verified_claims(raw, claims)
+        emit(
+            "Parsing verdicts…",
+            3,
+            detail=(f"{len(verified)} claims \u00b7 evidence matched" if granularity >= 3 else ""),
+        )
         completion_message = f"Verified {len(verified)} claims."
     except ProviderRequestError as exc:
         raw = ""
         verified = _fallback_verified_claims(claims, f"Verification unavailable: {exc}")
+        emit(
+            "Parsing verdicts…",
+            3,
+            detail=(f"{len(verified)} claims \u00b7 evidence matched" if granularity >= 3 else ""),
+        )
         completion_message = (
             f"Verification degraded after provider error; marked {len(verified)} claims as "
             "INSUFFICIENT_EVIDENCE."
@@ -341,7 +462,7 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         len(chunks),
         len(verified),
     )
-    return _invoke(
+    return _create_agent_result(
         AgentRole.VERIFIER,
         AgentStatus.COMPLETED,
         completion_message,
@@ -472,14 +593,20 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
             findings_ctx += f"  Sources: {', '.join(titles)}\n"
         findings_ctx += "\n"
 
+    query = _sanitize_query(session.query)
     user_ctx = (
-        f"Original query: {session.query}\n\n"
+        f"Original query: {query}\n\n"
         f"Verified findings:\n{findings_ctx}\n\n"
         f"Total sources used: "
         f"{len(set(verifier_result.citations + researcher_result.citations))}\n\n"
         "Produce a structured research report in markdown."
     )
     logger.info("Presenter start session_id=%s verified_claims=%s", session.id, len(claims))
+    reporter, step_index, total_steps, granularity = _extract_progress_context(message)
+    emit = _create_substep_emitter(
+        reporter, AgentRole.PRESENTER, step_index, total_steps, granularity, 2
+    )
+    emit("Calling LLM…", 0)
     try:
         raw = _call_llm(PRESENTER_PROMPT, user_ctx, stage="presenter")
         structured = parse_structured_response(raw, PresenterOutput)
@@ -498,17 +625,27 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
             logger.info(
                 "Presenter fell back to deterministic markdown report session_id=%s", session.id
             )
+        emit(
+            "Extracting report…",
+            1,
+            detail=f"{len(report.split())} words" if granularity >= 3 else "",
+        )
     except ProviderRequestError as exc:
         raw = ""
         session.agent_results[AgentRole.VERIFIER] = verifier_result.model_copy(
             update={"claims": claims}
         )
         report = build_markdown_report(session)
+        emit(
+            "Extracting report…",
+            1,
+            detail=f"{len(report.split())} words (fallback)" if granularity >= 3 else "",
+        )
         result_message = f"Report ready via fallback after provider error: {exc}"
         logger.warning("Presenter falling back to deterministic report session_id=%s", session.id)
 
     logger.info("Presenter completed session_id=%s report_chars=%s", session.id, len(report))
-    return _invoke(
+    return _create_agent_result(
         AgentRole.PRESENTER,
         AgentStatus.COMPLETED,
         result_message,

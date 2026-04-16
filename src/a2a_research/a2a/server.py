@@ -34,7 +34,7 @@ class A2AServer:
             description=f"A2A server for {agent_role.value}",
         )
 
-    def task_handler(self, message: A2AMessage, session: ResearchSession) -> AgentResult:
+    def handle_task(self, message: A2AMessage, session: ResearchSession) -> AgentResult:
         if message.recipient != self.role:
             return AgentResult(
                 role=self.role,
@@ -126,4 +126,4 @@ class A2AClient:
                 status=AgentStatus.FAILED,
                 message=f"No A2A server registered for {message.recipient.value}",
             )
-        return server.task_handler(message, session)
+        return server.handle_task(message, session)

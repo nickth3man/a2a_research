@@ -16,6 +16,7 @@ from ..models import (
     AgentStatus,
     ResearchSession,
 )
+from ..progress import ProgressEvent, ProgressGranularity, ProgressPhase, ProgressReporter
 
 logger = get_logger(__name__)
 
@@ -43,10 +44,14 @@ class ActorNode(AsyncNode):
         session = shared.get("session")
         if session is None:
             raise ValueError("Shared state missing 'session'")
-        return {"session": session}
+        return {"session": session, "shared": shared}
 
     async def exec_async(self, prep_res: dict[str, Any]) -> AgentResult:
         session: ResearchSession = prep_res["session"]
+        shared: dict[str, Any] = prep_res["shared"]
+        progress_reporter: ProgressReporter | None = shared.get("progress_reporter")
+        total_steps = len(session.roles)
+        step_index = session.roles.index(self.role) if self.role in session.roles else 0
         session.ensure_agent_results()
         session.agent_results[self.role] = AgentResult(
             role=self.role,
@@ -54,6 +59,23 @@ class ActorNode(AsyncNode):
             message=f"{self.role.value.title()} is running.",
         )
         payload = self._build_payload(self.role, session)
+        if progress_reporter:
+            progress_reporter(
+                ProgressEvent(
+                    phase=ProgressPhase.STEP_STARTED,
+                    role=self.role,
+                    step_index=step_index,
+                    total_steps=total_steps,
+                    substep_label=f"{self.role.value.title()} started.",
+                    granularity=ProgressGranularity.AGENT,
+                )
+            )
+            granularity = shared.get("progress_granularity", 1)
+            payload["progress_context"] = {
+                "step_index": step_index,
+                "total_steps": total_steps,
+                "granularity": granularity,
+            }
         logger.info(
             "Agent step start session_id=%s role=%s payload_keys=%s",
             session.id,
@@ -65,15 +87,31 @@ class ActorNode(AsyncNode):
         from ..a2a.server import A2AClient
 
         message = A2AMessage(
-            sender=self._sender_for_role(self.role),
+            sender=self._get_sender_for_role(self.role),
             recipient=self.role,
             payload=payload,
         )
+        if progress_reporter is not None:
+            # Attach reporter directly to the message instance so it does not cross
+            # the A2A payload boundary (payload is serialized; this private attr is not).
+            object.__setattr__(message, "_progress_reporter", progress_reporter)
         client = A2AClient(message.sender)
         try:
             result = await asyncio.to_thread(client.send, message, session)
         except Exception:
             elapsed_ms = (perf_counter() - started_at) * 1000
+            if progress_reporter:
+                progress_reporter(
+                    ProgressEvent(
+                        phase=ProgressPhase.STEP_FAILED,
+                        role=self.role,
+                        step_index=step_index,
+                        total_steps=total_steps,
+                        substep_label=f"{self.role.value.title()} failed.",
+                        granularity=ProgressGranularity.AGENT,
+                        elapsed_ms=elapsed_ms,
+                    )
+                )
             logger.exception(
                 "Agent step failed session_id=%s role=%s elapsed_ms=%.1f",
                 session.id,
@@ -82,6 +120,18 @@ class ActorNode(AsyncNode):
             )
             raise
         elapsed_ms = (perf_counter() - started_at) * 1000
+        if progress_reporter:
+            progress_reporter(
+                ProgressEvent(
+                    phase=ProgressPhase.STEP_COMPLETED,
+                    role=self.role,
+                    step_index=step_index,
+                    total_steps=total_steps,
+                    substep_label=result.message or f"{self.role.value.title()} completed.",
+                    granularity=ProgressGranularity.AGENT,
+                    elapsed_ms=elapsed_ms,
+                )
+            )
         logger.info(
             "Agent step completed session_id=%s role=%s status=%s elapsed_ms=%.1f message=%r",
             session.id,
@@ -103,7 +153,7 @@ class ActorNode(AsyncNode):
         session.error = exec_res.message if exec_res.status == AgentStatus.FAILED else None
 
         message = A2AMessage(
-            sender=self._sender_for_role(self.role),
+            sender=self._get_sender_for_role(self.role),
             recipient=self.role,
             payload=self._build_payload(self.role, session),
         )
@@ -115,7 +165,7 @@ class ActorNode(AsyncNode):
 
         return "default"
 
-    def _sender_for_role(self, role: AgentRole) -> AgentRole:
+    def _get_sender_for_role(self, role: AgentRole) -> AgentRole:
         return {
             AgentRole.RESEARCHER: AgentRole.RESEARCHER,
             AgentRole.ANALYST: AgentRole.RESEARCHER,
@@ -131,14 +181,18 @@ class ActorNode(AsyncNode):
             return {
                 "research_summary": researcher.raw_content,
                 "citations": researcher.citations,
-                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
+                "retrieved_chunks": [
+                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
+                ],
             }
         if role == AgentRole.VERIFIER:
             analyst = session.get_agent(AgentRole.ANALYST)
             return {
                 "claims": [c.model_dump() for c in analyst.claims],
                 "query": session.query,
-                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
+                "retrieved_chunks": [
+                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
+                ],
             }
         if role == AgentRole.PRESENTER:
             verifier = session.get_agent(AgentRole.VERIFIER)

@@ -102,7 +102,7 @@ async def test_actor_exec_async_missing_handler() -> None:
             message="No handler registered for researcher",
         ),
     ):
-        result = await node.exec_async({"session": session})
+        result = await node.exec_async({"session": session, "shared": {}})
     assert result.status == AgentStatus.FAILED
     assert "handler" in result.message.lower()
 
@@ -118,7 +118,7 @@ async def test_actor_exec_async_handler_raises() -> None:
         patch("a2a_research.a2a.server.A2AClient.send", side_effect=boom),
         pytest.raises(RuntimeError, match="agent boom"),
     ):
-        await node.exec_async({"session": session})
+        await node.exec_async({"session": session, "shared": {}})
 
 
 @pytest.mark.asyncio
@@ -186,4 +186,4 @@ async def test_actor_build_payload_branches() -> None:
     ):
         node = ActorNode(role)
         with patch("a2a_research.a2a.server.A2AClient.send", side_effect=handler):
-            await node.exec_async({"session": session})
+            await node.exec_async({"session": session, "shared": {}})
