@@ -212,6 +212,9 @@ def setup_logging() -> None:
     # (they write directly to terminal via _StreamToLogger._original_stream)
     stderr_logger = _configure_named_logger("stderr", logging.ERROR, propagate=False)
     stdout_logger = _configure_named_logger("stdout", level, propagate=False)
+    # Clear existing handlers to avoid duplication on reconfiguration
+    stderr_logger.handlers.clear()
+    stdout_logger.handlers.clear()
     # Attach file handlers directly to prevent log loss when propagation is off
     for handler in [app_file_handler, error_file_handler, trace_file_handler]:
         stdout_logger.addHandler(handler)
