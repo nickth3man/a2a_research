@@ -91,10 +91,11 @@ def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> 
     logger.log(level, "event=%s payload=%s", event, json.dumps(payload, sort_keys=True))
 
 
-def _configure_named_logger(name: str, level: int) -> None:
+def _configure_named_logger(name: str, level: int, propagate: bool = True) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
-    logger.propagate = True
+    logger.propagate = propagate
+    return logger
 
 
 def _install_exception_hooks() -> None:
@@ -199,8 +200,14 @@ def setup_logging() -> None:
     _configure_named_logger("mesop", level)
     _configure_named_logger("werkzeug", level)
     _configure_named_logger("flask", level)
-    _configure_named_logger("stderr", logging.ERROR)
-    _configure_named_logger("stdout", level)
+    # stdout/stderr loggers: disable propagation to avoid duplicate console output
+    # (they write directly to terminal via _StreamToLogger._original_stream)
+    stderr_logger = _configure_named_logger("stderr", logging.ERROR, propagate=False)
+    stdout_logger = _configure_named_logger("stdout", level, propagate=False)
+    # Attach file handlers directly to prevent log loss when propagation is off
+    for handler in [app_file_handler, error_file_handler, trace_file_handler]:
+        stdout_logger.addHandler(handler)
+        stderr_logger.addHandler(handler)
     _install_exception_hooks()
 
     log_event(

@@ -96,23 +96,7 @@ def CardQueryInput(  # noqa: N802
                         example_query,
                         on_click=handler,
                         type="stroked",
-                        style=me.Style(
-                            display="inline-flex",
-                            align_items="center",
-                            gap=4,
-                            padding=me.Padding(top=6, right=14, bottom=6, left=12),
-                            border_radius=CHIP_RADIUS,
-                            background=CHIP_BG,
-                            border=me.Border(
-                                top=me.BorderSide(width=1, color=CHIP_BORDER),
-                                right=me.BorderSide(width=1, color=CHIP_BORDER),
-                                bottom=me.BorderSide(width=1, color=CHIP_BORDER),
-                                left=me.BorderSide(width=1, color=CHIP_BORDER),
-                            ),
-                            font_size=FONT_SIZE_SMALL,
-                            color=CHIP_TEXT_COLOR,
-                            font_weight=500,
-                        ),
+                        style=_CHIP_STYLE,
                     )
         if on_granularity_agent and on_granularity_substep and on_granularity_detail:
             with me.box(

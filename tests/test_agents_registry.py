@@ -5,6 +5,7 @@ from a2a_research.agents.registry import (
     AgentSpec,
     get_agent_handler,
     get_agent_spec,
+    get_registry,
     register_agent,
 )
 from a2a_research.models import AgentRole
@@ -63,20 +64,34 @@ class TestAgentRegistry:
 
 class TestRegisterAgentDecorator:
     def test_decorator_registers_handler(self) -> None:
-        @register_agent(
-            AgentRole.ANALYST,
-            name="Test Analyst",
-            description="Testing",
-            version="1.1.0",
-            skills=["test"],
-        )
-        def my_analyst(_session: object, _message: object) -> str:
-            return "analyzed"
+        registry = get_registry()
+        # Save original state to restore after test
+        original_spec = registry.get_spec(AgentRole.ANALYST)
+        original_card = registry._cards.get(AgentRole.ANALYST)
 
-        spec = get_agent_spec(AgentRole.ANALYST)
-        assert spec is not None
-        assert spec.name == "Test Analyst"
-        assert spec.description == "Testing"
-        assert spec.version == "1.1.0"
-        assert spec.skills == ["test"]
-        assert get_agent_handler(AgentRole.ANALYST) is my_analyst
+        try:
+            @register_agent(
+                AgentRole.ANALYST,
+                name="Test Analyst",
+                description="Testing",
+                version="1.1.0",
+                skills=["test"],
+            )
+            def my_analyst(_session: object, _message: object) -> str:
+                return "analyzed"
+
+            spec = get_agent_spec(AgentRole.ANALYST)
+            assert spec is not None
+            assert spec.name == "Test Analyst"
+            assert spec.description == "Testing"
+            assert spec.version == "1.1.0"
+            assert spec.skills == ["test"]
+            assert get_agent_handler(AgentRole.ANALYST) is my_analyst
+        finally:
+            # Restore original state to prevent leakage to other tests
+            if original_spec is not None:
+                registry._specs[AgentRole.ANALYST] = original_spec
+                registry._cards[AgentRole.ANALYST] = original_card
+            else:
+                registry._specs.pop(AgentRole.ANALYST, None)
+                registry._cards.pop(AgentRole.ANALYST, None)

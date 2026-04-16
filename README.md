@@ -186,7 +186,7 @@ The Mesop app exposes five sections:
 
 - **Query input** — textarea at the bottom; submitting triggers the full pipeline
 - **Agent timeline** — per-role card showing status (PENDING → RUNNING → COMPLETED/FAILED) and the agent's log message
-- **Verified claims** — each claim shows verdict badge ([OK] SUPPORTED / [X] REFUTED / [?] INSUFFICIENT_EVIDENCE), confidence percentage, sources, and evidence snippets
+- **Verified claims** — each claim shows verdict badge (✅ SUPPORTED / ❌ REFUTED / ⚠️ INSUFFICIENT_EVIDENCE), confidence percentage, sources, and evidence snippets
 - **Sources panel** — deduplicated citation list with index numbers
 - **Final report** — rendered markdown output from the Presenter agent
 

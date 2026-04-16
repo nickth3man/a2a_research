@@ -77,7 +77,7 @@ uv run pytest --cov=src/a2a_research
 
 - **Python 3.11+** is required
 - **Type annotations** are required for all public functions
-- **mypy strict mode** is enforced (see `mypy.ini`)
+- **mypy strict mode** is enforced (see `pyproject.toml`)
 - **Docstrings** should be concise; module-level docstrings are fine, but avoid redundant inline comments
 - Follow the existing **feature-based structure** under `src/a2a_research/`
 
