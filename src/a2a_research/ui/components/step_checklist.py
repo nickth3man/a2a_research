@@ -7,6 +7,7 @@ from a2a_research.ui.data_access import get_agent_label, get_all_roles
 from a2a_research.ui.tokens import (
     FONT_SIZE_SMALL,
     FONT_SIZE_TINY,
+    STATUS_LABELS,
     SUBSTEP_COLOR,
     status_color,
 )
@@ -56,7 +57,7 @@ def _render_checklist_row(
                 style=me.Style(font_weight="bold", font_size=FONT_SIZE_SMALL, flex=1),
             )
             me.text(
-                result.status.value,
+                STATUS_LABELS[result.status],
                 style=me.Style(
                     color="#fff",
                     font_size=FONT_SIZE_TINY,

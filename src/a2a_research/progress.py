@@ -106,8 +106,10 @@ async def drain_progress_while_running(
             {queue_task, workflow_task},
             return_when=asyncio.FIRST_COMPLETED,
         )
-        for task in pending:
-            task.cancel()
+
+        if workflow_task in done and queue_task in pending:
+            queue_task.cancel()
+            await asyncio.gather(queue_task, return_exceptions=True)
 
         if queue_task in done:
             event = queue_task.result()
@@ -134,7 +136,17 @@ async def drain_progress_while_running(
                 queue_id=id(queue),
                 workflow_task_id=id(workflow_task),
             )
-            workflow_task.result()
+            try:
+                workflow_task.result()
+            except asyncio.CancelledError:
+                log_event(
+                    logger,
+                    20,
+                    "progress.drain.workflow_cancelled",
+                    queue_id=id(queue),
+                    workflow_task_id=id(workflow_task),
+                )
+                return
             while True:
                 try:
                     event = queue.get_nowait()

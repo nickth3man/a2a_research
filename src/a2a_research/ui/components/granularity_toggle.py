@@ -58,6 +58,7 @@ def _render_granularity_button(
             background=GRANULARITY_SELECTED_BG if is_selected else "transparent",
             border_radius=6,
             box_shadow=GRANULARITY_SELECTED_SHADOW if is_selected else None,
+            padding=me.Padding(top=2, bottom=2, left=2, right=2),
         )
     ):
         me.button(
@@ -65,4 +66,8 @@ def _render_granularity_button(
             on_click=handler,
             type="flat",
             color="primary" if is_selected else "accent",
+            style=me.Style(
+                font_weight="bold" if is_selected else "normal",
+                opacity=1.0 if is_selected else 0.75,
+            ),
         )

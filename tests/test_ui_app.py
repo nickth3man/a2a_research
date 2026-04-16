@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+
+if TYPE_CHECKING:
+    from mesop.events import InputEvent
 
 
 async def _drain_on_submit(app_mod, mock_event: MagicMock | None = None) -> None:
@@ -100,6 +105,35 @@ async def test_on_submit_exception_sets_error() -> None:
     assert "LLM down" in (st.session.error or "")
 
 
+async def test_on_submit_cancelled_sets_recoverable_error() -> None:
+    from a2a_research.ui import app as app_mod
+
+    st = SimpleNamespace(
+        query_text="Q",
+        loading=False,
+        session=ResearchSession(),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
+    )
+
+    with (
+        patch.object(app_mod.me, "state", return_value=st),
+        patch(
+            "a2a_research.workflow.run_workflow_async",
+            new_callable=AsyncMock,
+            side_effect=asyncio.CancelledError(),
+        ),
+    ):
+        await _drain_on_submit(app_mod)
+
+    assert st.loading is False
+    assert st.progress_pct == 0.0
+    assert st.session.error == "Live update stream was interrupted. Please retry."
+
+
 async def test_on_submit_success_yields_twice() -> None:
     """Loading flush + final UI flush."""
     from a2a_research.ui import app as app_mod
@@ -169,7 +203,7 @@ def test_on_query_input_updates_state() -> None:
         progress_step_label="",
         progress_running_substeps=[],
     )
-    ev = SimpleNamespace(value="  hello ")
+    ev = cast("InputEvent", SimpleNamespace(value="  hello "))
     with patch.object(app_mod.me, "state", return_value=st):
         app_mod._on_query_input(ev)
     assert st.query_text == "  hello "

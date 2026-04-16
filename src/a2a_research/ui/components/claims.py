@@ -10,6 +10,7 @@ from a2a_research.ui.tokens import (
     BORDER_WIDTH,
     CLAIM_INNER_RADIUS,
     CLAIM_PADDING,
+    EVIDENCE_TEXT_COLOR,
     FONT_SIZE_BODY,
     FONT_SIZE_SMALL,
     SECTION_MARGIN_BOTTOM_MD,
@@ -86,5 +87,5 @@ def _render_claim(claim: Claim) -> None:
             ):
                 me.text(
                     snippet,
-                    style=me.Style(font_size=FONT_SIZE_SMALL, color="#374151"),
+                    style=me.Style(font_size=FONT_SIZE_SMALL, color=EVIDENCE_TEXT_COLOR),
                 )

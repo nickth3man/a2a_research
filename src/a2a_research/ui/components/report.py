@@ -7,6 +7,7 @@ from a2a_research.ui.primitives import card_box
 from a2a_research.ui.tokens import (
     CARD_PADDING,
     CARD_PADDING_LARGE,
+    FONT_SIZE_SMALL,
     MARKDOWN_INNER_RADIUS,
     REPORT_MARKDOWN_BG,
     SECTION_MARGIN_BOTTOM_MD,
@@ -27,6 +28,12 @@ def PanelReport(session: ResearchSession) -> None:  # noqa: N802
                 style=me.Style(color=TEXT_MUTED),
             )
             return
+        me.text(
+            "Tip: select the report below and use Ctrl+C / Cmd+C to copy it.",
+            style=me.Style(
+                color=TEXT_MUTED, font_size=FONT_SIZE_SMALL, margin=me.Margin(bottom=12)
+            ),
+        )
         me.markdown(
             session.final_report,
             style=me.Style(

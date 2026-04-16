@@ -12,6 +12,7 @@ yields so the completed UI renders.
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
+from contextlib import suppress
 from dataclasses import field
 
 import mesop as me
@@ -43,7 +44,7 @@ from a2a_research.ui.components import (
 )
 from a2a_research.ui.data_access import get_agent_label
 from a2a_research.ui.session_state import get_session_error, has_progress, has_results
-from a2a_research.ui.tokens import PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
+from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
 
 setup_logging()
 logger = get_logger(__name__)
@@ -91,14 +92,7 @@ def main_page() -> None:
     log_event(logger, logging.INFO, "ui.main_page.render.start", state=_state_snapshot(state))
 
     try:
-        with me.box(
-            style=me.Style(
-                max_width=PAGE_MAX_WIDTH,
-                margin=me.Margin(left="auto", right="auto"),
-                padding=PAGE_PADDING,
-                font_family=PAGE_FONT_FAMILY,
-            )
-        ):
+        with me.box(style=_page_shell_style(state.loading)):
             log_event(logger, logging.DEBUG, "ui.component.render", component="PageHeader")
             PageHeader()
             log_event(logger, logging.DEBUG, "ui.component.render", component="PageInstructions")
@@ -113,7 +107,7 @@ def main_page() -> None:
                     component="BannerError",
                     error=session_error,
                 )
-                BannerError(session_error)
+                _render_error_banner(session_error)
 
             if state.loading:
                 log_event(
@@ -132,14 +126,6 @@ def main_page() -> None:
                     granularity=state.progress_granularity,
                     running_substeps=state.progress_running_substeps,
                 )
-                log_event(
-                    logger,
-                    logging.DEBUG,
-                    "ui.component.render",
-                    component="CardTimeline",
-                    state="loading",
-                )
-                CardTimeline(state.session)
             else:
                 if has_results(state.session):
                     log_event(
@@ -172,7 +158,7 @@ def main_page() -> None:
                 component="CardQueryInput",
                 props={
                     "query_text": state.query_text,
-                    "submit_disabled": int(state.loading),
+                    "submit_disabled": state.loading,
                     "progress_granularity": state.progress_granularity,
                     "has_example_handlers": True,
                 },
@@ -181,7 +167,7 @@ def main_page() -> None:
                 on_submit=_on_submit,
                 on_query_input=_on_query_input,
                 query_text=state.query_text,
-                submit_disabled=int(state.loading),
+                submit_disabled=state.loading,
                 progress_granularity=state.progress_granularity,
                 on_granularity_agent=_on_granularity_agent,
                 on_granularity_substep=_on_granularity_substep,
@@ -206,6 +192,24 @@ def main_page() -> None:
             "ui.main_page.render.complete",
             session_id=state.session.id,
         )
+
+
+def _page_shell_style(loading: bool) -> me.Style:
+    return me.Style(
+        max_width=PAGE_MAX_WIDTH,
+        margin=me.Margin(left="auto", right="auto"),
+        padding=PAGE_PADDING,
+        font_family=PAGE_FONT_FAMILY,
+        background="rgba(239, 246, 255, 0.45)" if loading else None,
+        border_radius=14 if loading else None,
+        box_shadow="0 0 0 4px rgba(219, 234, 254, 0.65)" if loading else None,
+        opacity=0.98 if loading else 1.0,
+        transition="background 180ms ease, box-shadow 180ms ease, opacity 180ms ease",
+    )
+
+
+def _render_error_banner(error: str) -> None:
+    BannerError(error, on_retry=_on_retry)
 
 
 def _progress_fraction(evt: ProgressEvent) -> float:
@@ -276,10 +280,10 @@ def _render_results(session: ResearchSession) -> None:
         agent_count=len(session.agent_results),
         report_chars=len(session.final_report),
     )
-    CardTimeline(session)
+    PanelReport(session)
     PanelClaims(session)
     PanelSources(session)
-    PanelReport(session)
+    CardTimeline(session)
 
 
 def _on_query_input(e: me.InputEvent) -> None:
@@ -309,15 +313,15 @@ def _set_example_query(query: str) -> None:
 
 
 def _on_example_a(_e: me.ClickEvent) -> None:
-    _set_example_query("What is the A2A protocol?")
+    _set_example_query(EXAMPLE_QUERIES[0])
 
 
 def _on_example_b(_e: me.ClickEvent) -> None:
-    _set_example_query("How do LLM agents collaborate?")
+    _set_example_query(EXAMPLE_QUERIES[1])
 
 
 def _on_example_c(_e: me.ClickEvent) -> None:
-    _set_example_query("What are RAG evaluation metrics?")
+    _set_example_query(EXAMPLE_QUERIES[2])
 
 
 def _on_granularity_agent(_e: me.ClickEvent) -> None:
@@ -339,7 +343,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     """Run research on click using Mesop's async-generator loading pattern."""
     install_asyncio_exception_logging()
     state: AppState = me.state(AppState)
-    query_text = state.query_text.strip()
+    query_text = state.query_text.strip() or state.session.query.strip()
     log_event(
         logger,
         logging.INFO,
@@ -351,7 +355,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
 
     if not query_text:
         state.session = ResearchSession(
-            query=query_text,
+            query="",
             error="Enter a research query before running the pipeline.",
         )
         log_event(
@@ -372,9 +376,9 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     state.loading = True
     state.session = ResearchSession(query=query_text)
     state.session.ensure_agent_results()
-    state.progress_pct = 0.0
-    state.current_substep = "Starting pipeline\u2026"
-    state.progress_step_label = "Preparing\u2026"
+    state.progress_pct = 0.05
+    state.current_substep = ""
+    state.progress_step_label = "Starting pipeline\u2026"
     state.progress_running_substeps = []
     log_event(
         logger,
@@ -386,6 +390,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     )
     yield
 
+    wf_task: asyncio.Task[ResearchSession] | None = None
     try:
         from a2a_research.workflow import run_workflow_async
 
@@ -402,20 +407,43 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             yield
 
         state.session = wf_task.result()
-        state.progress_pct = 1.0
+        if state.session.error:
+            state.progress_pct = 0.0
+            log_event(
+                logger,
+                logging.WARNING,
+                "ui.submit.completed.with_error",
+                session_id=state.session.id,
+                error=state.session.error,
+                final_report_chars=len(state.session.final_report),
+            )
+        else:
+            state.progress_pct = 1.0
+            log_event(
+                logger,
+                logging.INFO,
+                "ui.submit.completed",
+                session_id=state.session.id,
+                final_report_chars=len(state.session.final_report),
+                agent_statuses={
+                    role.value: result.status.value
+                    for role, result in state.session.agent_results.items()
+                },
+            )
+    except asyncio.CancelledError:
+        state.session.error = "Live update stream was interrupted. Please retry."
+        state.progress_pct = 0.0
         log_event(
             logger,
-            logging.INFO,
-            "ui.submit.completed",
+            logging.WARNING,
+            "ui.submit.cancelled",
+            query=query_text,
             session_id=state.session.id,
-            final_report_chars=len(state.session.final_report),
-            agent_statuses={
-                role.value: result.status.value
-                for role, result in state.session.agent_results.items()
-            },
+            state=_state_snapshot(state),
         )
     except Exception as exc:
         state.session.error = str(exc)
+        state.progress_pct = 0.0
         log_event(
             logger,
             logging.ERROR,
@@ -434,9 +462,18 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             session_id=state.session.id,
             state_before_cleanup=_state_snapshot(state),
         )
+        if wf_task is not None and not wf_task.done():
+            wf_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await wf_task
         state.loading = False
         state.current_substep = ""
         state.progress_step_label = ""
         state.progress_running_substeps = []
 
     yield
+
+
+async def _on_retry(e: me.ClickEvent) -> AsyncGenerator[None, None]:
+    async for _ in _on_submit(e):
+        yield

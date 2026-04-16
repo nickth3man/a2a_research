@@ -61,6 +61,28 @@ def test_main_page_loading() -> None:
 
 
 @pytest.mark.usefixtures("stub_mesop_box_runtime")
+def test_main_page_loading_does_not_render_timeline() -> None:
+    from a2a_research.ui import app as app_mod
+
+    st = _make_state(
+        loading=True,
+        session=ResearchSession(query="Q"),
+        progress_pct=0.25,
+        progress_step_label="Step 1 of 4 — Researcher",
+        current_substep="Querying ChromaDB…",
+    )
+    with (
+        patch("a2a_research.ui.app.me.state", return_value=st),
+        patch("a2a_research.ui.app.CardLoading") as card_loading,
+        patch("a2a_research.ui.app.CardTimeline") as card_timeline,
+    ):
+        app_mod.main_page()
+
+    card_loading.assert_called_once()
+    card_timeline.assert_not_called()
+
+
+@pytest.mark.usefixtures("stub_mesop_box_runtime")
 def test_main_page_results() -> None:
     from a2a_research.ui import app as app_mod
 

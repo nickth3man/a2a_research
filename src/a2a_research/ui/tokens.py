@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import mesop as me
 
-from a2a_research.ui.theme import status_color, verdict_bg, verdict_color
+from a2a_research.ui.theme import STATUS_LABELS, status_color, verdict_bg, verdict_color
 
 # Re-export theme functions so UI code can import from one place.
 __all__ = [
@@ -22,15 +22,24 @@ __all__ = [
     "CARD_PADDING_LARGE",
     "CARD_RADIUS",
     "CARD_SHADOW",
+    "CHIP_BG",
+    "CHIP_BORDER",
+    "CHIP_RADIUS",
+    "CHIP_TEXT_COLOR",
     "CLAIM_INNER_RADIUS",
     "CLAIM_PADDING",
     "EMPTY_STATE_BG",
     "EMPTY_STATE_BORDER",
+    "EMPTY_STATE_ICON_BG",
+    "EMPTY_STATE_ICON_SIZE",
     "EMPTY_STATE_STYLE",
     "ERROR_BANNER_BG",
     "ERROR_BANNER_BORDER",
     "ERROR_BANNER_STYLE",
+    "ERROR_ICON_COLOR",
     "ERROR_TEXT",
+    "EVIDENCE_TEXT_COLOR",
+    "EXAMPLE_QUERIES",
     "EXAMPLE_QUERY_COLOR",
     "FONT_SIZE_BODY",
     "FONT_SIZE_SMALL",
@@ -50,6 +59,7 @@ __all__ = [
     "LOADING_BG",
     "LOADING_BORDER",
     "LOADING_CARD_STYLE",
+    "LOADING_DOT_SIZE",
     "LOADING_TEXT",
     "MARKDOWN_INNER_RADIUS",
     "PAGE_FONT_FAMILY",
@@ -64,6 +74,8 @@ __all__ = [
     "SECTION_MARGIN_BOTTOM_MD",
     "SECTION_MARGIN_BOTTOM_SM",
     "SOURCE_ROW_BG",
+    "STATUS_LABELS",
+    "STEP_CARD_BORDER",
     "SUBSTEP_COLOR",
     "SUBTITLE_MARGIN_BOTTOM",
     "TEXT_MUTED",
@@ -106,12 +118,25 @@ HEADER_BORDER_WIDTH = 2
 HEADER_SUBTITLE_COLOR = "#374151"
 INSTRUCTIONS_BG = "#eff6ff"
 INSTRUCTIONS_BORDER = "#bfdbfe"
+STEP_CARD_BORDER = "#dbeafe"  # lighter blue for individual instruction step cards
 EMPTY_STATE_BG = "#f9fafb"
 EMPTY_STATE_BORDER = "#d1d5db"
 EXAMPLE_QUERY_COLOR = "#1d4ed8"
+CHIP_BG = "#eff6ff"
+CHIP_BORDER = "#bfdbfe"
+CHIP_RADIUS = 20
+CHIP_TEXT_COLOR = EXAMPLE_QUERY_COLOR
+SUBMIT_BUTTON_PADDING = me.Padding(top=10, right=24, bottom=10, left=24)
 GRANULARITY_GROUP_BG = "#f3f4f6"
 GRANULARITY_SELECTED_BG = "#ffffff"
 GRANULARITY_SELECTED_SHADOW = "0 1px 3px rgba(0,0,0,0.15)"
+
+# --- Example queries (single source of truth) ---
+EXAMPLE_QUERIES: list[str] = [
+    "What is the A2A protocol?",
+    "How do LLM agents collaborate?",
+    "What are RAG evaluation metrics?",
+]
 
 # --- Agent timeline rows ---
 AGENT_ROW_BG_IDLE = "#f9fafb"
@@ -127,15 +152,22 @@ REPORT_MARKDOWN_BG = "#fafafa"
 ERROR_BANNER_BG = "#fef2f2"
 ERROR_BANNER_BORDER = "#fecaca"
 ERROR_TEXT = "#dc2626"
+ERROR_ICON_COLOR = "#dc2626"
 LOADING_BG = "#fffbeb"
 LOADING_BORDER = "#fde68a"
 LOADING_TEXT = "#92400e"
+LOADING_DOT_SIZE = 16
+
+# --- Empty state ---
+EMPTY_STATE_ICON_SIZE = "42px"
+EMPTY_STATE_ICON_BG = "#eff6ff"
 
 # --- Claims ---
 CLAIM_INNER_RADIUS = 8
 CALLOUT_RADIUS = 8
 CLAIM_PADDING = me.Padding(top=14, right=14, bottom=14, left=14)
 MARKDOWN_INNER_RADIUS = 6
+EVIDENCE_TEXT_COLOR = "#374151"  # dark gray for evidence snippet body text
 
 QUERY_CARD_MARGIN_BOTTOM = 16
 
@@ -162,10 +194,14 @@ PULSE_BG = "#eff6ff"
 
 # --- Style Presets for Common Component Patterns ---
 
-# Error banner style preset
 ERROR_BANNER_STYLE = me.Style(
     background=ERROR_BANNER_BG,
-    border=_build_border(ERROR_BANNER_BORDER),
+    border=me.Border(
+        left=me.BorderSide(width=4, color=ERROR_TEXT),
+        top=me.BorderSide(width=BORDER_WIDTH, color=ERROR_BANNER_BORDER),
+        right=me.BorderSide(width=BORDER_WIDTH, color=ERROR_BANNER_BORDER),
+        bottom=me.BorderSide(width=BORDER_WIDTH, color=ERROR_BANNER_BORDER),
+    ),
     border_radius=CALLOUT_RADIUS,
     padding=me.Padding(top=14, right=14, bottom=14, left=14),
     margin=me.Margin(bottom=16),

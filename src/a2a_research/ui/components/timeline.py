@@ -15,6 +15,7 @@ from a2a_research.ui.tokens import (
     FONT_SIZE_TINY,
     PULSE_BG,
     SECTION_MARGIN_BOTTOM_SM,
+    STATUS_LABELS,
     SUBTITLE_MARGIN_BOTTOM,
     TEXT_MUTED,
     status_color,
@@ -84,7 +85,7 @@ def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
                     ),
                 )
         me.text(
-            result.status.value,
+            STATUS_LABELS[result.status],
             style=me.Style(
                 color="#fff",
                 font_size=FONT_SIZE_TINY,

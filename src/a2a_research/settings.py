@@ -130,6 +130,10 @@ class AppSettings(BaseSettings):
         default=32123,
         description="Default port for the Mesop UI in app tooling (env: MESOP_PORT).",
     )
+    workflow_timeout: float = Field(
+        default=120.0,
+        description="Maximum workflow runtime in seconds before returning a partial timed-out session.",
+    )
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)

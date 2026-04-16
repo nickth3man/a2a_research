@@ -97,13 +97,24 @@ def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
     )
 
 
+def test_report_panel_renders_without_html_iframe(stub_mesop_component_runtime: None) -> None:
+    from unittest.mock import patch
+
+    from a2a_research.ui.components import PanelReport
+
+    with patch("a2a_research.ui.components.report.me.html") as html_mock:
+        PanelReport(ResearchSession(query="q", final_report="# Title"))
+
+    html_mock.assert_not_called()
+
+
 def test_query_input_card(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import CardQueryInput
 
-    def on_submit() -> None:
+    def on_submit(_event: object) -> None:
         return None
 
-    def on_input() -> None:
+    def on_input(_event: object) -> None:
         return None
 
     CardQueryInput(

@@ -8,6 +8,13 @@ from __future__ import annotations
 
 from a2a_research.models import AgentStatus
 
+STATUS_LABELS: dict[AgentStatus, str] = {
+    AgentStatus.PENDING: "Waiting",
+    AgentStatus.RUNNING: "Running",
+    AgentStatus.COMPLETED: "Done",
+    AgentStatus.FAILED: "Failed",
+}
+
 
 def status_color(status: AgentStatus) -> str:
     if status == AgentStatus.COMPLETED:
@@ -16,7 +23,7 @@ def status_color(status: AgentStatus) -> str:
         return "#d97706"
     if status == AgentStatus.FAILED:
         return "#dc2626"
-    return "#9ca3af"
+    return "#6b7280"
 
 
 def verdict_color(verdict: str) -> str:

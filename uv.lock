@@ -15,22 +15,39 @@ dependencies = [
     { name = "anthropic" },
     { name = "chromadb" },
     { name = "google-genai" },
-    { name = "hypothesis" },
     { name = "mesop" },
-    { name = "mypy" },
     { name = "ollama" },
     { name = "openai" },
     { name = "pocketflow" },
-    { name = "pre-commit" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "rich" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
-    { name = "rich" },
     { name = "ruff" },
     { name = "ty" },
+]
+lint = [
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+test = [
+    { name = "hypothesis" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "pytest-xdist" },
 ]
 
 [package.metadata]
@@ -38,22 +55,39 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.95.0" },
     { name = "chromadb", specifier = ">=1.5.7" },
     { name = "google-genai", specifier = ">=1.73.1" },
-    { name = "hypothesis", specifier = ">=6.152.1" },
     { name = "mesop", specifier = ">=1.2.7" },
-    { name = "mypy", specifier = ">=1.20.1" },
     { name = "ollama", specifier = ">=0.6.1" },
     { name = "openai", specifier = ">=2.32.0" },
     { name = "pocketflow", specifier = ">=0.0.3" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pydantic", specifier = ">=2.13.1" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
+    { name = "rich", specifier = ">=15.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.152.1" },
+    { name = "mypy", specifier = ">=1.20.1" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "pytest-asyncio", specifier = ">=1.3.0" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", specifier = ">=0.15.10" },
     { name = "ty", specifier = ">=0.0.31" },
+]
+lint = [
+    { name = "mypy", specifier = ">=1.20.1" },
+    { name = "pre-commit", specifier = ">=4.5.1" },
+    { name = "ruff", specifier = ">=0.15.10" },
+    { name = "ty", specifier = ">=0.0.31" },
+]
+test = [
+    { name = "hypothesis", specifier = ">=6.152.1" },
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
 ]
 
 [[package]]

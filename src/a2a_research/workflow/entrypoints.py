@@ -14,8 +14,9 @@ from time import perf_counter
 from typing import Any
 
 from ..app_logging import get_logger
-from ..models import AgentRole, ResearchSession, default_roles
+from ..models import AgentRole, AgentStatus, ResearchSession, default_roles
 from ..progress import ProgressQueue, create_progress_reporter
+from ..settings import settings
 from .builder import get_workflow
 
 logger = get_logger(__name__)
@@ -96,7 +97,21 @@ async def run_workflow_from_session(
             asyncio.get_running_loop(), progress_queue
         )
         shared["progress_granularity"] = granularity
-    await flow.run_async(shared)
+    try:
+        await asyncio.wait_for(flow.run_async(shared), timeout=settings.workflow_timeout)
+    except TimeoutError:
+        timed_out_session: ResearchSession = shared["session"]
+        timed_out_session.error = f"Workflow timed out after {settings.workflow_timeout:.1f}s. Partial results are shown below."
+        for agent_result in timed_out_session.agent_results.values():
+            if agent_result.status == AgentStatus.RUNNING:
+                agent_result.status = AgentStatus.FAILED
+                agent_result.message = "Timed out while running."
+        logger.warning(
+            "Workflow timed out session_id=%s timeout_s=%.1f",
+            timed_out_session.id,
+            settings.workflow_timeout,
+        )
+        return timed_out_session
     result: ResearchSession = shared["session"]
     logger.info(
         "Workflow completed session_id=%s agents=%s final_report_chars=%s error=%r",
