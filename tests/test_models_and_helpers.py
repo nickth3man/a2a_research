@@ -162,9 +162,30 @@ class TestHelpers:
         assert claims[0].id == "1"
 
     def test_extract_claims_from_llm_output_fallback(self):
-        raw = "Some unstructured LLM output that does not contain JSON."
+        """Unstructured non-JSON output must produce zero claims (not raise, not fabricate).
+        Callers rely on an empty list to trigger their own fallback parser."""
+        claims = extract_claims_from_llm_output(
+            "Some unstructured LLM output that does not contain JSON."
+        )
+        assert claims == []
+
+    def test_extract_claims_from_llm_output_skips_items_missing_text(self):
+        """A claim dict without ``text`` (or ``claim``) must be skipped, not added as empty."""
+        raw = (
+            '{"atomic_claims": ['
+            '{"id": "c0"},'
+            '{"id": "c1", "text": "Real claim."},'
+            '{"id": "c2", "claim": ""}'
+            "]}"
+        )
         claims = extract_claims_from_llm_output(raw)
-        assert isinstance(claims, list)
+        assert [c.text for c in claims] == ["Real claim."]
+
+    def test_extract_claims_from_llm_output_invalid_verdict_defaults_to_insufficient(self):
+        raw = '{"verified_claims": [{"id": "c1", "text": "x", "verdict": "MAYBE"}]}'
+        claims = extract_claims_from_llm_output(raw)
+        assert len(claims) == 1
+        assert claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
 
     def test_extract_claims_from_llm_output_empty(self):
         claims = extract_claims_from_llm_output("")
@@ -218,29 +239,26 @@ class TestHelpers:
         assert "No claims" in result
 
 
-class TestVerdictEnum:
-    def test_verdict_values(self):
+class TestEnumContracts:
+    """Enum string values are serialized into persisted JSON and the A2A shared dict;
+    silently changing them would break on-disk sessions and workflow dispatch keys."""
+
+    def test_verdict_string_values_are_stable_contract(self):
         assert Verdict.SUPPORTED.value == "SUPPORTED"
         assert Verdict.REFUTED.value == "REFUTED"
         assert Verdict.INSUFFICIENT_EVIDENCE.value == "INSUFFICIENT_EVIDENCE"
 
-    def test_verdict_from_string(self):
-        assert Verdict("SUPPORTED") == Verdict.SUPPORTED
-        assert Verdict("REFUTED") == Verdict.REFUTED
-        assert Verdict("INSUFFICIENT_EVIDENCE") == Verdict.INSUFFICIENT_EVIDENCE
-
-
-class TestAgentRoleEnum:
-    def test_agent_role_values(self):
+    def test_agent_role_string_values_are_stable_contract(self):
         assert AgentRole.RESEARCHER.value == "researcher"
         assert AgentRole.ANALYST.value == "analyst"
         assert AgentRole.VERIFIER.value == "verifier"
         assert AgentRole.PRESENTER.value == "presenter"
 
-    def test_all_roles_present(self):
-        roles = list(AgentRole)
-        assert len(roles) == 4
-        assert AgentRole.RESEARCHER in roles
-        assert AgentRole.ANALYST in roles
-        assert AgentRole.VERIFIER in roles
-        assert AgentRole.PRESENTER in roles
+    def test_agent_role_count_guards_against_silent_role_removal(self):
+        """Exactly 4 roles; removing one would silently skip a pipeline stage."""
+        assert set(AgentRole) == {
+            AgentRole.RESEARCHER,
+            AgentRole.ANALYST,
+            AgentRole.VERIFIER,
+            AgentRole.PRESENTER,
+        }

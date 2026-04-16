@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
+
 from a2a_research.agents import _parse_claims_from_analyst, _parse_verified_claims
 from a2a_research.models import (
     AgentResult,
@@ -218,6 +220,106 @@ class TestClaimParsing:
         assert len(claims) == 1
         assert claims[0].id == "c1"
 
+    def test_parse_verified_claims_line_mode_extracts_verdict_and_confidence(self) -> None:
+        """The line-oriented fallback parses human-style output with section headers and
+        extracts the percentage confidence when present."""
+        raw = (
+            "- RAG improves grounding on open-domain QA tasks.\n"
+            "SUPPORTED 87%\n"
+            "\n"
+            "- RAG was invented by Facebook.\n"
+            "INSUFFICIENT\n"
+            "\n"
+        )
+        claims = _parse_verified_claims(raw, fallback_claims=[])
+        assert [c.verdict for c in claims] == [Verdict.SUPPORTED, Verdict.INSUFFICIENT_EVIDENCE]
+        assert claims[0].confidence == pytest.approx(0.87)
+        assert "RAG improves grounding" in claims[0].text
+        assert "Facebook" in claims[1].text
+
+    def test_parse_verified_claims_invalid_verdict_string_defaults_to_insufficient(self) -> None:
+        """A JSON payload with an unknown ``verdict`` string must not raise; default to
+        INSUFFICIENT_EVIDENCE so the pipeline can surface the claim with a safe verdict."""
+        raw = (
+            '{"verified_claims": ['
+            '{"id": "c1", "text": "x", "verdict": "MAYBE", "confidence": 0.5}]}'
+        )
+        claims = _parse_verified_claims(raw, fallback_claims=[])
+        assert len(claims) == 1
+        assert claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
+
+    def test_parse_claims_from_analyst_quoted_text_fallback(self) -> None:
+        """With no JSON object, the analyst parser recovers quoted phrases longer than
+        ~20 chars as atomic claims with INSUFFICIENT_EVIDENCE."""
+        from a2a_research.agents import _parse_claims_from_analyst
+
+        raw = (
+            "Here are your claims: "
+            '"RAG reduces hallucinations by grounding on retrieved context" and '
+            '"Dense retrievers outperform BM25 for semantic matches".'
+        )
+        claims = _parse_claims_from_analyst(raw)
+        texts = [c.text for c in claims]
+        assert any("RAG reduces hallucinations" in t for t in texts)
+        assert any("Dense retrievers" in t for t in texts)
+        assert all(c.verdict == Verdict.INSUFFICIENT_EVIDENCE for c in claims)
+
+
+class TestSanitizeQuery:
+    def test_strips_whitespace_and_collapses_internal_runs(self) -> None:
+        from a2a_research.agents import _sanitize_query
+
+        assert _sanitize_query("   hello   world\n\tagain  ") == "hello world again"
+
+    def test_truncates_at_10000_characters(self) -> None:
+        from a2a_research.agents import _sanitize_query
+
+        long_query = "a" * 20000
+        sanitized = _sanitize_query(long_query)
+        assert len(sanitized) == 10000
+
+
+class TestProgressContext:
+    def test_returns_defaults_when_message_is_none(self) -> None:
+        from a2a_research.agents import _extract_progress_context
+
+        reporter, step_index, total_steps, granularity = _extract_progress_context(None)
+        assert reporter is None
+        assert (step_index, total_steps, granularity) == (0, 4, 1)
+
+    def test_reads_from_payload_progress_context(self) -> None:
+        from a2a_research.agents import _extract_progress_context
+        from a2a_research.models import A2AMessage
+
+        msg = A2AMessage(
+            sender=AgentRole.RESEARCHER,
+            recipient=AgentRole.ANALYST,
+            payload={"progress_context": {"step_index": 2, "total_steps": 4, "granularity": 3}},
+        )
+        _, step_index, total_steps, granularity = _extract_progress_context(msg)
+        assert (step_index, total_steps, granularity) == (2, 4, 3)
+
+
+class TestResearcherRagFailure:
+    def test_researcher_invoke_returns_failed_when_retrieval_raises(self) -> None:
+        """A non-provider error during retrieval must short-circuit the researcher with
+        a FAILED status rather than falling through to the LLM call."""
+        from a2a_research.agents import researcher_invoke
+
+        session = ResearchSession(query="What is RAG?")
+        with (
+            patch(
+                "a2a_research.agents.retrieve_chunks",
+                side_effect=RuntimeError("chroma down"),
+            ),
+            patch("a2a_research.agents._call_llm") as call_llm,
+        ):
+            result = researcher_invoke(session)
+
+        assert result.status == AgentStatus.FAILED
+        assert "RAG retrieval failed" in result.message
+        call_llm.assert_not_called()
+
 
 class TestAgentFallbacks:
     def test_fallback_research_summary_with_empty_chunks(self) -> None:
@@ -325,6 +427,39 @@ class TestAgentFallbacks:
         assert "degraded" in result.message.lower() or "fallback" in result.message.lower()
         assert len(result.claims) == 1
         assert result.claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
+
+    def test_presenter_invoke_falls_back_when_llm_returns_empty_report(self) -> None:
+        """If the LLM returns a structured response whose ``report`` strips to empty
+        the presenter must rebuild a deterministic markdown report from verified claims."""
+        from a2a_research.agents import presenter_invoke
+
+        session = ResearchSession(query="What is RAG?")
+        session.agent_results[AgentRole.RESEARCHER] = AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.COMPLETED,
+            citations=["rag_accuracy"],
+        )
+        session.agent_results[AgentRole.VERIFIER] = AgentResult(
+            role=AgentRole.VERIFIER,
+            status=AgentStatus.COMPLETED,
+            claims=[
+                Claim(
+                    id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED, confidence=0.9
+                )
+            ],
+            citations=["rag_accuracy"],
+        )
+
+        with patch(
+            "a2a_research.agents._call_llm",
+            return_value='{"report": "", "formatted_output": ""}',
+        ):
+            result = presenter_invoke(session)
+
+        assert result.status.value == "COMPLETED"
+        assert "deterministic" in result.message.lower()
+        assert result.raw_content.startswith("# Research Report")
+        assert "RAG uses retrieval." in result.raw_content
 
     def test_presenter_invoke_handles_provider_request_error(self) -> None:
         from a2a_research.agents import presenter_invoke

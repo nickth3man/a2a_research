@@ -107,7 +107,15 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-n auto --cov=src/a2a_research --cov-report=term-missing"
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # Windows ProactorEventLoop and transport __del__ emit ResourceWarning during
+    # GC after a test finishes; pytest wraps those in PytestUnraisableExceptionWarning.
+    # Timing depends on garbage collection, so with filterwarnings=error they surface
+    # as random xdist failures in unrelated async tests. Same workaround used by
+    # aiogram, home-assistant/supervisor, Prefect, gunicorn, litestar, etc.
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.mypy]
 python_version = "3.11"

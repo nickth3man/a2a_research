@@ -8,7 +8,12 @@ from contextlib import suppress
 import pytest
 
 from a2a_research.models import AgentRole
-from a2a_research.progress import ProgressEvent, ProgressPhase, drain_progress_while_running
+from a2a_research.progress import (
+    ProgressEvent,
+    ProgressPhase,
+    create_progress_reporter,
+    drain_progress_while_running,
+)
 
 
 @pytest.mark.asyncio
@@ -64,3 +69,43 @@ async def test_drain_progress_drains_trailing_events_after_workflow_done() -> No
     events = [evt async for evt in drain_progress_while_running(queue, workflow_task)]
 
     assert events == [event]
+
+
+@pytest.mark.asyncio
+async def test_create_progress_reporter_schedules_put_on_target_loop() -> None:
+    """The reporter is invoked from worker threads; it must schedule ``queue.put_nowait``
+    on the owning event loop via ``call_soon_threadsafe`` so the consumer wakes up."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    reporter = create_progress_reporter(loop, queue)
+
+    event = ProgressEvent(
+        phase=ProgressPhase.STEP_STARTED,
+        role=AgentRole.RESEARCHER,
+        step_index=0,
+        total_steps=4,
+        substep_label="start",
+    )
+
+    reporter(event)
+    reporter(None)
+
+    delivered = await asyncio.wait_for(queue.get(), timeout=0.5)
+    sentinel = await asyncio.wait_for(queue.get(), timeout=0.5)
+
+    assert delivered is event
+    assert sentinel is None
+
+
+def test_create_progress_reporter_uses_call_soon_threadsafe() -> None:
+    """Explicitly verify thread-safety wiring so worker threads can report progress
+    without crossing the event loop directly."""
+    from unittest.mock import MagicMock
+
+    loop = MagicMock()
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    reporter = create_progress_reporter(loop, queue)
+
+    reporter(None)
+
+    loop.call_soon_threadsafe.assert_called_once_with(queue.put_nowait, None)
