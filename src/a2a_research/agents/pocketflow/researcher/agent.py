@@ -49,7 +49,6 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
     chunk_detail = f"{len(chunks)} chunks found" if granularity >= 3 else ""
     emit("Querying ChromaDB…", 1, detail=chunk_detail)
 
-    max_sources = 10
     user_ctx = f"Research query: {query}\n\nRelevant corpus chunks (id, source, score, content):\n"
     for rc in chunks:
         user_ctx += (
@@ -60,9 +59,7 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
     user_ctx += "\nProduce your research summary based on the above chunks."
     emit("Calling LLM…", 2)
     try:
-        raw = llm_utils.call_llm(
-            RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher"
-        )
+        raw = llm_utils.call_llm(RESEARCHER_PROMPT, user_ctx, stage="researcher")
         emit("Parsing result…", 3)
         structured = parse_structured_response(raw, ResearcherOutput)
         summary = (

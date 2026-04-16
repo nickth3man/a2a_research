@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from a2a_research import rag
 from a2a_research.agents.pocketflow.utils import llm as llm_utils
 from a2a_research.agents.pocketflow.utils.helpers import (
@@ -57,7 +59,16 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
     researcher_result = session.get_agent(AgentRole.RESEARCHER)
     claims = verifier_result.claims
     if message and isinstance(message.payload.get("verified_claims"), list):
-        claims = [Claim.model_validate(item) for item in message.payload["verified_claims"]]
+        try:
+            claims = [Claim.model_validate(item) for item in message.payload["verified_claims"]]
+        except (ValidationError, TypeError, ValueError) as exc:
+            logger.warning(
+                "Presenter received malformed verified_claims; falling back to verifier result "
+                "session_id=%s error=%s",
+                session.id,
+                exc,
+            )
+            claims = verifier_result.claims
 
     findings_ctx = _format_findings(claims)
 

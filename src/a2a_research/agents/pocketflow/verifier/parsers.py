@@ -44,13 +44,25 @@ def _parse_raw_json(raw: str) -> list[Claim] | None:
             Claim(
                 id=normalize_claim_id(item.get("id"), f"clm_{len(verified)}"),
                 text=text,
-                confidence=float(item.get("confidence", 0.5)),
+                confidence=_coerce_confidence(item.get("confidence")),
                 verdict=verdict,
                 sources=item.get("sources", []),
                 evidence_snippets=evidence_snippets,
             )
         )
     return verified
+
+
+def _coerce_confidence(value: object, default: float = 0.5) -> float:
+    """Best-effort numeric coercion for LLM-emitted confidence values."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+        except ValueError:
+            return default
+    return default
 
 
 def _parse_line_mode(raw: str) -> list[Claim]:

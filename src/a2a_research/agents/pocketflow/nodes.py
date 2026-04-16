@@ -8,6 +8,10 @@ from typing import Any
 
 from pocketflow import AsyncNode
 
+from a2a_research.agents.pocketflow.actor_helpers import (
+    build_payload,
+    get_sender_for_role,
+)
 from a2a_research.app_logging import get_logger
 from a2a_research.models import (
     A2AMessage,
@@ -63,7 +67,7 @@ class ActorNode(AsyncNode):
             status=AgentStatus.RUNNING,
             message=f"{self.role.value.title()} is running.",
         )
-        payload = self._build_payload(self.role, session)
+        payload = build_payload(self.role, session)
         if progress_reporter:
             progress_reporter(
                 ProgressEvent(
@@ -92,7 +96,7 @@ class ActorNode(AsyncNode):
         from a2a_research.a2a.server import A2AClient
 
         message = A2AMessage(
-            sender=self._get_sender_for_role(self.role),
+            sender=get_sender_for_role(self.role),
             recipient=self.role,
             payload=payload,
         )
@@ -158,9 +162,9 @@ class ActorNode(AsyncNode):
         session.error = exec_res.message if exec_res.status == AgentStatus.FAILED else None
 
         message = A2AMessage(
-            sender=self._get_sender_for_role(self.role),
+            sender=get_sender_for_role(self.role),
             recipient=self.role,
-            payload=self._build_payload(self.role, session),
+            payload=build_payload(self.role, session),
         )
         shared["messages"].append(message)
         shared["current_agent"] = self.role
@@ -169,42 +173,6 @@ class ActorNode(AsyncNode):
             session.final_report = exec_res.raw_content
 
         return "default"
-
-    def _get_sender_for_role(self, role: AgentRole) -> AgentRole:
-        return {
-            AgentRole.RESEARCHER: AgentRole.RESEARCHER,
-            AgentRole.ANALYST: AgentRole.RESEARCHER,
-            AgentRole.VERIFIER: AgentRole.ANALYST,
-            AgentRole.PRESENTER: AgentRole.VERIFIER,
-        }.get(role, role)
-
-    def _build_payload(self, role: AgentRole, session: ResearchSession) -> dict[str, Any]:
-        if role == AgentRole.RESEARCHER:
-            return {"query": session.query}
-        if role == AgentRole.ANALYST:
-            researcher = session.get_agent(AgentRole.RESEARCHER)
-            return {
-                "research_summary": researcher.raw_content,
-                "citations": researcher.citations,
-                "retrieved_chunks": [
-                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
-                ],
-            }
-        if role == AgentRole.VERIFIER:
-            analyst = session.get_agent(AgentRole.ANALYST)
-            return {
-                "claims": [c.model_dump() for c in analyst.claims],
-                "query": session.query,
-                "retrieved_chunks": [
-                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
-                ],
-            }
-        if role == AgentRole.PRESENTER:
-            verifier = session.get_agent(AgentRole.VERIFIER)
-            return {
-                "verified_claims": [c.model_dump() for c in verifier.claims],
-            }
-        return {}
 
 
 def create_actor_node(role: AgentRole, successor_role: AgentRole | None = None) -> ActorNode:

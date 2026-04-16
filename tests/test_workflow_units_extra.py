@@ -149,8 +149,10 @@ def test_adapter_get_graph_factory() -> None:
 
 
 def test_actor_build_payload_unknown_role_returns_empty() -> None:
-    node = ActorNode(role=cast("AgentRole", "nonstandard_role"))
-    payload = node._build_payload(cast("Any", "nonstandard_role"), ResearchSession(query="q"))
+    from a2a_research.agents.pocketflow.actor_helpers import build_payload
+
+    _ = ActorNode(role=cast("AgentRole", "nonstandard_role"))
+    payload = build_payload(cast("Any", "nonstandard_role"), ResearchSession(query="q"))
     assert payload == {}
 
 
