@@ -108,7 +108,11 @@ def _install_exception_hooks() -> None:
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        if exc_type is not None and exc_value is not None and not issubclass(exc_type, KeyboardInterrupt):
+        if (
+            exc_type is not None
+            and exc_value is not None
+            and not issubclass(exc_type, KeyboardInterrupt)
+        ):
             logging.getLogger("a2a_research.unhandled").error(
                 "Unhandled exception",
                 exc_info=(exc_type, exc_value, exc_traceback),

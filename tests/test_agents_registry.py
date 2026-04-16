@@ -70,6 +70,7 @@ class TestRegisterAgentDecorator:
         original_card = registry._cards.get(AgentRole.ANALYST)
 
         try:
+
             @register_agent(
                 AgentRole.ANALYST,
                 name="Test Analyst",

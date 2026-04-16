@@ -16,7 +16,9 @@ from a2a_research.settings import (
 
 
 class TestValidateDotenvKeys:
-    def test_unknown_keys_log_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    def test_unknown_keys_log_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Unknown .env keys should log a warning, not raise an error (supports shared environments)."""
         env_file = tmp_path / ".env"
         env_file.write_text("UNKNOWN_KEY=value\nLLM_API_KEY=secret\n")
@@ -58,7 +60,9 @@ class TestValidateDotenvKeys:
 
 
 class TestAppSettings:
-    def test_model_validator_calls_dotenv_validation(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    def test_model_validator_calls_dotenv_validation(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Unknown .env keys should log a warning, not prevent AppSettings from loading."""
         env_file = tmp_path / ".env"
         env_file.write_text("BAD_KEY=value\n")
