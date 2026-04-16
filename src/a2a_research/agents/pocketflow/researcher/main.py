@@ -29,9 +29,12 @@ logger = get_logger(__name__)
 
 
 def researcher_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
-    query = sanitize_query(
-        str(message.payload.get("query", session.query) if message else session.query)
-    )
+    raw_query = (message.payload.get("query") if message else None) or session.query
+    if not raw_query:
+        return create_agent_result(
+            AgentRole.RESEARCHER, AgentStatus.FAILED, "Researcher received an empty query."
+        )
+    query = sanitize_query(str(raw_query))
     reporter, step_index, total_steps, granularity = extract_progress_context(message)
     emit = create_substep_emitter(
         reporter, AgentRole.RESEARCHER, step_index, total_steps, granularity, 4

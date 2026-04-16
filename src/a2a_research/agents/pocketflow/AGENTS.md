@@ -79,7 +79,7 @@ agents/pocketflow/
 - Do not call `run_workflow_sync` or `SyncWorkflowAdapter.invoke()` from inside an existing event loop.
 - Do not bypass `ActorNode` and call handlers directly if you still expect A2A/progress/session semantics.
 - Do not put arbitrary (non-JSON-serializable) objects into message payloads; the progress reporter is attached as a private attribute specifically because payloads are serialized.
-- Do not add a role to the flow without the five-step registration contract: folder + `prompt.py` + `main.py` + `utils.py` (`SENDER` + `build_payload`) + `register_agent(...)` in `__init__.py`, plus an `AgentRole` enum value.
+- Do not add a role to the flow without the full registration contract: folder + `prompt.py` + `main.py` + `nodes.py` (ActorNode factory) + `flow.py` (single-node AsyncFlow) + `utils.py` (`SENDER` + `build_payload`) + `register_agent(...)` in `__init__.py`, plus an `AgentRole` enum value.
 - Do not add role-specific branches to `utils/actor_helpers.py`. It is a pure dispatcher — put the branch's logic in the agent's own `utils.py`.
 
 ## EDGE NOTES

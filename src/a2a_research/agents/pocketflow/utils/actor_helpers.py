@@ -14,8 +14,10 @@ generic ``ActorNode`` base is loaded alongside the agent subpackages.
 
 from __future__ import annotations
 
-from types import ModuleType
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from types import ModuleType
 
 from a2a_research.models import AgentRole, ResearchSession
 

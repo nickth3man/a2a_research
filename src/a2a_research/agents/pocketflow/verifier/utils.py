@@ -73,12 +73,21 @@ def _parse_raw_json(raw: str) -> list[Claim] | None:
 
 
 def _coerce_confidence(value: object, default: float = 0.5) -> float:
-    """Best-effort numeric coercion for LLM-emitted confidence values."""
+    """Best-effort numeric coercion for LLM-emitted confidence values.
+
+    Normalises values on the 0-100 scale (e.g. ``85`` → ``0.85``) and clamps
+    the result to [0.0, 1.0] to satisfy the :class:`~a2a_research.models.Claim`
+    field constraint.
+    """
     if isinstance(value, (int, float)):
-        return float(value)
+        raw = float(value)
+        if raw > 1.0:
+            raw /= 100.0
+        return max(0.0, min(1.0, raw))
     if isinstance(value, str):
         try:
-            return float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+            raw = float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+            return max(0.0, min(1.0, raw))
         except ValueError:
             return default
     return default
