@@ -60,7 +60,7 @@ async def run_workflow(
         elapsed_ms = (perf_counter() - started_at) * 1000
         session.error = str(exc)
         logger.exception("Workflow failed session_id=%s elapsed_ms=%.1f", session.id, elapsed_ms)
-        return session
+        raise
 
 
 def run_workflow_sync(

@@ -15,7 +15,7 @@ import os
 from collections.abc import AsyncGenerator, Callable
 from contextlib import suppress
 from dataclasses import field
-from typing import Any
+from typing import Any, cast
 
 import mesop as me
 
@@ -63,9 +63,7 @@ def _patched_send_file_compressed(path: str, disable_gzip_cache: bool) -> Any:
 
 
 _send_file_compressed_patch: Callable[[str, bool], Any] = _patched_send_file_compressed
-# Monkey-patch to return 404 for missing static files (framework bug on Windows).
-# type: ignore[attr-defined] is needed because send_file_compressed is not declared as assignable.
-_sfs.send_file_compressed = _send_file_compressed_patch  # type: ignore[attr-defined,assignment]
+cast("Any", _sfs).send_file_compressed = _send_file_compressed_patch
 
 setup_logging()
 logger = get_logger(__name__)

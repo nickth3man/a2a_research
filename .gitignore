@@ -83,6 +83,9 @@ ehthumbs.db
 *.log
 logs/
 
+# Mesop dev server (local stdout capture)
+.mesop-server.out
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

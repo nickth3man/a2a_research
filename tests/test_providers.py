@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from pydantic import BaseModel
-from unittest.mock import MagicMock, patch
 
 from a2a_research.providers import (
     AnthropicProvider,
     ChatResponse,
     GoogleProvider,
-    OllamaProvider,
-    OpenAIProvider,
-    OpenAIEmbeddings,
     OllamaEmbeddings,
+    OllamaProvider,
+    OpenAIEmbeddings,
+    OpenAIProvider,
     ProviderRateLimitError,
     ProviderRequestError,
     get_embedding_provider,
@@ -47,9 +48,11 @@ class TestProviderSelection:
             assert isinstance(provider, expected_class)
 
     def test_get_llm_provider_raises_on_unknown_provider(self):
-        with patch("a2a_research.providers.settings.llm.provider", "unknown"):
-            with pytest.raises(ValueError, match="Unknown LLM provider"):
-                get_llm_provider()
+        with (
+            patch("a2a_research.providers.settings.llm.provider", "unknown"),
+            pytest.raises(ValueError, match="Unknown LLM provider"),
+        ):
+            get_llm_provider()
 
 
 class TestEmbeddingProviderSelection:
@@ -69,9 +72,11 @@ class TestEmbeddingProviderSelection:
             assert isinstance(provider, expected_class)
 
     def test_get_embedding_provider_raises_on_unknown_provider(self):
-        with patch("a2a_research.providers.settings.embedding.provider", "unknown"):
-            with pytest.raises(ValueError, match="Unknown embedding provider"):
-                get_embedding_provider()
+        with (
+            patch("a2a_research.providers.settings.embedding.provider", "unknown"),
+            pytest.raises(ValueError, match="Unknown embedding provider"),
+        ):
+            get_embedding_provider()
 
 
 class TestSingletonBehavior:
@@ -159,12 +164,12 @@ class TestErrorTranslation:
 
 class TestRateLimitDetection:
     def test_429_status_code_raises_provider_rate_limit_error(self):
-        class FakeException(Exception):
+        class FakeError(Exception):
             status_code = 429
 
         with patch("a2a_research.providers._load_attr") as mock_load_attr:
             mock_client = MagicMock()
-            mock_client.chat.completions.create.side_effect = FakeException("rate limited")
+            mock_client.chat.completions.create.side_effect = FakeError("rate limited")
             mock_openai = MagicMock()
             mock_openai.return_value = mock_client
             mock_load_attr.return_value = mock_openai

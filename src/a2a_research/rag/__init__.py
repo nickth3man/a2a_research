@@ -22,10 +22,10 @@ from a2a_research.settings import settings
 
 __all__ = [
     "ensure_corpus_ingested",
-    "ingest_corpus",
-    "retrieve_chunks",
     "get_source_title",
+    "ingest_corpus",
     "reset_rag_singletons",
+    "retrieve_chunks",
 ]
 
 _CORPUS_DIR = Path(__file__).resolve().parents[3] / "data" / "corpus"
@@ -103,22 +103,6 @@ def _chunk_text(text: str, size: int | None = None, overlap: int | None = None) 
     start = 0
     while start < len(text):
         end = start + _size
-        chunk = text[start:end]
-        sentences = re.split(r"(?<=[.!?])\s+", chunk)
-        if len(sentences) > 1 and sentences[-1]:
-            last_complete = sentences[-1]
-            chunks.append(chunk[: len(chunk) - len(last_complete)].strip())
-            start = end - len(last_complete)
-        else:
-            chunks.append(chunk.strip())
-            start = end - overlap_chars
-    return [c for c in chunks if c.strip()]
-    if len(text) <= size:
-        return [text] if text.strip() else []
-    chunks: list[str] = []
-    start = 0
-    while start < len(text):
-        end = start + size
         chunk = text[start:end]
         sentences = re.split(r"(?<=[.!?])\s+", chunk)
         if len(sentences) > 1 and sentences[-1]:

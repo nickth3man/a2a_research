@@ -88,10 +88,10 @@ Return JSON only with no markdown fences or commentary."""
 
 
 __all__ = [
-    "RESEARCHER_PROMPT",
     "ANALYST_PROMPT",
-    "VERIFIER_PROMPT",
     "PRESENTER_PROMPT",
+    "RESEARCHER_PROMPT",
+    "VERIFIER_PROMPT",
     "get_prompt",
 ]
 

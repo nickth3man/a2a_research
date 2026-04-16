@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 __all__ = [
+    "ProgressEvent",
     "ProgressGranularity",
     "ProgressPhase",
-    "ProgressEvent",
     "ProgressQueue",
     "ProgressReporter",
     "create_progress_reporter",
