@@ -102,11 +102,15 @@ class TestA2AClient:
             assert result.role == AgentRole.ANALYST
 
 
+# Default embedding model (perplexity/pplx-embed-v1-4b) uses 2560-dimensional vectors.
+_EMBED_DIM = 2560
+
+
 class TestRAGWithMocks:
     def test_ingest_with_mocked_embeddings(self):
         mock_embedder = MagicMock()
         # Corpus has 4 files producing ~15 chunks; match that count
-        mock_embedder.embed_documents.return_value = [[0.1] * 1536] * 15
+        mock_embedder.embed_documents.return_value = [[0.1] * _EMBED_DIM] * 15
 
         with patch("a2a_research.providers.get_embedder", return_value=mock_embedder):
             from a2a_research.rag import _get_collection, ingest_corpus
@@ -118,7 +122,7 @@ class TestRAGWithMocks:
 
     def test_retrieve_returns_chunks_with_mock(self):
         mock_embedder = MagicMock()
-        mock_embedder.embed_query.return_value = [0.1] * 1536
+        mock_embedder.embed_query.return_value = [0.1] * _EMBED_DIM
 
         mock_coll = MagicMock()
         mock_coll.count.return_value = 5
@@ -153,7 +157,7 @@ class TestRAGWithMocks:
 
     def test_retrieve_empty_results(self):
         mock_embedder = MagicMock()
-        mock_embedder.embed_query.return_value = [0.1] * 1536
+        mock_embedder.embed_query.return_value = [0.1] * _EMBED_DIM
 
         mock_coll = MagicMock()
         mock_coll.count.return_value = 0
@@ -172,3 +176,39 @@ class TestRAGWithMocks:
 
             chunks = retrieve("Does not exist xyz abc", n_results=5)
             assert len(chunks) == 0
+
+    def test_retrieve_recovers_from_dimension_mismatch(self):
+        class DimensionMismatchError(Exception):
+            pass
+
+        mock_embedder = MagicMock()
+        mock_embedder.embed_query.return_value = [0.1] * 2560
+
+        stale_collection = MagicMock()
+        stale_collection.count.return_value = 5
+        stale_collection.query.side_effect = DimensionMismatchError(
+            "Collection expecting embedding with dimension of 2560, got 1536"
+        )
+
+        recovered_collection = MagicMock()
+        recovered_collection.query.return_value = {
+            "documents": [["Recovered chunk"]],
+            "metadatas": [[{"source": "rag_accuracy", "chunk_index": 0, "title": "Recovered"}]],
+            "distances": [[0.1]],
+        }
+
+        with (
+            patch("a2a_research.rag._collection", stale_collection),
+            patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
+            patch(
+                "a2a_research.rag._reset_collection", return_value=recovered_collection
+            ) as reset_collection,
+            patch("a2a_research.rag.ingest_corpus") as ingest_corpus,
+        ):
+            from a2a_research.rag import retrieve
+
+            chunks = retrieve("Is RAG effective?", n_results=1)
+
+        assert len(chunks) == 1
+        reset_collection.assert_called_once()
+        ingest_corpus.assert_called_once_with(force=True)

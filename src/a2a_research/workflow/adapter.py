@@ -1,4 +1,8 @@
-"""Sync adapter wrapping the PocketFlow AsyncFlow for backward-compatible invoke()."""
+"""Sync adapter that runs a PocketFlow ``AsyncFlow`` via :func:`asyncio.run` for ``invoke()``-style callers.
+
+Used by tooling that expects a synchronous graph object; the Mesop UI calls
+:func:`~a2a_research.workflow.run_research_sync` instead.
+"""
 
 from __future__ import annotations
 

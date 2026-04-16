@@ -1,10 +1,16 @@
-"""Deterministic helpers backed by the bundled PocketFlow reference runtime."""
+"""Deterministic helpers for parsing LLM output and building markdown reports.
+
+Includes JSON/text extraction for claims and verdicts, formatting helpers, and a
+small PocketFlow ``Flow`` used to assemble report sections without an LLM when needed.
+"""
 
 from __future__ import annotations
 
 import json
 import re
 from typing import Any, cast
+
+from pocketflow import Flow, Node
 
 from a2a_research.models import (
     AgentResult,
@@ -14,7 +20,14 @@ from a2a_research.models import (
     ResearchSession,
     Verdict,
 )
-from pocketflow import Flow, Node
+
+
+def normalize_claim_id(raw_id: Any, fallback: str) -> str:
+    if raw_id is None:
+        return fallback
+
+    normalized = str(raw_id).strip()
+    return normalized or fallback
 
 
 class _ReportHeaderNode(Node):
@@ -149,7 +162,7 @@ def extract_claims_from_llm_output(raw: str) -> list[Claim]:
             except ValueError:
                 verdict = Verdict.INSUFFICIENT_EVIDENCE
             claim = Claim(
-                id=item.get("id", f"clm_{len(results)}"),
+                id=normalize_claim_id(item.get("id"), f"clm_{len(results)}"),
                 text=text,
                 confidence=float(item.get("confidence", 0.5)),
                 verdict=verdict,

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any
 
 from pocketflow import AsyncNode
 
+from ..app_logging import get_logger
 from ..models import (
     A2AMessage,
     AgentResult,
@@ -13,6 +15,8 @@ from ..models import (
     AgentStatus,
     ResearchSession,
 )
+
+logger = get_logger(__name__)
 
 
 class ActorNode(AsyncNode):
@@ -42,11 +46,24 @@ class ActorNode(AsyncNode):
 
     async def exec_async(self, prep_res: dict[str, Any]) -> AgentResult:
         session: ResearchSession = prep_res["session"]
+        payload = self._build_payload(self.role, session)
+        logger.info(
+            "Agent step start session_id=%s role=%s payload_keys=%s",
+            session.id,
+            self.role.value,
+            sorted(payload),
+        )
+        started_at = perf_counter()
 
         from ..a2a.server import get_a2a_handler
 
         handler = get_a2a_handler(self.role)
         if handler is None:
+            logger.error(
+                "Agent step missing handler session_id=%s role=%s",
+                session.id,
+                self.role.value,
+            )
             return AgentResult(
                 role=self.role,
                 status=AgentStatus.FAILED,
@@ -56,9 +73,28 @@ class ActorNode(AsyncNode):
         message = A2AMessage(
             sender=self._sender_for_role(self.role),
             recipient=self.role,
-            payload=self._build_payload(self.role, session),
+            payload=payload,
         )
-        result = handler(session, message)
+        try:
+            result = handler(session, message)
+        except Exception:
+            elapsed_ms = (perf_counter() - started_at) * 1000
+            logger.exception(
+                "Agent step failed session_id=%s role=%s elapsed_ms=%.1f",
+                session.id,
+                self.role.value,
+                elapsed_ms,
+            )
+            raise
+        elapsed_ms = (perf_counter() - started_at) * 1000
+        logger.info(
+            "Agent step completed session_id=%s role=%s status=%s elapsed_ms=%.1f message=%r",
+            session.id,
+            self.role.value,
+            result.status.value,
+            elapsed_ms,
+            result.message,
+        )
         return result
 
     async def post_async(

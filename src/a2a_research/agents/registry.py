@@ -1,4 +1,8 @@
-"""Agent registry with decorator and spec for extensible PocketFlow + A2A runtime."""
+"""Agent registry: :class:`AgentSpec` records and decorators to register handlers per :class:`~a2a_research.models.AgentRole`.
+
+The default pipeline registers four agents at import time; tests or extensions can
+add alternate handlers before the workflow runs.
+"""
 
 from __future__ import annotations
 

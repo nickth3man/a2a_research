@@ -1,4 +1,8 @@
-"""Builder — constructs the PocketFlow workflow graph declaratively."""
+"""Builder — constructs the PocketFlow ``AsyncFlow`` and shared store for the pipeline.
+
+``build_workflow`` wires :class:`~a2a_research.workflow.nodes.ActorNode` instances in
+role order (or a custom ``roles`` list). ``get_workflow`` returns the cached default graph.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +16,7 @@ from .nodes import ActorNode, create_actor_node
 
 def build_workflow(
     roles: list[AgentRole] | None = None,
-) -> tuple[AsyncFlow, dict[str, Any]]:
+) -> tuple[AsyncFlow[Any, Any], dict[str, Any]]:
     if roles is None:
         roles = [
             AgentRole.RESEARCHER,
@@ -29,7 +33,7 @@ def build_workflow(
         _ = nodes[role] >> nodes[roles[i + 1]]
 
     start = nodes[roles[0]]
-    flow = AsyncFlow(start=start)
+    flow: AsyncFlow[Any, Any] = AsyncFlow(start=start)
 
     shared: dict[str, Any] = {
         "session": None,
@@ -40,5 +44,5 @@ def build_workflow(
     return flow, shared
 
 
-def get_workflow() -> tuple[AsyncFlow, dict[str, Any]]:
+def get_workflow() -> tuple[AsyncFlow[Any, Any], dict[str, Any]]:
     return build_workflow()

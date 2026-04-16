@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from a2a_research.agents import _parse_claims_from_analyst, _parse_verified_claims
 from a2a_research.models import (
     AgentRole,
+    Claim,
     DocumentChunk,
     ResearchSession,
     RetrievedChunk,
+    Verdict,
     WorkflowState,
 )
 from a2a_research.workflow import (
@@ -163,3 +166,23 @@ class TestActorNode:
             raise AssertionError("Expected ValueError")
         except ValueError as e:
             assert "session" in str(e)
+
+
+class TestClaimParsing:
+    def test_parse_claims_from_analyst_normalizes_numeric_ids(self) -> None:
+        claims = _parse_claims_from_analyst(
+            '{"atomic_claims": [{"id": 1, "text": "RAG uses retrieval."}]}'
+        )
+        assert [claim.id for claim in claims] == ["1"]
+
+    def test_parse_verified_claims_normalizes_numeric_ids(self) -> None:
+        fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
+        claims = _parse_verified_claims(
+            (
+                '{"verified_claims": [{"id": 1, "text": "RAG uses retrieval.", '
+                '"verdict": "SUPPORTED", "confidence": 0.85, '
+                '"sources": ["rag_accuracy"], "evidence_snippets": ["Evidence."]}]}'
+            ),
+            fallback_claims,
+        )
+        assert [claim.id for claim in claims] == ["1"]

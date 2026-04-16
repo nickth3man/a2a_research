@@ -1,4 +1,17 @@
-"""Typed application settings loaded from environment variables."""
+"""Typed application settings loaded from the project ``.env`` and environment.
+
+Prefixes (Pydantic ``BaseSettings``):
+
+- ``LLM_*`` — chat model provider, model id, base URL, API key.
+- ``EMBEDDING_*`` — embedding provider, model, URLs, key.
+- ``CHROMA_*`` — vector DB path and collection name.
+- ``CHUNK_*`` — RAG chunk size and overlap (see :class:`RAGSettings`).
+
+Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``, ``MESOP_PORT``.
+
+Mesop reads additional ``MESOP_*`` variables (for example ``MESOP_STATE_SESSION_BACKEND``)
+via its own library config; those are documented in ``.env.example``, not as fields here.
+"""
 
 from __future__ import annotations
 
@@ -16,19 +29,20 @@ class LLMSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
+        env_prefix="LLM_",
         extra="ignore",
     )
 
     provider: str = Field(
-        default="openai",
-        description="LLM provider: openai | anthropic | google | ollama",
+        default="openrouter",
+        description="LLM provider: openrouter | openai | anthropic | google | ollama",
     )
     model: str = Field(
-        default="gpt-4o-mini",
+        default="openrouter/elephant-alpha",
         description="Model identifier (provider-specific).",
     )
     base_url: str = Field(
-        default="",
+        default="https://openrouter.ai/api/v1",
         description="OpenAI-compatible base URL override (blank = provider default).",
     )
     api_key: str = Field(
@@ -48,12 +62,12 @@ class EmbeddingSettings(BaseSettings):
     )
 
     model: str = Field(
-        default="text-embedding-3-small",
+        default="perplexity/pplx-embed-v1-4b",
         description="Embedding model name.",
     )
     provider: str = Field(
-        default="openai",
-        description="Embedding provider: openai | ollama | huggingface.",
+        default="openrouter",
+        description="Embedding provider: openrouter | openai | ollama",
     )
     base_url: str = Field(
         default="",
@@ -108,8 +122,14 @@ class AppSettings(BaseSettings):
         extra="ignore",
     )
 
-    log_level: str = Field(default="INFO", description="DEBUG | INFO | WARNING | ERROR")
-    mesop_port: int = Field(default=32123, description="Mesop UI server port.")
+    log_level: str = Field(
+        default="INFO",
+        description="Logging level: DEBUG, INFO, WARNING, or ERROR (env: LOG_LEVEL).",
+    )
+    mesop_port: int = Field(
+        default=32123,
+        description="Default port for the Mesop UI in app tooling (env: MESOP_PORT).",
+    )
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
     embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)

@@ -11,6 +11,7 @@ from a2a_research.models import (
     RetrievedChunk,
     WorkflowState,
 )
+from a2a_research.providers import ProviderRateLimitError
 from a2a_research.workflow import get_graph, run_research_sync
 
 
@@ -75,3 +76,44 @@ def test_workflow_state_records_a2a_message_handoffs() -> None:
         AgentRole.PRESENTER,
     ]
     assert final_state["session"].final_report.startswith("# Report")
+
+
+def test_run_research_sync_falls_back_when_analyst_is_rate_limited() -> None:
+    responses = [
+        '{"research_summary": "RAG uses retrieval to ground answers in documents."}',
+        ProviderRateLimitError("provider throttled"),
+        '{"verified_claims": [{"id": "c1", "text": "RAG uses retrieval to ground answers in documents.", "verdict": "SUPPORTED", "confidence": 0.8, "sources": ["rag_accuracy"], "evidence_snippets": ["Retrieved documents ground answers."]}]}',
+        '{"report": "# Report\\n\\nFallback path still works.", "formatted_output": "Fallback path still works."}',
+    ]
+
+    with (
+        patch("a2a_research.agents._call_llm", side_effect=responses),
+        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+    ):
+        session = run_research_sync("How does RAG work?")
+
+    analyst = session.get_agent(AgentRole.ANALYST)
+    assert analyst.status.value == "COMPLETED"
+    assert analyst.claims
+    assert "fallback" in analyst.message.lower()
+    assert session.final_report.startswith("# Report")
+
+
+def test_run_research_sync_falls_back_when_presenter_is_rate_limited() -> None:
+    responses = [
+        '{"research_summary": "RAG uses retrieval."}',
+        '{"atomic_claims": [{"id": "c1", "text": "RAG uses retrieval."}]}',
+        '{"verified_claims": [{"id": "c1", "text": "RAG uses retrieval.", "verdict": "SUPPORTED", "confidence": 0.8, "sources": ["rag_accuracy"], "evidence_snippets": ["The corpus describes retrieval."]}]}',
+        ProviderRateLimitError("provider throttled"),
+    ]
+
+    with (
+        patch("a2a_research.agents._call_llm", side_effect=responses),
+        patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+    ):
+        session = run_research_sync("What is RAG?")
+
+    presenter = session.get_agent(AgentRole.PRESENTER)
+    assert presenter.status.value == "COMPLETED"
+    assert "fallback" in presenter.message.lower()
+    assert session.final_report.startswith("# Research Report")

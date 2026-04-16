@@ -1,4 +1,8 @@
-"""Workflow policy — constraints and routing rules for agent coordination."""
+"""Concrete workflow policies built on :class:`~a2a_research.models.policy.WorkflowPolicy`.
+
+``PipelineOrderPolicy`` is a placeholder hook for validating role transitions; the
+default graph is fixed in :mod:`a2a_research.workflow.builder`.
+"""
 
 from __future__ import annotations
 

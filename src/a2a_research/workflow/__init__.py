@@ -1,4 +1,13 @@
-"""PocketFlow-backed async runtime for the 4-agent research pipeline."""
+"""PocketFlow-backed async runtime for the 4-agent research pipeline.
+
+Exports the composed ``AsyncFlow``, actor nodes, policy hooks, and convenience callers:
+
+- ``run_research_sync(query)`` — blocking entry used by the Mesop UI.
+- ``run_workflow_async`` / ``run_workflow`` — async orchestration with logging.
+- ``get_workflow`` / ``get_graph`` — access the built graph or a sync adapter.
+
+The shared dict must map the key ``session`` to a :class:`~a2a_research.models.ResearchSession`.
+"""
 
 from __future__ import annotations
 

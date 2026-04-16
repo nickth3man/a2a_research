@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from a2a_research.helpers import (
     aggregate_citations,
     build_markdown_report,
@@ -74,6 +76,14 @@ class TestModels:
         assert claim.confidence == 0.9
         assert claim.sources == ["doc_1"]
 
+    def test_claim_numeric_id_is_coerced_to_string(self) -> None:
+        claim = Claim.model_validate({"id": 1, "text": "RAG is effective"})
+        assert claim.id == "1"
+
+    def test_claim_blank_id_raises(self) -> None:
+        with pytest.raises(ValueError, match="non-empty"):
+            Claim.model_validate({"id": "   ", "text": "x"})
+
     def test_agent_result_defaults(self):
         result = AgentResult(role=AgentRole.VERIFIER)
         assert result.status == AgentStatus.PENDING
@@ -144,6 +154,12 @@ class TestHelpers:
         assert claims[0].text == "RAG works"
         assert claims[0].verdict == Verdict.SUPPORTED
         assert claims[0].confidence == 0.9
+
+    def test_extract_claims_from_llm_output_numeric_id_is_normalized(self) -> None:
+        raw = '{"atomic_claims": [{"id": 1, "text": "RAG works", "confidence": 0.9} ]}'
+        claims = extract_claims_from_llm_output(raw)
+        assert len(claims) == 1
+        assert claims[0].id == "1"
 
     def test_extract_claims_from_llm_output_fallback(self):
         raw = "Some unstructured LLM output that does not contain JSON."

@@ -1,22 +1,26 @@
 """RAG ingestion and retrieval using ChromaDB.
 
-Ingestion: reads markdown files from data/corpus/, chunks them, and upserts
-into a ChromaDB collection (created on first run).
+Ingestion: reads markdown files from ``data/corpus/`` (under the repo root), chunks
+them using :class:`~a2a_research.settings.RAGSettings`, and upserts into a collection
+(configured via ``CHROMA_*`` settings).
 
-Retrieval: queries the collection by semantic similarity and returns
-ranked chunks with scores.
+Retrieval: embeds the query with the configured embedding provider, queries Chroma,
+and returns ranked :class:`~a2a_research.models.RetrievedChunk` values with scores.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
+from a2a_research.app_logging import get_logger
 from a2a_research.models import DocumentChunk, RetrievedChunk
 from a2a_research.settings import settings
 
 _CORPUS_DIR = Path(__file__).resolve().parents[3] / "data" / "corpus"
+logger = get_logger(__name__)
 
 # ChromaDB client (lazily initialised — requires chromadb package at runtime)
 _chroma_client: Any = None
@@ -41,6 +45,43 @@ def _get_collection() -> Any:
             metadata={"description": "A2A Research corpus"},
         )
     return _collection
+
+
+def _is_dimension_mismatch_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "expecting embedding with dimension" in message and "got" in message
+
+
+def _reset_collection(reason: str) -> Any:
+    global _collection
+    client = _get_chroma_client()
+    logger.warning(
+        "RAG resetting collection name=%s reason=%s", settings.chroma.collection, reason
+    )
+    try:
+        client.delete_collection(name=settings.chroma.collection)
+    except Exception:
+        logger.exception("RAG collection reset failed name=%s", settings.chroma.collection)
+        raise
+
+    _collection = client.get_or_create_collection(
+        name=settings.chroma.collection,
+        metadata={"description": "A2A Research corpus"},
+    )
+    return _collection
+
+
+def _query_collection(
+    collection: Any,
+    *,
+    query_embedding: list[float],
+    n_results: int,
+) -> Any:
+    return collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        include=["documents", "metadatas", "distances"],
+    )
 
 
 def _chunk_text(
@@ -79,6 +120,7 @@ def ingest_corpus(force: bool = False) -> int:
     """Ingest corpus files into ChromaDB. Idempotent — skip if already populated."""
     collection = _get_collection()
     if not force and collection.count() > 0:
+        logger.info("RAG ingest skipped existing_chunks=%s force=%s", collection.count(), force)
         return int(collection.count())
 
     from a2a_research.providers import get_embedder
@@ -89,6 +131,7 @@ def ingest_corpus(force: bool = False) -> int:
     ids: list[str] = []
 
     corpus = _load_corpus_files()
+    logger.info("RAG ingest start corpus_files=%s force=%s", len(corpus), force)
     chunk_id = 0
     for source_name, content in corpus.items():
         title_match = re.match(r"^#\s+(.+)$", content, re.MULTILINE)
@@ -103,8 +146,14 @@ def ingest_corpus(force: bool = False) -> int:
             chunk_id += 1
 
     if docs:
+        started_at = perf_counter()
+        logger.info("RAG ingest embedding chunks=%s", len(docs))
         embeddings = embedder.embed_documents(docs)
         collection.upsert(ids=ids, documents=docs, metadatas=metas, embeddings=embeddings)
+        elapsed_ms = (perf_counter() - started_at) * 1000
+        logger.info("RAG ingest upserted chunks=%s elapsed_ms=%.1f", len(ids), elapsed_ms)
+    else:
+        logger.info("RAG ingest found no chunks to index")
 
     return len(ids)
 
@@ -118,15 +167,40 @@ def retrieve(
 
     collection = _get_collection()
     if collection.count() == 0:
+        logger.info("RAG retrieve query=%r collection_empty=true", query)
         ingest_corpus()
 
     embedder = get_embedder()
-    query_embedding = embedder.embed_query(query)
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=n_results,
-        include=["documents", "metadatas", "distances"],
+    started_at = perf_counter()
+    logger.info(
+        "RAG retrieve start query=%r n_results=%s collection_count=%s",
+        query,
+        n_results,
+        collection.count(),
     )
+    query_embedding = embedder.embed_query(query)
+    try:
+        results = _query_collection(
+            collection,
+            query_embedding=query_embedding,
+            n_results=n_results,
+        )
+    except Exception as exc:
+        if not _is_dimension_mismatch_error(exc):
+            raise
+
+        logger.warning(
+            "RAG retrieve detected embedding dimension mismatch query=%r error=%s",
+            query,
+            exc,
+        )
+        collection = _reset_collection("embedding dimension mismatch")
+        ingest_corpus(force=True)
+        results = _query_collection(
+            collection,
+            query_embedding=query_embedding,
+            n_results=n_results,
+        )
 
     retrieved: list[RetrievedChunk] = []
     raw_docs = results.get("documents") or []
@@ -137,6 +211,8 @@ def retrieve(
     distances = raw_dists[0] if raw_dists else []
 
     if not docs:
+        elapsed_ms = (perf_counter() - started_at) * 1000
+        logger.info("RAG retrieve completed query=%r results=0 elapsed_ms=%.1f", query, elapsed_ms)
         return retrieved
 
     for doc_item, meta_item, dist in zip(docs, metas, distances, strict=False):
@@ -152,6 +228,13 @@ def retrieve(
         )
         retrieved.append(RetrievedChunk(chunk=chunk, score=score))
 
+    elapsed_ms = (perf_counter() - started_at) * 1000
+    logger.info(
+        "RAG retrieve completed query=%r results=%s elapsed_ms=%.1f",
+        query,
+        len(retrieved),
+        elapsed_ms,
+    )
     return retrieved
 
 

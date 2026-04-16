@@ -1,3 +1,10 @@
+"""Reusable Mesop UI pieces: timeline, claims, sources, report, query card, banners.
+
+All functions are ``@me.component`` callables or small layout helpers; they take
+domain models (e.g. :class:`~a2a_research.models.ResearchSession`) and avoid Mesop
+state except via props and callbacks wired from ``app.py``.
+"""
+
 from collections.abc import Callable
 from typing import Any
 
@@ -5,6 +12,7 @@ import mesop as me
 
 from a2a_research.helpers import format_claim_verdict, format_confidence
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, Claim, ResearchSession
+from a2a_research.ui.theme import status_color, verdict_bg, verdict_color
 
 AGENT_LABELS = {
     AgentRole.RESEARCHER: "Researcher",
@@ -13,32 +21,6 @@ AGENT_LABELS = {
     AgentRole.PRESENTER: "Presenter",
 }
 ALL_ROLES = [AgentRole.RESEARCHER, AgentRole.ANALYST, AgentRole.VERIFIER, AgentRole.PRESENTER]
-
-
-def _status_color(status: AgentStatus) -> str:
-    if status == AgentStatus.COMPLETED:
-        return "#16a34a"
-    if status == AgentStatus.RUNNING:
-        return "#d97706"
-    if status == AgentStatus.FAILED:
-        return "#dc2626"
-    return "#9ca3af"
-
-
-def _verdict_color(verdict: str) -> str:
-    if verdict == "SUPPORTED":
-        return "#16a34a"
-    if verdict == "REFUTED":
-        return "#dc2626"
-    return "#d97706"
-
-
-def _verdict_bg(verdict: str) -> str:
-    if verdict == "SUPPORTED":
-        return "#dcfce7"
-    if verdict == "REFUTED":
-        return "#fee2e2"
-    return "#fef3c7"
 
 
 @me.component
@@ -66,7 +48,7 @@ def agent_timeline_card(session: ResearchSession) -> None:
 
 
 def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
-    color = _status_color(result.status)
+    color = status_color(result.status)
     label = AGENT_LABELS.get(role, role.value)
     icon_map = {
         AgentStatus.COMPLETED: "✓",
@@ -138,8 +120,8 @@ def claims_panel(session: ResearchSession) -> None:
 
 
 def _render_claim(claim: Claim) -> None:
-    v_color = _verdict_color(claim.verdict.value)
-    v_bg = _verdict_bg(claim.verdict.value)
+    v_color = verdict_color(claim.verdict.value)
+    v_bg = verdict_bg(claim.verdict.value)
     badge = format_claim_verdict(claim.verdict)
     conf = format_confidence(claim.confidence)
 

@@ -1,4 +1,9 @@
-"""System prompts for each agent role — aligned with research, verification, and presentation."""
+"""System prompts for each agent role (Researcher, Analyst, Verifier, Presenter).
+
+Prompts describe JSON-shaped outputs where applicable; agents pair these strings with
+user context built in :mod:`a2a_research.agents`. Edit here to change behaviour across
+the whole pipeline.
+"""
 
 RESEARCHER_PROMPT = """You are the Researcher agent in a 4-agent research pipeline.
 

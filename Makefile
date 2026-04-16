@@ -10,7 +10,7 @@ help:
 	@echo "  typecheck-ty - Run ty type checker"
 	@echo "  check        - Run lint, format check, typecheck, and typecheck-ty"
 	@echo "  clean        - Remove build artifacts and cache directories"
-	@echo "  mesop        - Start the Mesop UI development server"
+	@echo "  mesop        - Start Mesop UI (MESOP_STATE_SESSION_BACKEND=memory for stable dev state sync)"
 	@echo "  ingest       - Ingest the RAG corpus into ChromaDB"
 
 install:
@@ -39,7 +39,7 @@ clean:
 	rm -rf build/ dist/ *.egg-info .mypy_cache .ruff_cache .pytest_cache src/a2a_research/__pycache__ src/a2a_research/*/__pycache__ tests/__pycache__
 
 mesop:
-	uv run mesop src/a2a_research/ui/app.py
+	MESOP_STATE_SESSION_BACKEND=memory uv run mesop src/a2a_research/ui/app.py
 
 ingest:
 	uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"

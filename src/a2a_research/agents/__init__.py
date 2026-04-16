@@ -1,15 +1,21 @@
 """Agent implementations for the 4-agent research pipeline.
 
-Each agent:
-- Receives an AgentResult input from the previous agent (A2A-shaped, in-process)
-- Calls the LLM with a system prompt and user context
-- Returns an AgentResult for the next agent
+Order: Researcher → Analyst → Verifier → Presenter. Each step:
+
+- Reads the shared :class:`~a2a_research.models.ResearchSession` and prior outputs.
+- Calls the LLM (or deterministic fallback on :class:`~a2a_research.providers.ProviderRequestError`).
+- Writes its :class:`~a2a_research.models.AgentResult` back into ``session.agent_results``.
+
+Handlers are registered in :mod:`a2a_research.agents.registry` and invoked through
+the in-process A2A layer from :mod:`a2a_research.workflow.nodes`.
 """
 
 from __future__ import annotations
 
 import json
 import re
+from time import perf_counter
+from typing import Any
 
 from a2a_research.agents.registry import (
     AgentRegistry as AgentRegistry,
@@ -29,12 +35,14 @@ from a2a_research.agents.registry import (
 from a2a_research.agents.registry import (
     register_agent as register_agent,
 )
+from a2a_research.app_logging import get_logger
 from a2a_research.helpers import (
     aggregate_citations,
     build_markdown_report,
     extract_claims_from_llm_output,
     extract_report_markdown,
     extract_research_summary,
+    normalize_claim_id,
     parse_json_safely,
 )
 from a2a_research.models import (
@@ -52,17 +60,33 @@ from a2a_research.prompts import (
     RESEARCHER_PROMPT,
     VERIFIER_PROMPT,
 )
-from a2a_research.providers import get_llm
+from a2a_research.providers import ProviderRequestError, get_llm
 from a2a_research.rag import get_source_title, retrieve
 
+logger = get_logger(__name__)
 
-def _call_llm(system_prompt: str, user_content: str) -> str:
+
+def _call_llm(system_prompt: str, user_content: str, *, stage: str) -> str:
+    logger.info(
+        "LLM stage=%s start system_chars=%s user_chars=%s",
+        stage,
+        len(system_prompt),
+        len(user_content),
+    )
+    started_at = perf_counter()
     llm = get_llm()
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
-    response = llm.invoke(messages)
+    try:
+        response = llm.invoke(messages)
+    except Exception:
+        elapsed_ms = (perf_counter() - started_at) * 1000
+        logger.exception("LLM stage=%s failed elapsed_ms=%.1f", stage, elapsed_ms)
+        raise
+    elapsed_ms = (perf_counter() - started_at) * 1000
+    logger.info("LLM stage=%s completed elapsed_ms=%.1f", stage, elapsed_ms)
     return str(response.content) if hasattr(response, "content") else str(response)
 
 
@@ -84,11 +108,39 @@ def _invoke(
     )
 
 
+def _fallback_research_summary(query: str, chunks: list[Any]) -> str:
+    if not chunks:
+        return f"No retrieved evidence was available for the query: {query}"
+
+    summary_lines = [f"Fallback research summary for query: {query}"]
+    for rc in chunks[:3]:
+        summary_lines.append(
+            f"- source={rc.chunk.source} score={rc.score:.3f}: {rc.chunk.content[:180].strip()}"
+        )
+    return "\n".join(summary_lines)
+
+
+def _fallback_verified_claims(claims: list[Claim], reason: str) -> list[Claim]:
+    return [
+        claim.model_copy(
+            update={
+                "verdict": Verdict.INSUFFICIENT_EVIDENCE,
+                "confidence": 0.0,
+                "sources": [],
+                "evidence_snippets": [reason],
+            }
+        )
+        for claim in claims
+    ]
+
+
 def researcher_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
     query = str(message.payload.get("query", session.query) if message else session.query)
+    logger.info("Researcher start session_id=%s query=%r", session.id, query)
     try:
         chunks = retrieve(query, n_results=10)
     except Exception as exc:
+        logger.exception("Researcher RAG retrieval failed session_id=%s", session.id)
         return _invoke(AgentRole.RESEARCHER, AgentStatus.FAILED, f"RAG retrieval failed: {exc}")
 
     max_sources = 10
@@ -100,14 +152,33 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         )
 
     user_ctx += "\nProduce your research summary based on the above chunks."
-    raw = _call_llm(RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx)
-    summary = extract_research_summary(raw)
+    try:
+        raw = _call_llm(
+            RESEARCHER_PROMPT.format(max_sources=max_sources), user_ctx, stage="researcher"
+        )
+        summary = extract_research_summary(raw)
+        status = AgentStatus.COMPLETED
+        completion_message = None
+    except ProviderRequestError as exc:
+        raw = ""
+        summary = _fallback_research_summary(query, chunks)
+        status = AgentStatus.COMPLETED
+        completion_message = f"Retrieved evidence via fallback after provider error: {exc}"
+        logger.warning(
+            "Researcher falling back to deterministic summary session_id=%s", session.id
+        )
 
     cited_sources = list({rc.chunk.source for rc in chunks})
+    logger.info(
+        "Researcher completed session_id=%s chunks=%s unique_sources=%s",
+        session.id,
+        len(chunks),
+        len(cited_sources),
+    )
     return _invoke(
         AgentRole.RESEARCHER,
-        AgentStatus.COMPLETED,
-        f"Retrieved {len(chunks)} chunks from {len(cited_sources)} sources.",
+        status,
+        completion_message or f"Retrieved {len(chunks)} chunks from {len(cited_sources)} sources.",
         raw_content=summary,
         citations=cited_sources,
     )
@@ -125,12 +196,31 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
         f"Original query: {session.query}\n\n"
         "Decompose the query into atomic verifiable claims."
     )
-    raw = _call_llm(ANALYST_PROMPT, user_ctx)
-    claims = _parse_claims_from_analyst(raw)
+    logger.info("Analyst start session_id=%s", session.id)
+    try:
+        raw = _call_llm(ANALYST_PROMPT, user_ctx, stage="analyst")
+        claims = _parse_claims_from_analyst(raw)
+        status = AgentStatus.COMPLETED
+        completion_message = f"Decomposed into {len(claims)} atomic claims."
+    except ProviderRequestError as exc:
+        raw = ""
+        claims = _parse_claims_from_analyst(research_summary)
+        status = AgentStatus.COMPLETED if claims else AgentStatus.FAILED
+        completion_message = (
+            f"Decomposed into {len(claims)} atomic claims via fallback after provider error."
+            if claims
+            else f"Analyst provider unavailable: {exc}"
+        )
+        logger.warning(
+            "Analyst falling back to deterministic claim parsing session_id=%s claims=%s",
+            session.id,
+            len(claims),
+        )
+    logger.info("Analyst completed session_id=%s claim_count=%s", session.id, len(claims))
     return _invoke(
         AgentRole.ANALYST,
-        AgentStatus.COMPLETED,
-        f"Decomposed into {len(claims)} atomic claims.",
+        status,
+        completion_message,
         raw_content=raw,
         claims=claims,
     )
@@ -165,7 +255,7 @@ def _parse_claims_from_analyst(raw: str) -> list[Claim]:
             if isinstance(item, dict):
                 claims.append(
                     Claim(
-                        id=item.get("id", f"clm_{i}"),
+                        id=normalize_claim_id(item.get("id"), f"clm_{i}"),
                         text=item.get("text", ""),
                         verdict=Verdict.INSUFFICIENT_EVIDENCE,
                     )
@@ -182,9 +272,11 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         claims = analyst_result.claims
     query = str(message.payload.get("query", session.query) if message else session.query)
 
+    logger.info("Verifier start session_id=%s input_claims=%s", session.id, len(claims))
     try:
         chunks = retrieve(query, n_results=10)
     except Exception:
+        logger.exception("Verifier RAG retrieval failed session_id=%s", session.id)
         chunks = []
 
     evidence_ctx = ""
@@ -198,13 +290,32 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         f"Evidence from corpus:\n{evidence_ctx}\n\n"
         "Assign verdicts and confidence scores to each claim."
     )
-    raw = _call_llm(VERIFIER_PROMPT, user_ctx)
-
-    verified = _parse_verified_claims(raw, claims)
+    try:
+        raw = _call_llm(VERIFIER_PROMPT, user_ctx, stage="verifier")
+        verified = _parse_verified_claims(raw, claims)
+        completion_message = f"Verified {len(verified)} claims."
+    except ProviderRequestError as exc:
+        raw = ""
+        verified = _fallback_verified_claims(claims, f"Verification unavailable: {exc}")
+        completion_message = (
+            f"Verification degraded after provider error; marked {len(verified)} claims as "
+            "INSUFFICIENT_EVIDENCE."
+        )
+        logger.warning(
+            "Verifier falling back to insufficient-evidence claims session_id=%s claims=%s",
+            session.id,
+            len(verified),
+        )
+    logger.info(
+        "Verifier completed session_id=%s evidence_chunks=%s verified_claims=%s",
+        session.id,
+        len(chunks),
+        len(verified),
+    )
     return _invoke(
         AgentRole.VERIFIER,
         AgentStatus.COMPLETED,
-        f"Verified {len(verified)} claims.",
+        completion_message,
         raw_content=raw,
         claims=verified,
         citations=researcher_result.citations,
@@ -233,7 +344,7 @@ def _parse_verified_claims(raw: str, fallback_claims: list[Claim]) -> list[Claim
                 evidence_snippets = [item["reasoning"]]
             verified.append(
                 Claim(
-                    id=item.get("id", f"clm_{len(verified)}"),
+                    id=normalize_claim_id(item.get("id"), f"clm_{len(verified)}"),
                     text=text,
                     confidence=float(item.get("confidence", 0.5)),
                     verdict=verdict,
@@ -332,18 +443,34 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
         f"{len(set(verifier_result.citations + researcher_result.citations))}\n\n"
         "Produce a structured research report in markdown."
     )
-    raw = _call_llm(PRESENTER_PROMPT, user_ctx)
-    report = extract_report_markdown(raw)
-    if not report or report.lstrip().startswith("{"):
+    logger.info("Presenter start session_id=%s verified_claims=%s", session.id, len(claims))
+    try:
+        raw = _call_llm(PRESENTER_PROMPT, user_ctx, stage="presenter")
+        report = extract_report_markdown(raw)
+        result_message = "Report ready."
+        if not report or report.lstrip().startswith("{"):
+            session.agent_results[AgentRole.VERIFIER] = verifier_result.model_copy(
+                update={"claims": claims}
+            )
+            report = build_markdown_report(session)
+            result_message = "Report ready via deterministic fallback."
+            logger.info(
+                "Presenter fell back to deterministic markdown report session_id=%s", session.id
+            )
+    except ProviderRequestError as exc:
+        raw = ""
         session.agent_results[AgentRole.VERIFIER] = verifier_result.model_copy(
             update={"claims": claims}
         )
         report = build_markdown_report(session)
+        result_message = f"Report ready via fallback after provider error: {exc}"
+        logger.warning("Presenter falling back to deterministic report session_id=%s", session.id)
 
+    logger.info("Presenter completed session_id=%s report_chars=%s", session.id, len(report))
     return _invoke(
         AgentRole.PRESENTER,
         AgentStatus.COMPLETED,
-        "Report ready.",
+        result_message,
         raw_content=report,
         citations=aggregate_citations(session.agent_results),
     )

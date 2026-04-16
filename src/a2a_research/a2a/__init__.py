@@ -1,4 +1,8 @@
-"""In-process A2A contract layer used by the PocketFlow orchestration path."""
+"""In-process A2A-style contracts used by the PocketFlow orchestration path.
+
+Provides a small server/client façade over registered callables (see ``register_a2a_agent``), so :class:`~a2a_research.workflow.nodes.ActorNode` can
+dispatch by :class:`~a2a_research.models.AgentRole` without HTTP.
+"""
 
 from __future__ import annotations
 

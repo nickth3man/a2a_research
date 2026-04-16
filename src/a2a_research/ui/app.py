@@ -1,8 +1,21 @@
-import asyncio
+"""Mesop application: main page, ``AppState``, and event handlers.
+
+``AppState.session`` is a non-optional :class:`~a2a_research.models.ResearchSession`
+so Mesop registers the Pydantic model for serialization (optional/union session
+fields are skipped and break round-trips).
+
+The submit handler is a synchronous **generator**: it updates loading state, yields once
+so Mesop flushes a render, then runs ``run_research_sync``. A plain ``async def`` click
+handler would not show loading, because Mesop renders only after the coroutine completes.
+"""
+
+from collections.abc import Generator
+from dataclasses import field
 
 import mesop as me
 
-from a2a_research.models import AgentStatus, ResearchSession
+from a2a_research.app_logging import get_logger, setup_logging
+from a2a_research.models import ResearchSession
 from a2a_research.ui.components import (
     agent_timeline_card,
     claims_panel,
@@ -12,6 +25,10 @@ from a2a_research.ui.components import (
     report_panel,
     sources_panel,
 )
+from a2a_research.ui.session_state import has_results
+
+setup_logging()
+logger = get_logger(__name__)
 
 
 @me.page(path="/", title="A2A Research — Multi-Agent Research System")
@@ -33,10 +50,9 @@ def main_page() -> None:
             error_banner(state.error)
 
         if state.loading:
-            if state.session:
-                loading_card(state.session)
+            loading_card(state.session)
         else:
-            if state.session and _has_results(state.session):
+            if has_results(state.session):
                 _render_results(state.session)
             else:
                 _render_empty_state()
@@ -51,7 +67,9 @@ def main_page() -> None:
 @me.stateclass
 class AppState:
     query_text: str = ""
-    session: ResearchSession | None = None
+    # Non-optional ResearchSession so Mesop registers the model in pydantic_model_cache
+    # (Union types like ResearchSession | None are skipped and break deserialization).
+    session: ResearchSession = field(default_factory=ResearchSession)
     loading: bool = False
     error: str | None = None
 
@@ -125,21 +143,19 @@ def _render_results(session: ResearchSession) -> None:
     report_panel(session)
 
 
-def _has_results(session: ResearchSession) -> bool:
-    if not session.agent_results:
-        return False
-    return all(
-        r.status in (AgentStatus.COMPLETED, AgentStatus.FAILED)
-        for r in session.agent_results.values()
-    ) or bool(session.final_report)
-
-
 def _on_query_input(e: me.InputEvent) -> None:
     state: AppState = me.state(AppState)
     state.query_text = e.value
 
 
-async def _on_submit(e: me.ClickEvent) -> None:
+def _on_submit(e: me.ClickEvent) -> Generator[None, None, None]:
+    """Run research on click.
+
+    Mesop only renders coroutine handlers after the coroutine completes, so a loading
+    state would never appear. A sync generator yields once to flush loading UI, then
+    runs the blocking pipeline (same worker model as ``run_in_executor`` on the default
+    loop).
+    """
     state: AppState = me.state(AppState)
     query_text = state.query_text.strip()
 
@@ -150,14 +166,21 @@ async def _on_submit(e: me.ClickEvent) -> None:
     state.loading = True
     state.error = None
     state.session = ResearchSession(query=query_text)
+    logger.info("UI submit query=%r session_id=%s", query_text, state.session.id)
+    yield
 
     try:
         from a2a_research.workflow import run_research_sync
 
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, run_research_sync, query_text)
+        result = run_research_sync(query_text)
         state.session = result
+        logger.info(
+            "UI submit completed session_id=%s final_report_chars=%s",
+            result.id,
+            len(result.final_report),
+        )
     except Exception as exc:
         state.error = str(exc)
+        logger.exception("UI submit failed query=%r", query_text)
     finally:
         state.loading = False

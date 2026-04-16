@@ -1,12 +1,12 @@
-"""Pydantic domain models shared across agents and UI.
+"""Pydantic domain models shared across agents, workflow, and UI.
 
-Single source of truth for all domain types used by:
-- models/     (shared types)
-- agents/     (agent I/O schemas)
-- rag/        (chunk & retrieval types)
-- workflow/   (PocketFlow runtime state)
+Single source of truth for:
+- agents/     (agent I/O and session mutation)
+- rag/        (chunk and retrieval types)
+- workflow/   (PocketFlow shared store)
 - a2a/        (in-process message contracts)
-- ui/         (Mesop frontend)
+- ui/         (Mesop ``@stateclass`` fields — keep nested models concrete for Mesop serialization)
+
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ import uuid
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from a2a_research.models.artifact import (
     Artifact as Artifact,
@@ -83,6 +83,21 @@ class Claim(BaseModel):
     verdict: Verdict = Verdict.INSUFFICIENT_EVIDENCE
     sources: list[str] = Field(default_factory=list)
     evidence_snippets: list[str] = Field(default_factory=list)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _coerce_id_to_string(cls, value: Any) -> str:
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped:
+                return stripped
+        elif value is not None:
+            normalized = str(value).strip()
+            if normalized:
+                return normalized
+
+        msg = "Claim id must be a non-empty string."
+        raise ValueError(msg)
 
 
 class AgentResult(BaseModel):

@@ -1,4 +1,9 @@
-"""A2A registry helpers — bridges agents/registry.py to the A2A server layer."""
+"""In-process A2A server stubs: :class:`A2AServer`, :class:`A2AClient`, registration helpers.
+
+Maps each :class:`~a2a_research.models.AgentRole` to a callable that accepts
+``(ResearchSession, A2AMessage)`` and returns an :class:`~a2a_research.models.AgentResult`,
+wrapping the lower-level handlers from :mod:`a2a_research.agents.registry`.
+"""
 
 from __future__ import annotations
 
