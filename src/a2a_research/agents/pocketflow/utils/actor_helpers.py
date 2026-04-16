@@ -14,6 +14,7 @@ generic ``ActorNode`` base is loaded alongside the agent subpackages.
 
 from __future__ import annotations
 
+import importlib
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -21,19 +22,19 @@ if TYPE_CHECKING:
 
 from a2a_research.models import AgentRole, ResearchSession
 
+_ROLE_UTILS_PATH: dict[AgentRole, str] = {
+    AgentRole.RESEARCHER: "a2a_research.agents.pocketflow.researcher.utils",
+    AgentRole.ANALYST: "a2a_research.agents.pocketflow.analyst.utils",
+    AgentRole.VERIFIER: "a2a_research.agents.pocketflow.verifier.utils",
+    AgentRole.PRESENTER: "a2a_research.agents.pocketflow.presenter.utils",
+}
+
 
 def _get_agent_utils(role: AgentRole) -> ModuleType | None:
-    if role == AgentRole.RESEARCHER:
-        from ..researcher import utils as agent_utils
-    elif role == AgentRole.ANALYST:
-        from ..analyst import utils as agent_utils
-    elif role == AgentRole.VERIFIER:
-        from ..verifier import utils as agent_utils
-    elif role == AgentRole.PRESENTER:
-        from ..presenter import utils as agent_utils
-    else:
+    path = _ROLE_UTILS_PATH.get(role)
+    if path is None:
         return None
-    return agent_utils
+    return importlib.import_module(path)
 
 
 def get_sender_for_role(role: AgentRole) -> AgentRole:
