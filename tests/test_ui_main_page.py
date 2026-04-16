@@ -17,6 +17,11 @@ def _make_state(**kwargs: object) -> SimpleNamespace:
         "error": None,
         "loading": False,
         "session": ResearchSession(),
+        "progress_granularity": 1,
+        "current_substep": "",
+        "progress_pct": 0.0,
+        "progress_step_label": "",
+        "progress_running_substeps": [],
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -47,6 +52,9 @@ def test_main_page_loading() -> None:
     st = _make_state(
         loading=True,
         session=ResearchSession(query="Q"),
+        progress_pct=0.25,
+        progress_step_label="Step 1 of 4 — Researcher",
+        current_substep="Querying ChromaDB…",
     )
     with patch("a2a_research.ui.app.me.state", return_value=st):
         app_mod.main_page()
@@ -73,8 +81,8 @@ def test_main_page_results() -> None:
 
 
 def test_app_state_uses_default_session_factory() -> None:
-    from a2a_research.ui import app as app_mod
+    from a2a_research.ui.state import AppState
 
-    st = app_mod.AppState()
+    st = AppState()
     assert isinstance(st.session, ResearchSession)
     assert st.session.query == ""

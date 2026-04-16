@@ -14,6 +14,12 @@ from a2a_research.ui.theme import status_color, verdict_bg, verdict_color
 __all__ = [
     # Layout / surfaces
     "AGENT_ROW_BG_IDLE",
+    # Progress bar
+    "PROGRESS_BAR_HEIGHT",
+    "PROGRESS_BAR_BG",
+    "PROGRESS_BAR_FILL",
+    "SUBSTEP_COLOR",
+    "PULSE_BG",
     "AGENT_ROW_BG_RUNNING",
     "BORDER_COLOR",
     "BORDER_WIDTH",
@@ -136,6 +142,14 @@ def _build_border(color: str) -> me.Border:
     """Build a border with the given color on all sides."""
     side = me.BorderSide(width=BORDER_WIDTH, color=color)
     return me.Border(top=side, right=side, bottom=side, left=side)
+
+
+# --- Progress bar ---
+PROGRESS_BAR_HEIGHT = 8
+PROGRESS_BAR_BG = "#e5e7eb"
+PROGRESS_BAR_FILL = "#3b82f6"
+SUBSTEP_COLOR = "#6b7280"
+PULSE_BG = "#eff6ff"
 
 
 # --- Style Presets for Common Component Patterns ---

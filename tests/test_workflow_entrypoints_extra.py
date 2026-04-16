@@ -78,5 +78,10 @@ async def test_run_workflow_async_awaits_run_workflow() -> None:
         from a2a_research.workflow.entrypoints import run_workflow_async
 
         out = await run_workflow_async("async", [AgentRole.RESEARCHER])
-    rw.assert_awaited_once_with("async", [AgentRole.RESEARCHER])
+    rw.assert_awaited_once_with(
+        "async",
+        [AgentRole.RESEARCHER],
+        progress_queue=None,
+        granularity=1,
+    )
     assert out is session

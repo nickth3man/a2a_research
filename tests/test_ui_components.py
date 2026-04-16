@@ -84,9 +84,17 @@ def test_error_banner_short_message_no_ellipsis(stub_mesop_component_runtime: No
 
 
 def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
+    from a2a_research.models import ResearchSession
     from a2a_research.ui.components import CardLoading
 
-    CardLoading()
+    CardLoading(
+        progress_pct=0.4,
+        progress_step_label="Step 2 of 4",
+        progress_substep_label="Calling LLM…",
+        session=ResearchSession(query="Q"),
+        granularity=2,
+        running_substeps=["Calling LLM…"],
+    )
 
 
 def test_query_input_card(stub_mesop_component_runtime: None) -> None:

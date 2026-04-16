@@ -21,6 +21,11 @@ async def test_on_submit_empty_query_sets_error() -> None:
         query_text="   ",
         loading=False,
         session=ResearchSession(),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
     )
     with patch.object(app_mod.me, "state", return_value=st):
         await _drain_on_submit(app_mod)
@@ -45,6 +50,11 @@ async def test_on_submit_success_updates_session() -> None:
         query_text="Q",
         loading=False,
         session=ResearchSession(),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
     )
 
     with (
@@ -69,6 +79,11 @@ async def test_on_submit_exception_sets_error() -> None:
         query_text="Q",
         loading=False,
         session=ResearchSession(),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
     )
 
     with (
@@ -94,6 +109,11 @@ async def test_on_submit_success_yields_twice() -> None:
         query_text="Q",
         loading=False,
         session=ResearchSession(),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
     )
     with (
         patch.object(app_mod.me, "state", return_value=st),
@@ -107,7 +127,7 @@ async def test_on_submit_success_yields_twice() -> None:
         yields = 0
         async for _ in agen:
             yields += 1
-    assert yields == 2
+    assert yields >= 2
 
 
 async def test_on_submit_skips_when_already_loading() -> None:
@@ -117,6 +137,11 @@ async def test_on_submit_skips_when_already_loading() -> None:
         query_text="Q",
         loading=True,
         session=ResearchSession(query="Q"),
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
     )
     mock_async = AsyncMock()
     with (
@@ -134,7 +159,16 @@ async def test_on_submit_skips_when_already_loading() -> None:
 def test_on_query_input_updates_state() -> None:
     from a2a_research.ui import app as app_mod
 
-    st = SimpleNamespace(query_text="", session=ResearchSession(), loading=False)
+    st = SimpleNamespace(
+        query_text="",
+        session=ResearchSession(),
+        loading=False,
+        progress_granularity=1,
+        current_substep="",
+        progress_pct=0.0,
+        progress_step_label="",
+        progress_running_substeps=[],
+    )
     ev = SimpleNamespace(value="  hello ")
     with patch.object(app_mod.me, "state", return_value=st):
         app_mod._on_query_input(ev)

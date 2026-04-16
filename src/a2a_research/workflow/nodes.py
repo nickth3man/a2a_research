@@ -70,10 +70,13 @@ class ActorNode(AsyncNode):
                     granularity=ProgressGranularity.AGENT,
                 )
             )
+            granularity = shared.get("progress_granularity", 1)
             payload["progress_context"] = {
                 "step_index": step_index,
                 "total_steps": total_steps,
+                "granularity": granularity,
             }
+            payload["__progress_reporter__"] = progress_reporter
         logger.info(
             "Agent step start session_id=%s role=%s payload_keys=%s",
             session.id,

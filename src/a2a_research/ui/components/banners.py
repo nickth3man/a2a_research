@@ -2,14 +2,14 @@
 
 import mesop as me
 
+from a2a_research.models import ResearchSession
+from a2a_research.ui.components.progress_bar import ProgressBar
+from a2a_research.ui.components.step_checklist import StepChecklist
 from a2a_research.ui.tokens import (
     ERROR_BANNER_STYLE,
     ERROR_TEXT,
     FONT_SIZE_BODY,
-    FONT_SIZE_SMALL,
-    FONT_SIZE_SUBTITLE,
     LOADING_CARD_STYLE,
-    LOADING_TEXT,
 )
 
 
@@ -32,15 +32,24 @@ def _error_banner_message(error: str, *, max_len: int = 200) -> str:
 
 
 @me.component
-def CardLoading() -> None:  # noqa: N802
-    """Display a loading card with progress messaging."""
+def CardLoading(  # noqa: N802
+    progress_pct: float,
+    progress_step_label: str,
+    progress_substep_label: str,
+    session: ResearchSession,
+    granularity: int,
+    running_substeps: list[str],
+) -> None:
+    """Live progress bar and agent checklist while the pipeline runs."""
     with me.box(style=LOADING_CARD_STYLE):
-        me.text(
-            "Running research pipeline\u2026",
-            style=me.Style(font_size=FONT_SIZE_SUBTITLE, color=LOADING_TEXT, font_weight="bold"),
+        ProgressBar(
+            pct=progress_pct,
+            step_label=progress_step_label or "In progress\u2026",
+            substep_label=progress_substep_label,
         )
-        me.text(
-            "Researchers retrieving documents \u00b7 Analysts decomposing \u00b7 "
-            "Verifiers checking evidence \u00b7 Presenter rendering",
-            style=me.Style(font_size=FONT_SIZE_SMALL, color=LOADING_TEXT, margin=me.Margin(top=8)),
+        me.box(style=me.Style(height=20))
+        StepChecklist(
+            session=session,
+            granularity=granularity,
+            running_substeps=running_substeps,
         )

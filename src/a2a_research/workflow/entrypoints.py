@@ -35,6 +35,7 @@ async def run_workflow(
     query: str,
     roles: list[AgentRole] | None = None,
     progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
     normalized_roles = _normalize_roles(roles)
     session = ResearchSession(query=query, roles=normalized_roles or default_roles())
@@ -52,6 +53,7 @@ async def run_workflow(
             session,
             normalized_roles,
             progress_queue=progress_queue,
+            granularity=granularity,
         )
     except Exception as exc:
         elapsed_ms = (perf_counter() - started_at) * 1000
@@ -71,14 +73,16 @@ async def run_workflow_async(
     query: str,
     roles: list[AgentRole] | None = None,
     progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
-    return await run_workflow(query, roles, progress_queue=progress_queue)
+    return await run_workflow(query, roles, progress_queue=progress_queue, granularity=granularity)
 
 
 async def run_workflow_from_session(
     session: ResearchSession,
     roles: list[AgentRole] | None = None,
     progress_queue: ProgressQueue | None = None,
+    granularity: int = 1,
 ) -> ResearchSession:
     explicit_roles = _normalize_roles(roles)
     normalized_roles = explicit_roles or _normalize_roles(session.roles) or default_roles()
@@ -89,6 +93,7 @@ async def run_workflow_from_session(
     shared["session"] = session
     if progress_queue is not None:
         shared["progress_reporter"] = make_progress_reporter(asyncio.get_running_loop(), progress_queue)
+        shared["progress_granularity"] = granularity
     await flow.run_async(shared)
     result: ResearchSession = shared["session"]
     logger.info(
