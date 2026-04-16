@@ -61,7 +61,7 @@ def _render_checklist_row(
                     color="#fff",
                     font_size=FONT_SIZE_TINY,
                     background=color,
-                    padding=me.Padding(top=2, bottom=2, left=8, right=8),
+                    padding=me.Padding(top=2, bottom=2, left=10, right=10),
                     border_radius=10,
                 ),
             )
@@ -72,6 +72,7 @@ def _render_checklist_row(
                     style=me.Style(
                         font_size=FONT_SIZE_TINY,
                         color=SUBSTEP_COLOR,
+                        line_height=1.4,
                         margin=me.Margin(left=26),
                     ),
                 )

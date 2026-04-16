@@ -1,18 +1,102 @@
 # AGENTS.md
 
-When you are unsure how to do something or need external documentation, use the following tools.
-Prioritize local codebase knowledge when available. Reach for external tools only when the answer is not in the repo.
+High-signal guidance for working in this repo. If a fact is obvious from filenames or generic Python conventions, it’s omitted.
 
-## GitHub examples & repo docs
+---
 
-- **`searchGitHub`** — Search for real-world code patterns across public GitHub repositories. Best for finding production usage examples of unfamiliar APIs, frameworks, or libraries.
-- **`read_wiki_structure`** — List the documentation topics and structure of a GitHub repository. Use this to quickly map what docs are available before reading them.
-- **`read_wiki_contents`** — Read the full content of a specific documentation topic from a GitHub repository. Use after `read_wiki_structure` to pull the relevant guide.
-- **`ask_question`** — Ask an AI-powered, context-grounded question about a GitHub repository. Useful when you need a synthesized answer instead of scrolling through raw code or docs.
+## Developer commands
 
-## Web search & extraction
+Use `uv` for everything. The project is managed with `pyproject.toml` + `uv.lock`.
 
-- **`tavily-search`** — Run a broad web search with AI-generated summaries and citations. Best for current best practices, framework changelogs, troubleshooting errors, or verifying facts.
-- **`tavily-crawl`** — Start a structured crawl from a base URL and follow internal links. Use for deep documentation dives, blog series, or multi-page guides.
-- **`tavily-map`** — Discover and list the URL structure of a website. Use this before crawling to identify the most relevant pages.
-- **`tavily-extract`** — Fetch and parse raw content from one or more specific URLs. Use when you already know the exact page(s) you need.
+```bash
+# Install
+uv pip install -e .
+
+# Verification pipeline (run these in order)
+make check        # lint + format-check + mypy + ty
+make test         # pytest with coverage and auto-parallel (-n auto)
+
+# Direct equivalents
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run mypy src/
+uv run ty check src/
+uv run pytest
+```
+
+- CI runs on Python 3.11 and 3.12 and executes the exact same four checks as `make check` plus tests.
+- pytest defaults (from `pyproject.toml`) include `-n auto --cov=src/a2a_research --cov-report=term-missing`.
+
+---
+
+## Source layout & entrypoints
+
+- Package root: `src/a2a_research/`
+- **Ignore the stale nested directory `src/a2a_research/src/`** — it is not part of the build and should not be edited.
+- Main modules:
+  - `workflow/` — PocketFlow runtime (`run_research_sync` is the stable public entrypoint)
+  - `a2a/` — In-process A2A registry, server, and client facades
+  - `agents/` — Agent invoke functions (researcher, analyst, verifier, presenter)
+  - `rag/` — ChromaDB ingestion and retrieval
+  - `ui/` — Mesop web app (`app.py` is the page entrypoint)
+  - `models/` — Pydantic domain types
+  - `prompts/` — System prompt strings
+  - `helpers/` — Deterministic formatting/reporting utilities
+
+---
+
+## Adding a new agent
+
+If you add an agent role, you must register it in **four** places:
+1. `a2a/__init__.py` — register the handler callable
+2. `models/__init__.py` — add the role enum/value
+3. `prompts/__init__.py` — add the system prompt
+4. `workflow/builder.py` — wire the role into the pipeline
+
+---
+
+## Type-checking quirks
+
+- mypy runs in **strict** mode (`mypy.ini`), but three areas are explicitly relaxed:
+  - `a2a_research.ui.*` — untyped defs/decorators/calls allowed
+  - `a2a_research.workflow.*` — untyped defs/calls allowed; `type-arg` ignored
+  - `a2a_research.helpers` — same relaxations as workflow
+- `pocketflow.*` is entirely ignored by mypy.
+- `ty` is also run in CI; it must pass independently of mypy.
+
+---
+
+## Testing conventions
+
+- Unit tests **require no API key** — all LLM calls are mocked.
+- UI tests rely on fixtures in `tests/conftest.py` that stub Mesop’s component runtime.
+- Run a single test file: `uv run pytest tests/test_workflow.py`
+- Run a single test: `uv run pytest tests/test_workflow.py::test_name -v`
+
+---
+
+## UI & RAG runtime quirks
+
+- **Mesop dev server**: `make mesop` sets `MESOP_STATE_SESSION_BACKEND=memory` to avoid state-desync errors on hot reload. UI listens on `http://localhost:32123` by default.
+- **RAG corpus**: markdown files live in `data/corpus/`. Ingest with `make ingest` (idempotent; skips if already populated, force with `ingest_corpus(force=True)`).
+- **ChromaDB storage**: `data/chroma/` is gitignored and created automatically.
+
+---
+
+## Environment & configuration
+
+- Settings are loaded via `pydantic-settings` from `.env` automatically.
+- Default `.env.example` uses **OpenRouter** (`LLM_PROVIDER=openrouter`, `LLM_MODEL=openrouter/elephant-alpha`).
+- Provider-agnostic design: LLM and embedding providers can differ (`openrouter`, `openai`, `anthropic`, `google`, `ollama`).
+
+---
+
+## External tools
+
+When you need docs or examples beyond the repo, prefer these tools:
+
+- **`searchGitHub`** — Search public GitHub for production usage patterns of unfamiliar APIs or libraries.
+- **`read_wiki_structure`** / **`read_wiki_contents`** — Map and read docs from a GitHub repository.
+- **`ask_question`** — Ask a synthesized, context-grounded question about a GitHub repository.
+- **`tavily-search`** — Current best practices, changelogs, and troubleshooting.
+- **`tavily-crawl`** / **`tavily-extract`** — Deep documentation dives or raw page content.

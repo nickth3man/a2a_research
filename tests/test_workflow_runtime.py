@@ -114,7 +114,9 @@ class TestWorkflowRun:
     async def test_run_workflow_reuses_researcher_retrieval_for_verifier(self):
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()) as retrieve_mock,
+            patch(
+                "a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()
+            ) as retrieve_mock,
         ):
             session = await run_workflow("What is RAG?")
         assert session.retrieved_chunks

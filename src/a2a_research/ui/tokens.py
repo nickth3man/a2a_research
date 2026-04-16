@@ -31,13 +31,19 @@ __all__ = [
     "ERROR_BANNER_BORDER",
     "ERROR_BANNER_STYLE",
     "ERROR_TEXT",
+    "EXAMPLE_QUERY_COLOR",
     "FONT_SIZE_BODY",
     "FONT_SIZE_SMALL",
     "FONT_SIZE_SUBTITLE",
     "FONT_SIZE_TINY",
+    "GRANULARITY_GROUP_BG",
+    "GRANULARITY_SELECTED_BG",
+    "GRANULARITY_SELECTED_SHADOW",
+    "HEADER_ACCENT_COLOR",
     "HEADER_BORDER_COLOR",
     "HEADER_BORDER_WIDTH",
     "HEADER_STYLE",
+    "HEADER_SUBTITLE_COLOR",
     "INSTRUCTIONS_BG",
     "INSTRUCTIONS_BORDER",
     "INSTRUCTIONS_STYLE",
@@ -94,12 +100,18 @@ SECTION_MARGIN_BOTTOM_SM = 16
 SECTION_MARGIN_BOTTOM_MD = 20
 
 # --- Header / instructions / empty (page_sections) ---
+HEADER_ACCENT_COLOR = "#2563eb"
 HEADER_BORDER_COLOR = BORDER_COLOR
 HEADER_BORDER_WIDTH = 2
+HEADER_SUBTITLE_COLOR = "#374151"
 INSTRUCTIONS_BG = "#eff6ff"
 INSTRUCTIONS_BORDER = "#bfdbfe"
 EMPTY_STATE_BG = "#f9fafb"
 EMPTY_STATE_BORDER = "#d1d5db"
+EXAMPLE_QUERY_COLOR = "#1d4ed8"
+GRANULARITY_GROUP_BG = "#f3f4f6"
+GRANULARITY_SELECTED_BG = "#ffffff"
+GRANULARITY_SELECTED_SHADOW = "0 1px 3px rgba(0,0,0,0.15)"
 
 # --- Agent timeline rows ---
 AGENT_ROW_BG_IDLE = "#f9fafb"
@@ -175,9 +187,10 @@ LOADING_CARD_STYLE = me.Style(
 # Header section style preset
 HEADER_STYLE = me.Style(
     border=me.Border(
+        left=me.BorderSide(width=4, color=HEADER_ACCENT_COLOR),
         bottom=me.BorderSide(width=HEADER_BORDER_WIDTH, color=HEADER_BORDER_COLOR),
     ),
-    padding=me.Padding(bottom=16),
+    padding=me.Padding(left=16, bottom=16),
     margin=me.Margin(bottom=24),
 )
 

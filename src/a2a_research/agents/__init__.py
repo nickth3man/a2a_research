@@ -206,7 +206,9 @@ def researcher_invoke(session: ResearchSession, message: A2AMessage | None = Non
         chunks = retrieve_chunks(query, n_results=10)
     except Exception as exc:
         logger.exception("Researcher RAG retrieval failed session_id=%s", session.id)
-        return _create_agent_result(AgentRole.RESEARCHER, AgentStatus.FAILED, f"RAG retrieval failed: {exc}")
+        return _create_agent_result(
+            AgentRole.RESEARCHER, AgentStatus.FAILED, f"RAG retrieval failed: {exc}"
+        )
 
     chunk_detail = f"{len(chunks)} chunks found" if granularity >= 3 else ""
     emit("Querying ChromaDB…", 1, detail=chunk_detail)

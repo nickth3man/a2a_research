@@ -1,14 +1,19 @@
 """A / B / C control for progress update verbosity."""
 
 from collections.abc import Callable
-from typing import Any, Literal
+from typing import Any
 
 import mesop as me
 
-from a2a_research.ui.tokens import FONT_SIZE_SMALL, TEXT_MUTED
+from a2a_research.ui.tokens import (
+    FONT_SIZE_SMALL,
+    GRANULARITY_GROUP_BG,
+    GRANULARITY_SELECTED_BG,
+    GRANULARITY_SELECTED_SHADOW,
+    TEXT_MUTED,
+)
 
 
-@me.component
 def GranularityToggle(  # noqa: N802
     current: int,
     on_agent_level: Callable[[Any], Any],
@@ -25,25 +30,39 @@ def GranularityToggle(  # noqa: N802
         )
     ):
         me.text(
-            "Progress detail: A = agents \u00b7 B = sub-steps \u00b7 C = full detail",
+            "Pipeline detail level",
             style=me.Style(font_size=FONT_SIZE_SMALL, color=TEXT_MUTED),
         )
-        with me.box(style=me.Style(display="flex", gap=8, flex_wrap="wrap")):
-            _render_granularity_button("A", "Agent steps", current == 1, on_agent_level)
-            _render_granularity_button("B", "Sub-steps", current == 2, on_substep_level)
-            _render_granularity_button("C", "Maximum", current == 3, on_detail_level)
+        with me.box(
+            style=me.Style(
+                display="flex",
+                gap=4,
+                flex_wrap="wrap",
+                background=GRANULARITY_GROUP_BG,
+                border_radius=8,
+                padding=me.Padding(top=4, right=4, bottom=4, left=4),
+            )
+        ):
+            _render_granularity_button("Agents only", current == 1, on_agent_level)
+            _render_granularity_button("With steps", current == 2, on_substep_level)
+            _render_granularity_button("Detail", current == 3, on_detail_level)
 
 
 def _render_granularity_button(
-    key_label: str,
-    subtitle: str,
+    label: str,
     is_selected: bool,
     handler: Callable[[Any], Any],
 ) -> None:
-    color: Literal["primary", "accent", "warn"] = "primary" if is_selected else "accent"
-    with me.box(style=me.Style(display="flex", flex_direction="column", align_items="center")):
-        me.button(f"{key_label}", on_click=handler, type="flat", color=color)
-        me.text(
-            subtitle,
-            style=me.Style(font_size="11px", color=TEXT_MUTED, margin=me.Margin(top=2)),
+    with me.box(
+        style=me.Style(
+            background=GRANULARITY_SELECTED_BG if is_selected else "transparent",
+            border_radius=6,
+            box_shadow=GRANULARITY_SELECTED_SHADOW if is_selected else None,
+        )
+    ):
+        me.button(
+            label,
+            on_click=handler,
+            type="flat",
+            color="primary" if is_selected else "accent",
         )
