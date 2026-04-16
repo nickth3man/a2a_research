@@ -16,6 +16,7 @@ Mesop reads additional ``MESOP_*`` variables (for example
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -144,6 +145,7 @@ _PASSTHROUGH_PREFIXES = ("MESOP_",)
 
 
 def _validate_dotenv_keys() -> None:
+    """Warn about unknown keys in .env without failing (supports shared environments)."""
     raw_values = dotenv_values(_ENV_FILE)
     unknown_keys: list[str] = []
 
@@ -163,12 +165,12 @@ def _validate_dotenv_keys() -> None:
 
     if unknown_keys:
         rendered = ", ".join(sorted(unknown_keys))
-        raise ValueError(
-            "Unknown keys in .env: "
-            f"{rendered}. "
+        logging.getLogger(__name__).warning(
+            "Unknown keys in .env: %s. "
             "Allowed project keys are LOG_LEVEL, MESOP_PORT, WORKFLOW_TIMEOUT, "
             "and keys under the LLM_, EMBEDDING_, CHROMA_, and CHUNK_ prefixes. "
-            "MESOP_* keys are allowed as passthrough."
+            "MESOP_* keys are allowed as passthrough.",
+            rendered,
         )
 
 

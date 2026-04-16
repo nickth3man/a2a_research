@@ -12,6 +12,7 @@ yields so the completed UI renders.
 import asyncio
 import logging
 import os
+import sys
 from collections.abc import AsyncGenerator, Callable
 from contextlib import suppress
 from dataclasses import field
@@ -19,10 +20,21 @@ from typing import Any, cast
 
 import mesop as me
 
-# Patch Mesop's static file serving to return 404 instead of 500 for missing
-# files such as /robots.txt (framework bug on Windows pip installs).
-import mesop.server.static_file_serving as _sfs
-from flask import Response as _Response
+# Conditionally patch Mesop's static file serving on Windows to return 404
+# instead of 500 for missing files such as /robots.txt (framework bug on Windows).
+if sys.platform == "win32":
+    import mesop.server.static_file_serving as _sfs
+    from flask import Response as _Response
+
+    _original_send_file_compressed = _sfs.send_file_compressed
+
+    def _patched_send_file_compressed(path: str, disable_gzip_cache: bool) -> Any:
+        if not os.path.exists(path):
+            return _Response("Not found", status=404)
+        return _original_send_file_compressed(path, disable_gzip_cache)
+
+    _send_file_compressed_patch: Callable[[str, bool], Any] = _patched_send_file_compressed
+    cast("Any", _sfs).send_file_compressed = _send_file_compressed_patch
 
 from a2a_research.app_logging import (
     get_logger,
@@ -52,18 +64,6 @@ from a2a_research.ui.components import (
 from a2a_research.ui.data_access import get_agent_label
 from a2a_research.ui.session_state import get_session_error, has_progress, has_results
 from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
-
-_original_send_file_compressed = _sfs.send_file_compressed
-
-
-def _patched_send_file_compressed(path: str, disable_gzip_cache: bool) -> Any:
-    if not os.path.exists(path):
-        return _Response("Not found", status=404)
-    return _original_send_file_compressed(path, disable_gzip_cache)
-
-
-_send_file_compressed_patch: Callable[[str, bool], Any] = _patched_send_file_compressed
-cast("Any", _sfs).send_file_compressed = _send_file_compressed_patch
 
 setup_logging()
 logger = get_logger(__name__)

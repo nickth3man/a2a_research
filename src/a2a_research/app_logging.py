@@ -16,7 +16,7 @@ import sys
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, cast
+from typing import TYPE_CHECKING, Any, TextIO
 
 from a2a_research.settings import settings
 
@@ -98,34 +98,35 @@ def _configure_named_logger(name: str, level: int) -> None:
 
 
 def _install_exception_hooks() -> None:
+    """Install exception hooks that log and preserve original handlers."""
+    original_excepthook = sys.excepthook
+    original_thread_excepthook = threading.excepthook
+
     def _log_unhandled_exception(
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
         exc_traceback: TracebackType | None,
     ) -> None:
-        if exc_type is None or issubclass(exc_type, KeyboardInterrupt):
-            sys.__excepthook__(
-                cast("Any", exc_type),
-                cast("Any", exc_value),
-                exc_traceback,
+        if exc_type is not None and exc_value is not None and not issubclass(exc_type, KeyboardInterrupt):
+            logging.getLogger("a2a_research.unhandled").error(
+                "Unhandled exception",
+                exc_info=(exc_type, exc_value, exc_traceback),
             )
-            return
-        if exc_value is None:
-            return
-        logging.getLogger("a2a_research.unhandled").error(
-            "Unhandled exception",
-            exc_info=(exc_type, exc_value, exc_traceback),
-        )
+        original_excepthook(exc_type, exc_value, exc_traceback)  # type: ignore[arg-type]
 
     def _log_thread_exception(args: threading.ExceptHookArgs) -> None:
-        exc_info: tuple[type[BaseException], BaseException, TracebackType | None] | None = None
         if args.exc_type is not None and args.exc_value is not None:
-            exc_info = (args.exc_type, args.exc_value, args.exc_traceback)
-        logging.getLogger("a2a_research.threading").error(
-            "Unhandled thread exception in %s",
-            getattr(args.thread, "name", "<unknown>"),
-            exc_info=exc_info,
-        )
+            logging.getLogger("a2a_research.threading").error(
+                "Unhandled thread exception in %s",
+                getattr(args.thread, "name", "<unknown>"),
+                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
+            )
+        else:
+            logging.getLogger("a2a_research.threading").error(
+                "Unhandled thread exception in %s (no exception info)",
+                getattr(args.thread, "name", "<unknown>"),
+            )
+        original_thread_excepthook(args)
 
     sys.excepthook = _log_unhandled_exception
     threading.excepthook = _log_thread_exception

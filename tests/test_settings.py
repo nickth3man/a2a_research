@@ -16,15 +16,15 @@ from a2a_research.settings import (
 
 
 class TestValidateDotenvKeys:
-    def test_unknown_keys_raise_value_error(self, tmp_path: Path) -> None:
+    def test_unknown_keys_log_warning(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """Unknown .env keys should log a warning, not raise an error (supports shared environments)."""
         env_file = tmp_path / ".env"
         env_file.write_text("UNKNOWN_KEY=value\nLLM_API_KEY=secret\n")
 
-        with (
-            patch("a2a_research.settings._ENV_FILE", env_file),
-            pytest.raises(ValueError, match="Unknown keys in \\.env: UNKNOWN_KEY"),  # type: ignore[attr-defined]
-        ):
+        with patch("a2a_research.settings._ENV_FILE", env_file):
             settings_module._validate_dotenv_keys()
+
+        assert "Unknown keys in .env: UNKNOWN_KEY" in caplog.text
 
     def test_mesop_passthrough_keys_are_allowed(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
@@ -58,15 +58,16 @@ class TestValidateDotenvKeys:
 
 
 class TestAppSettings:
-    def test_model_validator_calls_dotenv_validation(self, tmp_path: Path) -> None:
+    def test_model_validator_calls_dotenv_validation(self, tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """Unknown .env keys should log a warning, not prevent AppSettings from loading."""
         env_file = tmp_path / ".env"
         env_file.write_text("BAD_KEY=value\n")
 
-        with (
-            patch("a2a_research.settings._ENV_FILE", env_file),
-            pytest.raises(ValueError, match="Unknown keys"),  # type: ignore[attr-defined]
-        ):
-            AppSettings()
+        with patch("a2a_research.settings._ENV_FILE", env_file):
+            settings = AppSettings()
+
+        assert "Unknown keys in .env: BAD_KEY" in caplog.text
+        assert isinstance(settings, AppSettings)
 
     def test_nested_settings_defaults(self) -> None:
         env_file = Path(__file__).resolve().parents[3] / ".env"

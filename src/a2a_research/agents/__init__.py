@@ -84,7 +84,10 @@ def _sanitize_query(query: str) -> str:
     """Sanitize user query before interpolation into prompts."""
     query = query.strip()
     query = " ".join(query.split())
-    return query[:10000]
+    if len(query) > 10000:
+        logger.warning("Query truncated from %d to 10000 characters", len(query))
+        return query[:10000]
+    return query
 
 
 def _extract_progress_context(
