@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from a2a_research.agents.pocketflow import create_pocketflow_workflow, get_graph
 from a2a_research.models import AgentRole
-from a2a_research.workflow import create_pocketflow_workflow, get_graph
 
 
 def test_create_pocketflow_workflow_default_roles_seeds_shared_state() -> None:

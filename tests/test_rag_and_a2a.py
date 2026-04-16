@@ -62,7 +62,7 @@ class TestA2ADispatch:
         not the sender's own handler."""
         raw = '{"atomic_claims": [{"id": "c1", "text": "RAG uses retrieval augmentation."}]}'
 
-        with patch("a2a_research.agents._call_llm", return_value=raw):
+        with patch("a2a_research.agents.pocketflow.utils.llm.call_llm", return_value=raw):
             session = ResearchSession(query="What is RAG?")
             session.agent_results[AgentRole.RESEARCHER] = AgentResult(
                 role=AgentRole.RESEARCHER,

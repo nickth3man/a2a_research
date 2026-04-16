@@ -8,15 +8,20 @@ from typing import Any
 
 from pocketflow import AsyncNode
 
-from ..app_logging import get_logger
-from ..models import (
+from a2a_research.app_logging import get_logger
+from a2a_research.models import (
     A2AMessage,
     AgentResult,
     AgentRole,
     AgentStatus,
     ResearchSession,
 )
-from ..progress import ProgressEvent, ProgressGranularity, ProgressPhase, ProgressReporter
+from a2a_research.progress import (
+    ProgressEvent,
+    ProgressGranularity,
+    ProgressPhase,
+    ProgressReporter,
+)
 
 logger = get_logger(__name__)
 
@@ -84,7 +89,7 @@ class ActorNode(AsyncNode):
         )
         started_at = perf_counter()
 
-        from ..a2a.server import A2AClient
+        from a2a_research.a2a.server import A2AClient
 
         message = A2AMessage(
             sender=self._get_sender_for_role(self.role),

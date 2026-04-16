@@ -2,7 +2,7 @@
 
 Maps each :class:`~a2a_research.models.AgentRole` to a callable that accepts
 ``(ResearchSession, A2AMessage)`` and returns an :class:`~a2a_research.models.AgentResult`,
-wrapping the lower-level handlers from :mod:`a2a_research.agents.registry`.
+wrapping the lower-level handlers from :mod:`a2a_research.agents.pocketflow.registry`.
 """
 
 from __future__ import annotations
@@ -57,12 +57,10 @@ _SERVER_REGISTRY: dict[AgentRole, A2AServer] | None = None
 
 
 def _build_server_registry() -> dict[AgentRole, A2AServer]:
-    from a2a_research.agents import (
-        analyst_invoke,
-        presenter_invoke,
-        researcher_invoke,
-        verifier_invoke,
-    )
+    from a2a_research.agents.pocketflow.analyst import analyst_invoke
+    from a2a_research.agents.pocketflow.presenter import presenter_invoke
+    from a2a_research.agents.pocketflow.researcher import researcher_invoke
+    from a2a_research.agents.pocketflow.verifier import verifier_invoke
     from a2a_research.models import get_agent_card
 
     handler_map: dict[AgentRole, AgentHandler] = {

@@ -1,7 +1,7 @@
 """Deterministic helpers for parsing LLM output and building markdown reports.
 
-Includes JSON/text extraction for claims and verdicts, formatting helpers, and a
-small PocketFlow ``Flow`` used to assemble report sections without an LLM when needed.
+JSON/text extraction for claims and verdicts, formatting helpers, and a small
+PocketFlow ``Flow`` used to assemble report sections without an LLM when needed.
 """
 
 from __future__ import annotations

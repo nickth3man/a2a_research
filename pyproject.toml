@@ -140,14 +140,7 @@ disallow_untyped_decorators = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = "a2a_research.workflow.*"
-disallow_untyped_defs = false
-disallow_untyped_calls = false
-warn_return_any = false
-disable_error_code = ["type-arg"]
-
-[[tool.mypy.overrides]]
-module = "a2a_research.helpers"
+module = "a2a_research.agents.pocketflow.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
 warn_return_any = false

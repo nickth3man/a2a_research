@@ -412,7 +412,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     )
     yield
 
-    from a2a_research.workflow import run_workflow_async
+    from a2a_research.agents.pocketflow import run_workflow_async
 
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:
