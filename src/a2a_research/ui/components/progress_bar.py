@@ -34,22 +34,25 @@ def ProgressBar(  # noqa: N802
                 margin=me.Margin(bottom=8),
             ),
         )
-        with me.box(
-            style=me.Style(
-                width="100%",
-                height=PROGRESS_BAR_HEIGHT,
-                background=PROGRESS_BAR_BG,
-                border_radius=6,
-                overflow="hidden",
-            )
-        ), me.box(
-            style=me.Style(
-                height="100%",
-                width=fill_width,
-                background=f"linear-gradient(90deg, {PROGRESS_BAR_FILL}, #22c55e)",
-                border_radius=6,
-                transition="width 0.2s ease-out",
-            )
+        with (
+            me.box(
+                style=me.Style(
+                    width="100%",
+                    height=PROGRESS_BAR_HEIGHT,
+                    background=PROGRESS_BAR_BG,
+                    border_radius=6,
+                    overflow="hidden",
+                )
+            ),
+            me.box(
+                style=me.Style(
+                    height="100%",
+                    width=fill_width,
+                    background=f"linear-gradient(90deg, {PROGRESS_BAR_FILL}, #22c55e)",
+                    border_radius=6,
+                    transition="width 0.2s ease-out",
+                )
+            ),
         ):
             pass
         me.text(

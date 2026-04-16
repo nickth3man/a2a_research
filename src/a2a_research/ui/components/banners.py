@@ -23,12 +23,12 @@ def BannerError(error: str) -> None:  # noqa: N802
         )
 
 
-def _error_banner_message(error: str, *, max_len: int = 200) -> str:
+def _error_banner_message(error: str, *, max_length: int = 200) -> str:
     """Format an error message with prefix and length limit."""
     prefix = "Pipeline error: "
-    if len(error) <= max_len:
+    if len(error) <= max_length:
         return prefix + error
-    return prefix + error[:max_len] + "\u2026"
+    return prefix + error[:max_length] + "\u2026"
 
 
 @me.component

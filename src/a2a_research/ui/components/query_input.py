@@ -6,7 +6,7 @@ from typing import Any, cast
 import mesop as me
 
 from a2a_research.ui.components.granularity_toggle import GranularityToggle
-from a2a_research.ui.primitives import query_input_card_style
+from a2a_research.ui.primitives import get_query_input_card_style
 from a2a_research.ui.tokens import SUBTITLE_MARGIN_BOTTOM
 
 
@@ -22,17 +22,13 @@ def CardQueryInput(  # noqa: N802
     on_granularity_detail: Callable[[Any], Any] | None = None,
 ) -> None:
     """Render the query input card with textarea and submit button."""
-    with me.box(style=query_input_card_style()):
+    with me.box(style=get_query_input_card_style()):
         me.text(
             "Research Query",
             type="subtitle-1",
             style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM),
         )
-        if (
-            on_granularity_agent
-            and on_granularity_substep
-            and on_granularity_detail
-        ):
+        if on_granularity_agent and on_granularity_substep and on_granularity_detail:
             GranularityToggle(
                 current=progress_granularity,
                 on_agent_level=on_granularity_agent,

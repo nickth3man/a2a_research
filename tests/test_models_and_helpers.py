@@ -11,7 +11,7 @@ from a2a_research.helpers import (
     format_claim_verdict,
     format_claims_section,
     format_confidence,
-    make_result,
+    create_result,
     parse_json_safely,
 )
 from a2a_research.models import (
@@ -94,8 +94,8 @@ class TestModels:
 
 
 class TestHelpers:
-    def test_make_result(self):
-        result = make_result(
+    def test_create_result(self):
+        result = create_result(
             AgentRole.RESEARCHER,
             AgentStatus.COMPLETED,
             "Retrieved docs",

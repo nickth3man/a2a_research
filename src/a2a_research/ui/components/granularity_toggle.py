@@ -1,7 +1,7 @@
 """A / B / C control for progress update verbosity."""
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import mesop as me
 
@@ -29,20 +29,20 @@ def GranularityToggle(  # noqa: N802
             style=me.Style(font_size=FONT_SIZE_SMALL, color=TEXT_MUTED),
         )
         with me.box(style=me.Style(display="flex", gap=8, flex_wrap="wrap")):
-            _gran_button("A", "Agent steps", current == 1, on_agent_level)
-            _gran_button("B", "Sub-steps", current == 2, on_substep_level)
-            _gran_button("C", "Maximum", current == 3, on_detail_level)
+            _render_granularity_button("A", "Agent steps", current == 1, on_agent_level)
+            _render_granularity_button("B", "Sub-steps", current == 2, on_substep_level)
+            _render_granularity_button("C", "Maximum", current == 3, on_detail_level)
 
 
-def _gran_button(
-    short: str,
+def _render_granularity_button(
+    key_label: str,
     subtitle: str,
-    selected: bool,
+    is_selected: bool,
     handler: Callable[[Any], Any],
 ) -> None:
-    color = "primary" if selected else "accent"
+    color: Literal["primary", "accent", "warn"] = "primary" if is_selected else "accent"
     with me.box(style=me.Style(display="flex", flex_direction="column", align_items="center")):
-        me.button(f"{short}", on_click=handler, type="flat", color=color)
+        me.button(f"{key_label}", on_click=handler, type="flat", color=color)
         me.text(
             subtitle,
             style=me.Style(font_size="11px", color=TEXT_MUTED, margin=me.Margin(top=2)),

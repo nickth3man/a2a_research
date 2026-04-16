@@ -107,10 +107,10 @@ def _format_substep_line(evt: ProgressEvent, granularity: int) -> str:
     return evt.substep_label
 
 
-def _apply_progress_event(state: AppState, evt: ProgressEvent) -> None:
+def _handle_progress_event(state: AppState, evt: ProgressEvent) -> None:
     state.progress_pct = _progress_fraction(evt)
-    g = state.progress_granularity
-    label = _format_substep_line(evt, g)
+    granularity = state.progress_granularity
+    label = _format_substep_line(evt, granularity)
     state.current_substep = label
 
     agent_label = get_agent_label(evt.role)
@@ -118,7 +118,7 @@ def _apply_progress_event(state: AppState, evt: ProgressEvent) -> None:
 
     if evt.phase == ProgressPhase.STEP_STARTED:
         state.progress_running_substeps = []
-    elif evt.phase == ProgressPhase.STEP_SUBSTEP and g >= 2:
+    elif evt.phase == ProgressPhase.STEP_SUBSTEP and granularity >= 2:
         state.progress_running_substeps = [*state.progress_running_substeps, label]
 
     state.session.ensure_agent_results()
@@ -199,7 +199,7 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             )
         )
         async for evt in drain_progress_while_running(queue, wf_task):
-            _apply_progress_event(state, evt)
+            _handle_progress_event(state, evt)
             yield
 
         state.session = wf_task.result()

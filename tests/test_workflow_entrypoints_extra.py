@@ -29,9 +29,7 @@ async def test_run_workflow_reraises_after_flow_failure() -> None:
 async def test_run_workflow_from_session_uses_role_aware_flow() -> None:
     out = ResearchSession(query="done")
     flow = MagicMock()
-    flow.run_async = AsyncMock(
-        side_effect=lambda shared: shared.__setitem__("session", out)
-    )
+    flow.run_async = AsyncMock(side_effect=lambda shared: shared.__setitem__("session", out))
     with patch(
         "a2a_research.workflow.entrypoints.get_workflow_for_roles",
         return_value=(flow, {}),

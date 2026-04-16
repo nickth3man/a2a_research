@@ -82,7 +82,7 @@ class TestWorkflowRun:
     def test_run_workflow_via_run_research_sync(self):
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
         ):
             session = run_research_sync("What is RAG?")
 
@@ -100,7 +100,7 @@ class TestWorkflowRun:
     async def test_run_workflow_async(self):
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
         ):
             session = await run_workflow("What is RAG?")
         assert session.final_report.startswith("# Report")
@@ -114,7 +114,7 @@ class TestWorkflowRun:
     async def test_run_workflow_reuses_researcher_retrieval_for_verifier(self):
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()) as retrieve_mock,
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()) as retrieve_mock,
         ):
             session = await run_workflow("What is RAG?")
         assert session.retrieved_chunks
@@ -132,7 +132,7 @@ class TestWorkflowAdapter:
 
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
         ):
             state = adapter.invoke(WorkflowState(session=ResearchSession(query="Test?")))
 
@@ -147,7 +147,7 @@ class TestWorkflowAdapter:
 
         with (
             patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve", return_value=_fake_chunks()),
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
         ):
             result = await adapter.ainvoke(state)
 

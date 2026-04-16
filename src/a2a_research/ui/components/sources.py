@@ -30,8 +30,8 @@ def PanelSources(session: ResearchSession) -> None:  # noqa: N802
             me.text("No sources cited yet.", style=me.Style(color=TEXT_MUTED))
             return
 
-        for i, src in enumerate(all_citations, 1):
-            src_display = format_source_display(src)
+        for i, citation in enumerate(all_citations, 1):
+            formatted_citation = format_source_display(citation)
             with me.box(
                 style=me.Style(
                     display="flex",
@@ -55,4 +55,4 @@ def PanelSources(session: ResearchSession) -> None:  # noqa: N802
                         text_align="center",
                     ),
                 )
-                me.text(src_display, style=me.Style(font_size="13px", flex=1))
+                me.text(formatted_citation, style=me.Style(font_size="13px", flex=1))

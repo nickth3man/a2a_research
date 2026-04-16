@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from time import perf_counter
-from typing import Callable
+from typing import TYPE_CHECKING, Any
 
-from a2a_research.models import AgentRole
+if TYPE_CHECKING:
+    from a2a_research.models import AgentRole
 
 
 class ProgressGranularity(IntEnum):
@@ -49,7 +51,7 @@ ProgressQueue = asyncio.Queue[ProgressEvent | None]
 ProgressReporter = Callable[[ProgressEvent | None], None]
 
 
-def make_progress_reporter(
+def create_progress_reporter(
     loop: asyncio.AbstractEventLoop,
     queue: ProgressQueue,
 ) -> ProgressReporter:
@@ -63,8 +65,8 @@ def make_progress_reporter(
 
 async def drain_progress_while_running(
     queue: ProgressQueue,
-    workflow_task: asyncio.Task,
-):
+    workflow_task: asyncio.Task[Any],
+) -> AsyncGenerator[ProgressEvent, None]:
     """Yield queued events until the workflow finishes and the queue is drained."""
 
     while True:

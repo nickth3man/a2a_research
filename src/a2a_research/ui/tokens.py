@@ -12,14 +12,7 @@ from a2a_research.ui.theme import status_color, verdict_bg, verdict_color
 
 # Re-export theme functions so UI code can import from one place.
 __all__ = [
-    # Layout / surfaces
     "AGENT_ROW_BG_IDLE",
-    # Progress bar
-    "PROGRESS_BAR_HEIGHT",
-    "PROGRESS_BAR_BG",
-    "PROGRESS_BAR_FILL",
-    "SUBSTEP_COLOR",
-    "PULSE_BG",
     "AGENT_ROW_BG_RUNNING",
     "BORDER_COLOR",
     "BORDER_WIDTH",
@@ -33,7 +26,6 @@ __all__ = [
     "CLAIM_PADDING",
     "EMPTY_STATE_BG",
     "EMPTY_STATE_BORDER",
-    # Style presets
     "EMPTY_STATE_STYLE",
     "ERROR_BANNER_BG",
     "ERROR_BANNER_BORDER",
@@ -57,15 +49,19 @@ __all__ = [
     "PAGE_FONT_FAMILY",
     "PAGE_MAX_WIDTH",
     "PAGE_PADDING",
+    "PROGRESS_BAR_BG",
+    "PROGRESS_BAR_FILL",
+    "PROGRESS_BAR_HEIGHT",
+    "PULSE_BG",
     "QUERY_CARD_MARGIN_BOTTOM",
     "REPORT_MARKDOWN_BG",
     "SECTION_MARGIN_BOTTOM_MD",
     "SECTION_MARGIN_BOTTOM_SM",
     "SOURCE_ROW_BG",
+    "SUBSTEP_COLOR",
     "SUBTITLE_MARGIN_BOTTOM",
     "TEXT_MUTED",
     "build_default_border",
-    # Theme functions
     "status_color",
     "verdict_bg",
     "verdict_color",

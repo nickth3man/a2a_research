@@ -135,7 +135,7 @@ def _log_request_failure(
     )
 
 
-def _exception_status_code(exc: Exception) -> int | None:
+def _get_exception_status_code(exc: Exception) -> int | None:
     status_code = getattr(exc, "status_code", None)
     if isinstance(status_code, int):
         return status_code
@@ -152,7 +152,7 @@ def _raise_provider_error(
     model: str,
     endpoint: str,
 ) -> None:
-    status_code = _exception_status_code(exc)
+    status_code = _get_exception_status_code(exc)
     exc_name = exc.__class__.__name__
     message = str(exc)
     if status_code == 429 or exc_name == "RateLimitError":

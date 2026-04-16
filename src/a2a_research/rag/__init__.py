@@ -164,7 +164,7 @@ def ingest_corpus(force: bool = False) -> int:
     return len(ids)
 
 
-def retrieve(
+def retrieve_chunks(
     query: str,
     n_results: int = 10,
 ) -> list[RetrievedChunk]:

@@ -8,7 +8,7 @@ Typical entrypoints:
 
 - ``a2a_research.workflow.run_research_sync`` — run the full pipeline on a query string.
 - ``a2a_research.ui.app`` — Mesop web UI (see ``a2a_research.ui`` package docstring).
-- ``a2a_research.rag.ingest_corpus`` / ``retrieve`` — build and query the vector index.
+- ``a2a_research.rag.ingest_corpus`` / ``retrieve_chunks`` — build and query the vector index.
 
 Configuration is environment-driven; see ``a2a_research.settings`` and the repo ``.env.example``.
 """

@@ -15,7 +15,7 @@ from typing import Any
 
 from ..app_logging import get_logger
 from ..models import AgentRole, ResearchSession, default_roles
-from ..progress import ProgressQueue, make_progress_reporter
+from ..progress import ProgressQueue, create_progress_reporter
 from .builder import get_workflow
 
 logger = get_logger(__name__)
@@ -92,7 +92,9 @@ async def run_workflow_from_session(
     flow, shared = get_workflow() if use_default_flow else get_workflow_for_roles(normalized_roles)
     shared["session"] = session
     if progress_queue is not None:
-        shared["progress_reporter"] = make_progress_reporter(asyncio.get_running_loop(), progress_queue)
+        shared["progress_reporter"] = create_progress_reporter(
+            asyncio.get_running_loop(), progress_queue
+        )
         shared["progress_granularity"] = granularity
     await flow.run_async(shared)
     result: ResearchSession = shared["session"]

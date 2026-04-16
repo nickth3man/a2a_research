@@ -148,9 +148,9 @@ class TestRAGWithMocks:
             patch("a2a_research.rag._collection", mock_coll),
             patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
         ):
-            from a2a_research.rag import RetrievedChunk, retrieve
+            from a2a_research.rag import RetrievedChunk, retrieve_chunks
 
-            chunks = retrieve("Is RAG effective?", n_results=3)
+            chunks = retrieve_chunks("Is RAG effective?", n_results=3)
             assert len(chunks) == 3
             assert all(isinstance(rc, RetrievedChunk) for rc in chunks)
             assert all(0.0 <= rc.score <= 1.0 for rc in chunks)
@@ -172,9 +172,9 @@ class TestRAGWithMocks:
             patch("a2a_research.rag._collection", mock_coll),
             patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
         ):
-            from a2a_research.rag import retrieve
+            from a2a_research.rag import retrieve_chunks
 
-            chunks = retrieve("Does not exist xyz abc", n_results=5)
+            chunks = retrieve_chunks("Does not exist xyz abc", n_results=5)
             assert len(chunks) == 0
 
     def test_retrieve_recovers_from_dimension_mismatch(self):
@@ -205,9 +205,9 @@ class TestRAGWithMocks:
             ) as reset_collection,
             patch("a2a_research.rag.ingest_corpus") as ingest_corpus,
         ):
-            from a2a_research.rag import retrieve
+            from a2a_research.rag import retrieve_chunks
 
-            chunks = retrieve("Is RAG effective?", n_results=1)
+            chunks = retrieve_chunks("Is RAG effective?", n_results=1)
 
         assert len(chunks) == 1
         reset_collection.assert_called_once()

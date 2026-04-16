@@ -88,7 +88,7 @@ class ActorNode(AsyncNode):
         from ..a2a.server import A2AClient
 
         message = A2AMessage(
-            sender=self._sender_for_role(self.role),
+            sender=self._get_sender_for_role(self.role),
             recipient=self.role,
             payload=payload,
         )
@@ -150,7 +150,7 @@ class ActorNode(AsyncNode):
         session.error = exec_res.message if exec_res.status == AgentStatus.FAILED else None
 
         message = A2AMessage(
-            sender=self._sender_for_role(self.role),
+            sender=self._get_sender_for_role(self.role),
             recipient=self.role,
             payload=self._build_payload(self.role, session),
         )
@@ -162,7 +162,7 @@ class ActorNode(AsyncNode):
 
         return "default"
 
-    def _sender_for_role(self, role: AgentRole) -> AgentRole:
+    def _get_sender_for_role(self, role: AgentRole) -> AgentRole:
         return {
             AgentRole.RESEARCHER: AgentRole.RESEARCHER,
             AgentRole.ANALYST: AgentRole.RESEARCHER,
@@ -178,14 +178,18 @@ class ActorNode(AsyncNode):
             return {
                 "research_summary": researcher.raw_content,
                 "citations": researcher.citations,
-                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
+                "retrieved_chunks": [
+                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
+                ],
             }
         if role == AgentRole.VERIFIER:
             analyst = session.get_agent(AgentRole.ANALYST)
             return {
                 "claims": [c.model_dump() for c in analyst.claims],
                 "query": session.query,
-                "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
+                "retrieved_chunks": [
+                    chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
+                ],
             }
         if role == AgentRole.PRESENTER:
             verifier = session.get_agent(AgentRole.VERIFIER)
