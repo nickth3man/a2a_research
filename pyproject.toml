@@ -78,7 +78,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/a2a_research/ui/**" = ["T20"]
-"tests/**" = ["T20"]
+"tests/**" = ["T20", "TCH002"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -98,6 +98,7 @@ lint = [
     "mypy>=1.20.1",
     "ty>=0.0.31",
     "pre-commit>=4.5.1",
+    "bandit>=1.8.3",
 ]
 dev = [
     {include-group = "test"},

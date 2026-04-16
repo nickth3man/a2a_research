@@ -22,16 +22,16 @@ class TestValidateDotenvKeys:
 
         with (
             patch("a2a_research.settings._ENV_FILE", env_file),
-            pytest.raises(ValueError, match="Unknown keys in \\.env: UNKNOWN_KEY"),
+            pytest.raises(ValueError, match="Unknown keys in \\.env: UNKNOWN_KEY"),  # type: ignore[attr-defined]
         ):
-            getattr(settings_module, "_validate_dotenv_keys")()
+            settings_module._validate_dotenv_keys()
 
     def test_mesop_passthrough_keys_are_allowed(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
         env_file.write_text("MESOP_STATE_SESSION_BACKEND=memory\nLLM_API_KEY=secret\n")
 
         with patch("a2a_research.settings._ENV_FILE", env_file):
-            getattr(settings_module, "_validate_dotenv_keys")()
+            settings_module._validate_dotenv_keys()
 
     def test_expected_keys_are_allowed(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
@@ -54,7 +54,7 @@ class TestValidateDotenvKeys:
         )
 
         with patch("a2a_research.settings._ENV_FILE", env_file):
-            getattr(settings_module, "_validate_dotenv_keys")()
+            settings_module._validate_dotenv_keys()
 
 
 class TestAppSettings:
@@ -64,16 +64,18 @@ class TestAppSettings:
 
         with (
             patch("a2a_research.settings._ENV_FILE", env_file),
-            pytest.raises(ValueError, match="Unknown keys"),
+            pytest.raises(ValueError, match="Unknown keys"),  # type: ignore[attr-defined]
         ):
             AppSettings()
 
     def test_nested_settings_defaults(self) -> None:
         env_file = Path(__file__).resolve().parents[3] / ".env"
         if not env_file.exists():
-            with patch("a2a_research.settings._ENV_FILE", env_file):
-                with patch("a2a_research.settings.dotenv_values", return_value={}):
-                    settings = AppSettings()
+            with (
+                patch("a2a_research.settings._ENV_FILE", env_file),
+                patch("a2a_research.settings.dotenv_values", return_value={}),
+            ):
+                settings = AppSettings()
         else:
             with patch("a2a_research.settings.dotenv_values", return_value={}):
                 settings = AppSettings()

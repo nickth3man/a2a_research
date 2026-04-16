@@ -3,18 +3,20 @@ from __future__ import annotations
 import io
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
-
-import pytest
 
 import a2a_research.app_logging as logging_module
 from a2a_research.app_logging import get_logger, log_event, setup_logging
 from a2a_research.models import AgentRole, AgentStatus
 
+if TYPE_CHECKING:
+    import pytest
+
 
 class TestNormalizeLogValue:
     def test_primitive_types_passthrough(self) -> None:
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         assert normalize("hello") == "hello"
         assert normalize(42) == 42
         assert normalize(3.14) == 3.14
@@ -22,22 +24,22 @@ class TestNormalizeLogValue:
         assert normalize(None) is None
 
     def test_path_converted_to_string(self) -> None:
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         assert normalize(Path("/tmp/foo")) == str(Path("/tmp/foo"))
 
     def test_dict_recursively_normalizes(self) -> None:
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         assert normalize({"role": AgentRole.RESEARCHER}) == {"role": "researcher"}
 
     def test_list_recursively_normalizes(self) -> None:
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         assert normalize([Path("/tmp"), AgentStatus.COMPLETED]) == [
             str(Path("/tmp")),
             "COMPLETED",
         ]
 
     def test_pydantic_model_dumped(self) -> None:
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         result = normalize(AgentRole.ANALYST)
         assert result == "analyst"
 
@@ -46,7 +48,7 @@ class TestNormalizeLogValue:
             def __init__(self) -> None:
                 self.role = AgentRole.RESEARCHER
 
-        normalize = getattr(logging_module, "_normalize_log_value")
+        normalize = logging_module._normalize_log_value
         assert normalize(Foo()) == {"role": "researcher"}
 
 
@@ -91,9 +93,9 @@ class TestSetupLogging:
         ):
             import a2a_research.app_logging as logging_mod
 
-            original = getattr(logging_mod, "_CONFIGURED")
+            original = logging_mod._CONFIGURED
             try:
-                setattr(logging_mod, "_CONFIGURED", False)
+                logging_mod._CONFIGURED = False
                 setup_logging()
                 handler_count = len(logging.getLogger().handlers)
                 setup_logging()
@@ -104,7 +106,7 @@ class TestSetupLogging:
                     root.removeHandler(handler)
                 for handler in existing_handlers:
                     root.addHandler(handler)
-                setattr(logging_mod, "_CONFIGURED", original)
+                logging_mod._CONFIGURED = original
 
     def test_get_logger_triggers_setup(self, tmp_path: Path) -> None:
         def make_file_handler(*_args: object, **_kwargs: object) -> logging.Handler:
@@ -125,9 +127,9 @@ class TestSetupLogging:
         ):
             import a2a_research.app_logging as logging_mod
 
-            original = getattr(logging_mod, "_CONFIGURED")
+            original = logging_mod._CONFIGURED
             try:
-                setattr(logging_mod, "_CONFIGURED", False)
+                logging_mod._CONFIGURED = False
                 logger = get_logger("test.module")
                 assert isinstance(logger, logging.Logger)
                 assert logger.name == "test.module"
@@ -137,4 +139,4 @@ class TestSetupLogging:
                     root.removeHandler(handler)
                 for handler in existing_handlers:
                     root.addHandler(handler)
-                setattr(logging_mod, "_CONFIGURED", original)
+                logging_mod._CONFIGURED = original
