@@ -16,6 +16,7 @@ from ..models import (
     AgentStatus,
     ResearchSession,
 )
+from ..progress import ProgressEvent, ProgressGranularity, ProgressPhase, ProgressReporter
 
 logger = get_logger(__name__)
 
@@ -43,10 +44,14 @@ class ActorNode(AsyncNode):
         session = shared.get("session")
         if session is None:
             raise ValueError("Shared state missing 'session'")
-        return {"session": session}
+        return {"session": session, "shared": shared}
 
     async def exec_async(self, prep_res: dict[str, Any]) -> AgentResult:
         session: ResearchSession = prep_res["session"]
+        shared: dict[str, Any] = prep_res["shared"]
+        progress_reporter: ProgressReporter | None = shared.get("progress_reporter")
+        total_steps = len(session.roles)
+        step_index = session.roles.index(self.role) if self.role in session.roles else 0
         session.ensure_agent_results()
         session.agent_results[self.role] = AgentResult(
             role=self.role,
@@ -54,6 +59,21 @@ class ActorNode(AsyncNode):
             message=f"{self.role.value.title()} is running.",
         )
         payload = self._build_payload(self.role, session)
+        if progress_reporter:
+            progress_reporter(
+                ProgressEvent(
+                    phase=ProgressPhase.STEP_STARTED,
+                    role=self.role,
+                    step_index=step_index,
+                    total_steps=total_steps,
+                    substep_label=f"{self.role.value.title()} started.",
+                    granularity=ProgressGranularity.AGENT,
+                )
+            )
+            payload["progress_context"] = {
+                "step_index": step_index,
+                "total_steps": total_steps,
+            }
         logger.info(
             "Agent step start session_id=%s role=%s payload_keys=%s",
             session.id,
@@ -74,6 +94,18 @@ class ActorNode(AsyncNode):
             result = await asyncio.to_thread(client.send, message, session)
         except Exception:
             elapsed_ms = (perf_counter() - started_at) * 1000
+            if progress_reporter:
+                progress_reporter(
+                    ProgressEvent(
+                        phase=ProgressPhase.STEP_FAILED,
+                        role=self.role,
+                        step_index=step_index,
+                        total_steps=total_steps,
+                        substep_label=f"{self.role.value.title()} failed.",
+                        granularity=ProgressGranularity.AGENT,
+                        elapsed_ms=elapsed_ms,
+                    )
+                )
             logger.exception(
                 "Agent step failed session_id=%s role=%s elapsed_ms=%.1f",
                 session.id,
@@ -82,6 +114,18 @@ class ActorNode(AsyncNode):
             )
             raise
         elapsed_ms = (perf_counter() - started_at) * 1000
+        if progress_reporter:
+            progress_reporter(
+                ProgressEvent(
+                    phase=ProgressPhase.STEP_COMPLETED,
+                    role=self.role,
+                    step_index=step_index,
+                    total_steps=total_steps,
+                    substep_label=result.message or f"{self.role.value.title()} completed.",
+                    granularity=ProgressGranularity.AGENT,
+                    elapsed_ms=elapsed_ms,
+                )
+            )
         logger.info(
             "Agent step completed session_id=%s role=%s status=%s elapsed_ms=%.1f message=%r",
             session.id,

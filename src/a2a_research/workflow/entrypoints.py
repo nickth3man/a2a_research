@@ -15,6 +15,7 @@ from typing import Any
 
 from ..app_logging import get_logger
 from ..models import AgentRole, ResearchSession, default_roles
+from ..progress import ProgressQueue, make_progress_reporter
 from .builder import get_workflow
 
 logger = get_logger(__name__)
@@ -33,6 +34,7 @@ def _normalize_roles(roles: list[AgentRole] | None) -> list[AgentRole] | None:
 async def run_workflow(
     query: str,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
 ) -> ResearchSession:
     normalized_roles = _normalize_roles(roles)
     session = ResearchSession(query=query, roles=normalized_roles or default_roles())
@@ -46,7 +48,11 @@ async def run_workflow(
     started_at = perf_counter()
 
     try:
-        return await run_workflow_from_session(session, normalized_roles)
+        return await run_workflow_from_session(
+            session,
+            normalized_roles,
+            progress_queue=progress_queue,
+        )
     except Exception as exc:
         elapsed_ms = (perf_counter() - started_at) * 1000
         session.error = str(exc)
@@ -64,13 +70,15 @@ def run_workflow_sync(
 async def run_workflow_async(
     query: str,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
 ) -> ResearchSession:
-    return await run_workflow(query, roles)
+    return await run_workflow(query, roles, progress_queue=progress_queue)
 
 
 async def run_workflow_from_session(
     session: ResearchSession,
     roles: list[AgentRole] | None = None,
+    progress_queue: ProgressQueue | None = None,
 ) -> ResearchSession:
     explicit_roles = _normalize_roles(roles)
     normalized_roles = explicit_roles or _normalize_roles(session.roles) or default_roles()
@@ -79,6 +87,8 @@ async def run_workflow_from_session(
     use_default_flow = explicit_roles is None and normalized_roles == default_roles()
     flow, shared = get_workflow() if use_default_flow else get_workflow_for_roles(normalized_roles)
     shared["session"] = session
+    if progress_queue is not None:
+        shared["progress_reporter"] = make_progress_reporter(asyncio.get_running_loop(), progress_queue)
     await flow.run_async(shared)
     result: ResearchSession = shared["session"]
     logger.info(
