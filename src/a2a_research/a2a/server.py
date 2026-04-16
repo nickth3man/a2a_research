@@ -2,7 +2,7 @@
 
 Maps each :class:`~a2a_research.models.AgentRole` to a callable that accepts
 ``(ResearchSession, A2AMessage)`` and returns an :class:`~a2a_research.models.AgentResult`,
-wrapping the lower-level handlers from :mod:`a2a_research.agents.pocketflow.registry`.
+wrapping the lower-level handlers from :mod:`a2a_research.agents.pocketflow.utils.registry`.
 """
 
 from __future__ import annotations

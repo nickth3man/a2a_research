@@ -1,4 +1,4 @@
-"""Async coordinator — builds a linear ``AsyncFlow`` over four :class:`~a2a_research.agents.pocketflow.nodes.ActorNode` instances.
+"""Async coordinator — builds a linear ``AsyncFlow`` over four :class:`~a2a_research.agents.pocketflow.utils.nodes.ActorNode` instances.
 
 Used by higher-level builders; ``run_coordinator`` is a convenience that runs the flow
 with a fresh ``shared`` dict seeded via :func:`build_shared_store`.
@@ -13,7 +13,7 @@ from pocketflow import AsyncFlow
 from a2a_research.models import AgentRole, ResearchSession
 
 from .nodes import create_actor_node
-from .utils.shared_store import build_shared_store
+from .shared_store import build_shared_store
 
 
 def build_coordinator() -> AsyncFlow[Any, Any]:

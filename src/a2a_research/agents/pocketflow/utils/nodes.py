@@ -8,7 +8,7 @@ from typing import Any
 
 from pocketflow import AsyncNode
 
-from a2a_research.agents.pocketflow.actor_helpers import (
+from a2a_research.agents.pocketflow.utils.actor_helpers import (
     build_payload,
     get_sender_for_role,
 )

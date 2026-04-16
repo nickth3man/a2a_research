@@ -164,7 +164,7 @@ class TestWorkflowAdapter:
 
 class TestActorNode:
     async def test_actor_node_prep_extracts_session(self):
-        from a2a_research.agents.pocketflow.nodes import ActorNode
+        from a2a_research.agents.pocketflow.utils.nodes import ActorNode
 
         node = ActorNode(AgentRole.RESEARCHER)
         shared = {"session": ResearchSession(query="Test query")}
@@ -172,7 +172,7 @@ class TestActorNode:
         assert prep["session"].query == "Test query"
 
     async def test_actor_node_prep_raises_on_missing_session(self):
-        from a2a_research.agents.pocketflow.nodes import ActorNode
+        from a2a_research.agents.pocketflow.utils.nodes import ActorNode
 
         node = ActorNode(AgentRole.RESEARCHER)
         shared = {}

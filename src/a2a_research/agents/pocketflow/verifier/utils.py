@@ -1,13 +1,32 @@
-"""Verifier output parsers — JSON-first with a permissive line-oriented fallback."""
+"""Verifier role-specific helpers.
+
+- :data:`SENDER` / :func:`build_payload` — A2A dispatch metadata.
+- :func:`parse_verified_claims` plus its supporting parsers — JSON-first with a
+  permissive line-oriented fallback.
+"""
 
 from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 from a2a_research.agents.pocketflow.utils.helpers import normalize_claim_id
-from a2a_research.models import Claim, Verdict, VerifierOutput
+from a2a_research.models import AgentRole, Claim, ResearchSession, Verdict, VerifierOutput
 from a2a_research.providers import parse_structured_response
+
+SENDER: AgentRole = AgentRole.ANALYST
+
+
+def build_payload(session: ResearchSession) -> dict[str, Any]:
+    analyst = session.get_agent(AgentRole.ANALYST)
+    return {
+        "claims": [c.model_dump() for c in analyst.claims],
+        "query": session.query,
+        "retrieved_chunks": [
+            chunk.model_dump(mode="json") for chunk in session.retrieved_chunks
+        ],
+    }
 
 
 def _parse_structured(raw: str) -> list[Claim] | None:

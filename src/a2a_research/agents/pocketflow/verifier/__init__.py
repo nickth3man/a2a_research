@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from a2a_research.agents.pocketflow.registry import register_agent
+from a2a_research.agents.pocketflow.utils.registry import register_agent
 from a2a_research.models import AgentRole
 
-from .agent import verifier_invoke
-from .parsers import parse_verified_claims
+from .main import verifier_invoke
+from .utils import parse_verified_claims
 
 register_agent(
     AgentRole.VERIFIER,

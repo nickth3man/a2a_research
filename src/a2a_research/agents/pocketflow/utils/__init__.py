@@ -2,13 +2,19 @@
 
 Splits by concern:
 
-- :mod:`llm`          — LLM invocation (single patch point for tests)
-- :mod:`sanitize`     — input query normalisation
-- :mod:`progress`     — substep progress-event helpers
-- :mod:`fallbacks`    — deterministic fallbacks for provider failures
-- :mod:`results`      — :class:`AgentResult` construction
-- :mod:`shared_store` — Shared Store schema
-- :mod:`helpers`      — deterministic output parsing and markdown formatting
+- :mod:`llm`            — LLM invocation (single patch point for tests)
+- :mod:`sanitize`       — input query normalisation
+- :mod:`progress`       — substep progress-event helpers
+- :mod:`fallbacks`      — deterministic fallbacks for provider failures
+- :mod:`results`        — :class:`AgentResult` construction
+- :mod:`shared_store`   — Shared Store schema
+- :mod:`helpers`        — deterministic output parsing and markdown formatting
+- :mod:`registry`       — :class:`AgentRegistry`, :class:`AgentSpec`, ``register_agent``
+- :mod:`nodes`          — generic :class:`ActorNode` base + ``create_actor_node`` factory
+- :mod:`actor_helpers`  — role\u2192agent-utils dispatcher for payload/sender lookup
+- :mod:`policy`         — :class:`PipelineOrderPolicy`
+- :mod:`adapter`        — :class:`SyncWorkflowAdapter` (``invoke``/``ainvoke`` wrappers)
+- :mod:`coordinator`    — legacy linear 4-role :class:`AsyncFlow` builder
 """
 
 from __future__ import annotations

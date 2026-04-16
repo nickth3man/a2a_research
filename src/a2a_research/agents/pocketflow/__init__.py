@@ -1,7 +1,7 @@
 """PocketFlow-backed async runtime for the 4-agent research pipeline.
 
 Importing this package triggers per-agent registration in
-:mod:`a2a_research.agents.pocketflow.registry`, then exposes the composed
+:mod:`a2a_research.agents.pocketflow.utils.registry`, then exposes the composed
 ``AsyncFlow``, actor nodes, policy hooks, and convenience callers:
 
 - ``run_research_sync(query)`` — blocking entry for scripts, tests, and REPL use.
@@ -26,9 +26,7 @@ from . import analyst as _analyst  # noqa: F401
 from . import presenter as _presenter  # noqa: F401
 from . import researcher as _researcher  # noqa: F401
 from . import verifier as _verifier  # noqa: F401
-from .adapter import SyncWorkflowAdapter
 from .analyst import analyst_invoke, parse_claims_from_analyst
-from .coordinator import build_coordinator, run_coordinator
 from .entrypoints import (
     get_workflow_for_roles,
     run_workflow,
@@ -36,10 +34,13 @@ from .entrypoints import (
     run_workflow_sync,
 )
 from .flow import get_workflow
-from .nodes import ActorNode, create_actor_node
-from .policy import PipelineOrderPolicy
 from .presenter import presenter_invoke
-from .registry import (
+from .researcher import researcher_invoke
+from .utils.adapter import SyncWorkflowAdapter
+from .utils.coordinator import build_coordinator, run_coordinator
+from .utils.nodes import ActorNode, create_actor_node
+from .utils.policy import PipelineOrderPolicy
+from .utils.registry import (
     AgentRegistry,
     AgentSpec,
     get_agent_handler,
@@ -47,7 +48,6 @@ from .registry import (
     get_registry,
     register_agent,
 )
-from .researcher import researcher_invoke
 from .verifier import parse_verified_claims, verifier_invoke
 
 __all__ = [
