@@ -16,7 +16,7 @@ import sys
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 from a2a_research.settings import settings
 
@@ -117,7 +117,11 @@ def _install_exception_hooks() -> None:
                 "Unhandled exception",
                 exc_info=(exc_type, exc_value, exc_traceback),
             )
-        original_excepthook(exc_type, exc_value, exc_traceback)  # type: ignore[arg-type]
+        original_excepthook(
+            cast("type[BaseException]", exc_type),
+            cast("BaseException", exc_value),
+            exc_traceback,
+        )
 
     def _log_thread_exception(args: threading.ExceptHookArgs) -> None:
         if args.exc_type is not None and args.exc_value is not None:
