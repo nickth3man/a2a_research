@@ -30,8 +30,9 @@ Researcher ──► Analyst ──► Verifier ──► Presenter
 ## Quick Start
 
 ```bash
-# 1. Install dependencies with uv (use make dev to also activate pre-commit hooks)
-uv sync --all-groups
+# 1. Install dependencies (use make dev to also setup pre-commit hooks)
+make install
+# Or: uv sync --all-groups
 
 # 2. Configure credentials
 # macOS/Linux: cp .env.example .env
@@ -39,14 +40,17 @@ uv sync --all-groups
 # Edit .env — set LLM_API_KEY and any provider-specific values
 
 # 3. Ingest the RAG corpus (one-time; idempotent — safe to re-run)
-uv run python -c "from a2a_research.rag import ensure_corpus_ingested; print(f'Ingested {ensure_corpus_ingested()} chunks')"
+make ingest
+# Or: uv run python -c "from a2a_research.rag import ensure_corpus_ingested; print(f'Ingested {ensure_corpus_ingested()} chunks')"
 
 # 4. Start the Mesop UI
-uv run mesop src/a2a_research/ui/app.py
+make mesop
+# Or: uv run mesop src/a2a_research/ui/app.py
 # Opens at http://localhost:32123
 
 # Run tests (no API key required for unit tests)
-uv run pytest
+make test
+# Or: uv run pytest
 ```
 
 ---
@@ -182,7 +186,7 @@ The Mesop app exposes five sections:
 
 - **Query input** — textarea at the bottom; submitting triggers the full pipeline
 - **Agent timeline** — per-role card showing status (PENDING → RUNNING → COMPLETED/FAILED) and the agent's log message
-- **Verified claims** — each claim shows verdict badge (✅ SUPPORTED / ❌ REFUTED / ⚠️ INSUFFICIENT_EVIDENCE), confidence percentage, sources, and evidence snippets
+- **Verified claims** — each claim shows verdict badge ([OK] SUPPORTED / [X] REFUTED / [?] INSUFFICIENT_EVIDENCE), confidence percentage, sources, and evidence snippets
 - **Sources panel** — deduplicated citation list with index numbers
 - **Final report** — rendered markdown output from the Presenter agent
 
@@ -218,10 +222,10 @@ tests/              # Pytest suite (no API key required for unit tests)
 
 ```bash
 # Ingest corpus (already done on first install)
-uv run python -c "from a2a_research.rag import ingest_corpus; print(ingest_corpus())"
+make ingest
 
 # Start UI
-uv run mesop src/a2a_research/ui/app.py
+make mesop
 # Open http://localhost:32123
 ```
 
@@ -248,23 +252,54 @@ print(session.error)
 
 ## Development
 
-Use the provided Makefile for common tasks:
+The project includes a self-documenting Makefile. Run `make` or `make help` to see all available commands:
 
 ```bash
-make install       # Install package + all dependency groups with uv
-make dev           # Full dev setup: install + activate pre-commit hooks
-make test          # Run pytest suite with coverage
-make watch         # Run pytest in watch mode (TDD)
-make lint          # Run ruff linter
-make format        # Run ruff formatter
-make typecheck     # Run mypy (strict py311)
-make typecheck-ty  # Run ty type checker
-make check         # Run lint + format check + typecheck + ty
-make mesop         # Start the Mesop UI dev server
-make ingest        # Ingest the RAG corpus into ChromaDB
+$ make
+  install         Install package with uv
+  dev             Full dev setup: install + activate pre-commit hooks
+  test            Run pytest suite with coverage
+  watch           Run pytest in watch mode (re-runs on file changes)
+  lint            Run ruff linter
+  format          Format code with ruff
+  format-check    Check formatting without modifying files
+  typecheck       Run mypy type checker
+  typecheck-ty    Run ty type checker
+  check           Run all quality checks (no tests)
+  all             Run tests + all quality checks (CI-ready)
+  clean           Remove build artifacts and cache directories
+  mesop           Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
+  ingest          Ingest the RAG corpus into ChromaDB
+  htmlcov         Generate HTML coverage report
 ```
 
-You can also run tools directly:
+### Common Workflows
+
+**Setup for development:**
+```bash
+make dev           # Install + activate pre-commit hooks
+```
+
+**During development:**
+```bash
+make test          # Run tests
+make watch         # Run tests in watch mode (TDD)
+```
+
+**Before committing:**
+```bash
+make check         # Run lint + typecheck + format-check (fast)
+make all           # Run everything including tests (CI-ready)
+```
+
+**Run the UI:**
+```bash
+make mesop         # Start the Mesop UI dev server
+```
+
+### Direct Commands
+
+You can also run tools directly without Make:
 
 ```bash
 uv run ruff check src/ tests/     # lint
