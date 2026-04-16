@@ -2,7 +2,7 @@
 
 import mesop as me
 
-from a2a_research.helpers import format_claim_verdict, format_confidence
+from a2a_research.agents.pocketflow.utils.helpers import format_claim_verdict, format_confidence
 from a2a_research.models import Claim, ResearchSession
 from a2a_research.ui.data_access import get_verified_claims
 from a2a_research.ui.primitives import card_box, verdict_badge_text

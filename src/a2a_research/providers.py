@@ -15,7 +15,6 @@ from typing import Any, TypeVar, cast
 from pydantic import BaseModel, ValidationError
 
 from a2a_research.app_logging import get_logger
-from a2a_research.helpers import parse_json_safely
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
@@ -80,6 +79,8 @@ def parse_structured_response(
     content: str, schema: type[StructuredOutputT]
 ) -> StructuredOutputT | None:
     """Parse provider output into a Pydantic schema when valid JSON is available."""
+    from a2a_research.agents.pocketflow.utils.helpers import parse_json_safely
+
     data = parse_json_safely(content)
     if not data:
         return None

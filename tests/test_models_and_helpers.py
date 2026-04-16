@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.helpers import (
+from a2a_research.agents.pocketflow.utils.helpers import (
     aggregate_citations,
     build_markdown_report,
     create_result,

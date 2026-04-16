@@ -6,7 +6,16 @@ from unittest.mock import patch
 
 import pytest
 
-from a2a_research.agents import _parse_claims_from_analyst, _parse_verified_claims
+from a2a_research.agents import parse_claims_from_analyst, parse_verified_claims
+from a2a_research.agents.pocketflow import (
+    ActorNode,
+    create_actor_node,
+    create_pocketflow_workflow,
+    get_graph,
+    get_workflow,
+    run_research_sync,
+    run_workflow,
+)
 from a2a_research.models import (
     AgentResult,
     AgentRole,
@@ -17,15 +26,6 @@ from a2a_research.models import (
     RetrievedChunk,
     Verdict,
     WorkflowState,
-)
-from a2a_research.workflow import (
-    ActorNode,
-    create_actor_node,
-    create_pocketflow_workflow,
-    get_graph,
-    get_workflow,
-    run_research_sync,
-    run_workflow,
 )
 
 
@@ -85,8 +85,8 @@ class TestWorkflowRun:
 
     def test_run_workflow_via_run_research_sync(self):
         with (
-            patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm", side_effect=_responses()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
         ):
             session = run_research_sync("What is RAG?")
 
@@ -103,8 +103,8 @@ class TestWorkflowRun:
 
     async def test_run_workflow_async(self):
         with (
-            patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm", side_effect=_responses()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
         ):
             session = await run_workflow("What is RAG?")
         assert session.final_report.startswith("# Report")
@@ -117,9 +117,9 @@ class TestWorkflowRun:
 
     async def test_run_workflow_reuses_researcher_retrieval_for_verifier(self):
         with (
-            patch("a2a_research.agents._call_llm", side_effect=_responses()),
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm", side_effect=_responses()),
             patch(
-                "a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()
+                "a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()
             ) as retrieve_mock,
         ):
             session = await run_workflow("What is RAG?")
@@ -137,8 +137,8 @@ class TestWorkflowAdapter:
         adapter = get_graph()
 
         with (
-            patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm", side_effect=_responses()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
         ):
             state = adapter.invoke(WorkflowState(session=ResearchSession(query="Test?")))
 
@@ -152,8 +152,8 @@ class TestWorkflowAdapter:
         state = WorkflowState(session=ResearchSession(query="Test?"))
 
         with (
-            patch("a2a_research.agents._call_llm", side_effect=_responses()),
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm", side_effect=_responses()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
         ):
             result = await adapter.ainvoke(state)
 
@@ -164,7 +164,7 @@ class TestWorkflowAdapter:
 
 class TestActorNode:
     async def test_actor_node_prep_extracts_session(self):
-        from a2a_research.workflow.nodes import ActorNode
+        from a2a_research.agents.pocketflow.nodes import ActorNode
 
         node = ActorNode(AgentRole.RESEARCHER)
         shared = {"session": ResearchSession(query="Test query")}
@@ -172,7 +172,7 @@ class TestActorNode:
         assert prep["session"].query == "Test query"
 
     async def test_actor_node_prep_raises_on_missing_session(self):
-        from a2a_research.workflow.nodes import ActorNode
+        from a2a_research.agents.pocketflow.nodes import ActorNode
 
         node = ActorNode(AgentRole.RESEARCHER)
         shared = {}
@@ -185,14 +185,14 @@ class TestActorNode:
 
 class TestClaimParsing:
     def test_parse_claims_from_analyst_normalizes_numeric_ids(self) -> None:
-        claims = _parse_claims_from_analyst(
+        claims = parse_claims_from_analyst(
             '{"atomic_claims": [{"id": 1, "text": "RAG uses retrieval."}]}'
         )
         assert [claim.id for claim in claims] == ["1"]
 
     def test_parse_verified_claims_normalizes_numeric_ids(self) -> None:
         fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
-        claims = _parse_verified_claims(
+        claims = parse_verified_claims(
             (
                 '{"verified_claims": [{"id": 1, "text": "RAG uses retrieval.", '
                 '"verdict": "SUPPORTED", "confidence": 0.85, '
@@ -204,19 +204,19 @@ class TestClaimParsing:
 
     def test_parse_verified_claims_handles_non_json(self) -> None:
         fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
-        claims = _parse_verified_claims("this is not json", fallback_claims)
+        claims = parse_verified_claims("this is not json", fallback_claims)
         assert len(claims) == 1
         assert claims[0].id == "c1"
 
     def test_parse_verified_claims_handles_partial_json(self) -> None:
         fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
-        claims = _parse_verified_claims('{"other_key": "bad"}', fallback_claims)
+        claims = parse_verified_claims('{"other_key": "bad"}', fallback_claims)
         assert len(claims) == 1
         assert claims[0].id == "c1"
 
     def test_parse_verified_claims_handles_empty_string(self) -> None:
         fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
-        claims = _parse_verified_claims("", fallback_claims)
+        claims = parse_verified_claims("", fallback_claims)
         assert len(claims) == 1
         assert claims[0].id == "c1"
 
@@ -231,7 +231,7 @@ class TestClaimParsing:
             "INSUFFICIENT\n"
             "\n"
         )
-        claims = _parse_verified_claims(raw, fallback_claims=[])
+        claims = parse_verified_claims(raw, fallback_claims=[])
         assert [c.verdict for c in claims] == [Verdict.SUPPORTED, Verdict.INSUFFICIENT_EVIDENCE]
         assert claims[0].confidence == pytest.approx(0.87)
         assert "RAG improves grounding" in claims[0].text
@@ -244,21 +244,19 @@ class TestClaimParsing:
             '{"verified_claims": ['
             '{"id": "c1", "text": "x", "verdict": "MAYBE", "confidence": 0.5}]}'
         )
-        claims = _parse_verified_claims(raw, fallback_claims=[])
+        claims = parse_verified_claims(raw, fallback_claims=[])
         assert len(claims) == 1
         assert claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
 
     def test_parse_claims_from_analyst_quoted_text_fallback(self) -> None:
         """With no JSON object, the analyst parser recovers quoted phrases longer than
         ~20 chars as atomic claims with INSUFFICIENT_EVIDENCE."""
-        from a2a_research.agents import _parse_claims_from_analyst
-
         raw = (
             "Here are your claims: "
             '"RAG reduces hallucinations by grounding on retrieved context" and '
             '"Dense retrievers outperform BM25 for semantic matches".'
         )
-        claims = _parse_claims_from_analyst(raw)
+        claims = parse_claims_from_analyst(raw)
         texts = [c.text for c in claims]
         assert any("RAG reduces hallucinations" in t for t in texts)
         assert any("Dense retrievers" in t for t in texts)
@@ -267,28 +265,28 @@ class TestClaimParsing:
 
 class TestSanitizeQuery:
     def test_strips_whitespace_and_collapses_internal_runs(self) -> None:
-        from a2a_research.agents import _sanitize_query
+        from a2a_research.agents.pocketflow.utils.sanitize import sanitize_query
 
-        assert _sanitize_query("   hello   world\n\tagain  ") == "hello world again"
+        assert sanitize_query("   hello   world\n\tagain  ") == "hello world again"
 
     def test_truncates_at_10000_characters(self) -> None:
-        from a2a_research.agents import _sanitize_query
+        from a2a_research.agents.pocketflow.utils.sanitize import sanitize_query
 
         long_query = "a" * 20000
-        sanitized = _sanitize_query(long_query)
+        sanitized = sanitize_query(long_query)
         assert len(sanitized) == 10000
 
 
 class TestProgressContext:
     def test_returns_defaults_when_message_is_none(self) -> None:
-        from a2a_research.agents import _extract_progress_context
+        from a2a_research.agents.pocketflow.utils.progress import extract_progress_context
 
-        reporter, step_index, total_steps, granularity = _extract_progress_context(None)
+        reporter, step_index, total_steps, granularity = extract_progress_context(None)
         assert reporter is None
         assert (step_index, total_steps, granularity) == (0, 4, 1)
 
     def test_reads_from_payload_progress_context(self) -> None:
-        from a2a_research.agents import _extract_progress_context
+        from a2a_research.agents.pocketflow.utils.progress import extract_progress_context
         from a2a_research.models import A2AMessage
 
         msg = A2AMessage(
@@ -296,7 +294,7 @@ class TestProgressContext:
             recipient=AgentRole.ANALYST,
             payload={"progress_context": {"step_index": 2, "total_steps": 4, "granularity": 3}},
         )
-        _, step_index, total_steps, granularity = _extract_progress_context(msg)
+        _, step_index, total_steps, granularity = extract_progress_context(msg)
         assert (step_index, total_steps, granularity) == (2, 4, 3)
 
 
@@ -309,10 +307,10 @@ class TestResearcherRagFailure:
         session = ResearchSession(query="What is RAG?")
         with (
             patch(
-                "a2a_research.agents.retrieve_chunks",
+                "a2a_research.rag.retrieve_chunks",
                 side_effect=RuntimeError("chroma down"),
             ),
-            patch("a2a_research.agents._call_llm") as call_llm,
+            patch("a2a_research.agents.pocketflow.utils.llm.call_llm") as call_llm,
         ):
             result = researcher_invoke(session)
 
@@ -323,38 +321,38 @@ class TestResearcherRagFailure:
 
 class TestAgentFallbacks:
     def test_fallback_research_summary_with_empty_chunks(self) -> None:
-        from a2a_research.agents import _fallback_research_summary
+        from a2a_research.agents.pocketflow.utils.fallbacks import fallback_research_summary
 
-        summary = _fallback_research_summary("What is RAG?", [])
+        summary = fallback_research_summary("What is RAG?", [])
         assert "No retrieved evidence" in summary
         assert "What is RAG?" in summary
 
     def test_fallback_verified_claims_with_empty_claims(self) -> None:
-        from a2a_research.agents import _fallback_verified_claims
+        from a2a_research.agents.pocketflow.utils.fallbacks import fallback_verified_claims
 
-        claims = _fallback_verified_claims([], "provider error")
+        claims = fallback_verified_claims([], "provider error")
         assert claims == []
 
     def test_fallback_verified_claims_all_supported(self) -> None:
-        from a2a_research.agents import _fallback_verified_claims
+        from a2a_research.agents.pocketflow.utils.fallbacks import fallback_verified_claims
 
         input_claims = [
             Claim(id="c1", text="Claim one.", verdict=Verdict.SUPPORTED, confidence=0.9),
             Claim(id="c2", text="Claim two.", verdict=Verdict.SUPPORTED, confidence=0.8),
         ]
-        claims = _fallback_verified_claims(input_claims, "rate limited")
+        claims = fallback_verified_claims(input_claims, "rate limited")
         assert len(claims) == 2
         assert all(c.verdict == Verdict.INSUFFICIENT_EVIDENCE for c in claims)
         assert all(c.confidence == 0.0 for c in claims)
         assert all("rate limited" in c.evidence_snippets for c in claims)
 
     def test_fallback_verified_claims_all_refuted(self) -> None:
-        from a2a_research.agents import _fallback_verified_claims
+        from a2a_research.agents.pocketflow.utils.fallbacks import fallback_verified_claims
 
         input_claims = [
             Claim(id="c1", text="Claim one.", verdict=Verdict.REFUTED, confidence=0.9),
         ]
-        claims = _fallback_verified_claims(input_claims, "provider down")
+        claims = fallback_verified_claims(input_claims, "provider down")
         assert len(claims) == 1
         assert claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
         assert claims[0].confidence == 0.0
@@ -365,9 +363,9 @@ class TestAgentFallbacks:
 
         session = ResearchSession(query="What is RAG?")
         with (
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
             patch(
-                "a2a_research.agents._call_llm",
+                "a2a_research.agents.pocketflow.utils.llm.call_llm",
                 side_effect=ProviderRequestError("provider failed"),
             ),
         ):
@@ -389,7 +387,8 @@ class TestAgentFallbacks:
             raw_content="RAG is retrieval augmented generation.",
         )
         with patch(
-            "a2a_research.agents._call_llm", side_effect=ProviderRequestError("provider failed")
+            "a2a_research.agents.pocketflow.utils.llm.call_llm",
+            side_effect=ProviderRequestError("provider failed"),
         ):
             result = analyst_invoke(session)
 
@@ -414,9 +413,9 @@ class TestAgentFallbacks:
             claims=[Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)],
         )
         with (
-            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch("a2a_research.rag.retrieve_chunks", return_value=_fake_chunks()),
             patch(
-                "a2a_research.agents._call_llm",
+                "a2a_research.agents.pocketflow.utils.llm.call_llm",
                 side_effect=ProviderRequestError("provider failed"),
             ),
         ):
@@ -451,7 +450,7 @@ class TestAgentFallbacks:
         )
 
         with patch(
-            "a2a_research.agents._call_llm",
+            "a2a_research.agents.pocketflow.utils.llm.call_llm",
             return_value='{"report": "", "formatted_output": ""}',
         ):
             result = presenter_invoke(session)
@@ -483,7 +482,8 @@ class TestAgentFallbacks:
             claims=[Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)],
         )
         with patch(
-            "a2a_research.agents._call_llm", side_effect=ProviderRequestError("provider failed")
+            "a2a_research.agents.pocketflow.utils.llm.call_llm",
+            side_effect=ProviderRequestError("provider failed"),
         ):
             result = presenter_invoke(session)
 

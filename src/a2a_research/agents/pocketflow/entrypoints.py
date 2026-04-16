@@ -13,11 +13,12 @@ import asyncio
 from time import perf_counter
 from typing import Any
 
-from ..app_logging import get_logger
-from ..models import AgentRole, AgentStatus, ResearchSession, default_roles
-from ..progress import ProgressQueue, create_progress_reporter
-from ..settings import settings
-from .builder import get_workflow
+from a2a_research.app_logging import get_logger
+from a2a_research.models import AgentRole, AgentStatus, ResearchSession, default_roles
+from a2a_research.progress import ProgressQueue, create_progress_reporter
+from a2a_research.settings import settings
+
+from .flow import get_workflow
 
 logger = get_logger(__name__)
 
@@ -134,7 +135,7 @@ async def run_workflow_from_session(
 
 
 def get_workflow_for_roles(roles: list[AgentRole]) -> tuple[Any, dict[str, Any]]:
-    from .builder import build_workflow
+    from .flow import build_workflow
 
     normalized_roles = _normalize_roles(roles) or []
     return build_workflow(normalized_roles)

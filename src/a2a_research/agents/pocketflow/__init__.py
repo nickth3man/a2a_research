@@ -1,6 +1,8 @@
 """PocketFlow-backed async runtime for the 4-agent research pipeline.
 
-Exports the composed ``AsyncFlow``, actor nodes, policy hooks, and convenience callers:
+Importing this package triggers per-agent registration in
+:mod:`a2a_research.agents.pocketflow.registry`, then exposes the composed
+``AsyncFlow``, actor nodes, policy hooks, and convenience callers:
 
 - ``run_research_sync(query)`` — blocking entry for scripts, tests, and REPL use.
 - ``run_workflow_async`` / ``run_workflow`` — async orchestration with logging.
@@ -12,41 +14,70 @@ The shared dict must map the key ``session`` to a :class:`~a2a_research.models.R
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from ..models import AgentRole, ResearchSession  # noqa: TC001
-from ..models.policy import PolicyEffect, WorkflowPolicy
+from a2a_research.models.policy import PolicyEffect, WorkflowPolicy
+
+if TYPE_CHECKING:
+    from a2a_research.models import AgentRole, ResearchSession
+
+# Importing each subpackage triggers `register_agent(...)` on the shared registry.
+from . import analyst as _analyst  # noqa: F401
+from . import presenter as _presenter  # noqa: F401
+from . import researcher as _researcher  # noqa: F401
+from . import verifier as _verifier  # noqa: F401
 from .adapter import SyncWorkflowAdapter
-from .builder import get_workflow
-from .coordinator import run_coordinator
+from .analyst import analyst_invoke, parse_claims_from_analyst
+from .coordinator import build_coordinator, run_coordinator
 from .entrypoints import (
     get_workflow_for_roles,
+    run_workflow,
+    run_workflow_async,
     run_workflow_sync,
 )
-from .entrypoints import (
-    run_workflow as run_workflow,
-)
-from .entrypoints import (
-    run_workflow_async as run_workflow_async,
-)
+from .flow import get_workflow
 from .nodes import ActorNode, create_actor_node
 from .policy import PipelineOrderPolicy
+from .presenter import presenter_invoke
+from .registry import (
+    AgentRegistry,
+    AgentSpec,
+    get_agent_handler,
+    get_agent_spec,
+    get_registry,
+    register_agent,
+)
+from .researcher import researcher_invoke
+from .verifier import parse_verified_claims, verifier_invoke
 
 __all__ = [
     "ActorNode",
+    "AgentRegistry",
+    "AgentSpec",
     "PipelineOrderPolicy",
     "PolicyEffect",
     "SyncWorkflowAdapter",
     "WorkflowPolicy",
+    "analyst_invoke",
+    "build_coordinator",
     "create_actor_node",
     "create_pocketflow_workflow",
+    "get_agent_handler",
+    "get_agent_spec",
     "get_graph",
+    "get_registry",
     "get_workflow",
+    "parse_claims_from_analyst",
+    "parse_verified_claims",
+    "presenter_invoke",
+    "register_agent",
+    "researcher_invoke",
     "run_coordinator",
     "run_research_sync",
     "run_workflow",
     "run_workflow_async",
     "run_workflow_sync",
+    "verifier_invoke",
 ]
 
 

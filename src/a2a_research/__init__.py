@@ -6,7 +6,7 @@ Agents talk through an in-process A2A-shaped layer; RAG uses ChromaDB over
 
 Typical entrypoints:
 
-- ``a2a_research.workflow.run_research_sync`` — run the full pipeline on a query string.
+- ``a2a_research.agents.pocketflow.run_research_sync`` — run the full pipeline on a query string.
 - ``a2a_research.ui.app`` — Mesop web UI (see ``a2a_research.ui`` package docstring).
 - ``a2a_research.rag.ingest_corpus`` / ``retrieve_chunks`` — build and query the vector index.
 

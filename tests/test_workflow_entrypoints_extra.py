@@ -17,10 +17,10 @@ async def test_run_workflow_reraises_after_flow_failure() -> None:
     mock_flow.run_async = AsyncMock(side_effect=RuntimeError("flow failed"))
 
     with patch(
-        "a2a_research.workflow.entrypoints.get_workflow",
+        "a2a_research.agents.pocketflow.entrypoints.get_workflow",
         return_value=(mock_flow, shared),
     ):
-        from a2a_research.workflow.entrypoints import run_workflow
+        from a2a_research.agents.pocketflow.entrypoints import run_workflow
 
         with pytest.raises(RuntimeError, match="flow failed"):
             await run_workflow("why")
@@ -32,10 +32,10 @@ async def test_run_workflow_from_session_uses_role_aware_flow() -> None:
     flow = MagicMock()
     flow.run_async = AsyncMock(side_effect=lambda shared: shared.__setitem__("session", out))
     with patch(
-        "a2a_research.workflow.entrypoints.get_workflow_for_roles",
+        "a2a_research.agents.pocketflow.entrypoints.get_workflow_for_roles",
         return_value=(flow, {}),
     ) as gw:
-        from a2a_research.workflow.entrypoints import run_workflow_from_session
+        from a2a_research.agents.pocketflow.entrypoints import run_workflow_from_session
 
         s = ResearchSession(query="start", roles=[AgentRole.RESEARCHER])
         result = await run_workflow_from_session(s, [AgentRole.RESEARCHER])
@@ -61,10 +61,12 @@ async def test_run_workflow_from_session_returns_partial_session_on_timeout() ->
     flow.run_async = AsyncMock(side_effect=slow_run_async)
 
     with (
-        patch("a2a_research.workflow.entrypoints.get_workflow", return_value=(flow, shared)),
-        patch("a2a_research.workflow.entrypoints.settings.workflow_timeout", 0.001),
+        patch(
+            "a2a_research.agents.pocketflow.entrypoints.get_workflow", return_value=(flow, shared)
+        ),
+        patch("a2a_research.agents.pocketflow.entrypoints.settings.workflow_timeout", 0.001),
     ):
-        from a2a_research.workflow.entrypoints import run_workflow_from_session
+        from a2a_research.agents.pocketflow.entrypoints import run_workflow_from_session
 
         result = await run_workflow_from_session(ResearchSession(query="start"))
 
@@ -74,9 +76,9 @@ async def test_run_workflow_from_session_returns_partial_session_on_timeout() ->
 
 
 def test_get_workflow_for_roles_imports_builder() -> None:
-    with patch("a2a_research.workflow.builder.build_workflow") as bw:
+    with patch("a2a_research.agents.pocketflow.flow.build_workflow") as bw:
         bw.return_value = (MagicMock(), {})
-        from a2a_research.workflow.entrypoints import get_workflow_for_roles
+        from a2a_research.agents.pocketflow.entrypoints import get_workflow_for_roles
 
         get_workflow_for_roles([AgentRole.RESEARCHER])
     bw.assert_called_once_with([AgentRole.RESEARCHER])
@@ -88,8 +90,8 @@ def test_run_workflow_sync_runs_coroutine() -> None:
     async def fake_workflow(_q: str, _roles: list | None = None) -> ResearchSession:
         return session
 
-    with patch("a2a_research.workflow.entrypoints.run_workflow", fake_workflow):
-        from a2a_research.workflow.entrypoints import run_workflow_sync
+    with patch("a2a_research.agents.pocketflow.entrypoints.run_workflow", fake_workflow):
+        from a2a_research.agents.pocketflow.entrypoints import run_workflow_sync
 
         out = run_workflow_sync("sync")
     assert out is session
@@ -99,11 +101,11 @@ def test_run_workflow_sync_runs_coroutine() -> None:
 async def test_run_workflow_async_awaits_run_workflow() -> None:
     session = ResearchSession(query="async")
     with patch(
-        "a2a_research.workflow.entrypoints.run_workflow",
+        "a2a_research.agents.pocketflow.entrypoints.run_workflow",
         new_callable=AsyncMock,
         return_value=session,
     ) as rw:
-        from a2a_research.workflow.entrypoints import run_workflow_async
+        from a2a_research.agents.pocketflow.entrypoints import run_workflow_async
 
         out = await run_workflow_async("async", [AgentRole.RESEARCHER])
     rw.assert_awaited_once_with(
