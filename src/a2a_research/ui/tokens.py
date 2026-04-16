@@ -173,7 +173,7 @@ QUERY_CARD_MARGIN_BOTTOM = 16
 
 
 def build_default_border() -> me.Border:
-    """Standard1px border on all sides using :data:`BORDER_COLOR`."""
+    """Standard 1px border on all sides using :data:`BORDER_COLOR`."""
     side = me.BorderSide(width=BORDER_WIDTH, color=BORDER_COLOR)
     return me.Border(top=side, right=side, bottom=side, left=side)
 

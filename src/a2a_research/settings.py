@@ -22,6 +22,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+__all__ = [
+    "settings",
+    "AppSettings",
+    "LLMSettings",
+    "EmbeddingSettings",
+    "ChromaSettings",
+    "RAGSettings",
+]
+
 
 class LLMSettings(BaseSettings):
     """LLM provider configuration — vendor-agnostic."""
@@ -30,7 +39,7 @@ class LLMSettings(BaseSettings):
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         env_prefix="LLM_",
-        extra="ignore",
+        extra="forbid",
     )
 
     provider: str = Field(
@@ -58,7 +67,7 @@ class EmbeddingSettings(BaseSettings):
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         env_prefix="EMBEDDING_",
-        extra="ignore",
+        extra="forbid",
     )
 
     model: str = Field(
@@ -86,7 +95,7 @@ class ChromaSettings(BaseSettings):
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         env_prefix="CHROMA_",
-        extra="ignore",
+        extra="forbid",
     )
 
     persist_dir: Path = Field(
@@ -106,7 +115,7 @@ class RAGSettings(BaseSettings):
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         env_prefix="CHUNK_",
-        extra="ignore",
+        extra="forbid",
     )
 
     size: int = Field(default=512, description="Chunk size in tokens.")
@@ -119,7 +128,7 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(_PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
-        extra="ignore",
+        extra="forbid",
     )
 
     log_level: str = Field(

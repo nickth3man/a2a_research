@@ -41,7 +41,24 @@ venv.bak/
 .ruff_cache/
 .pytype/
 .pytest_cache/
-pyrightconfig.json
+
+# uv
+.uv-cache/
+uv-cache/
+
+# Additional IDEs
+.fleet/
+.zed/
+.vs/
+
+# Additional tool artifacts
+.tox/
+.nox/
+.dmypy.json
+
+# Windows
+*.stackdump
+*.lnk
 
 # Test / Coverage
 .coverage

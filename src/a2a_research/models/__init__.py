@@ -15,7 +15,7 @@ import uuid
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 from a2a_research.models.artifact import (
     Artifact as Artifact,
@@ -42,6 +42,37 @@ from a2a_research.models.policy import (
 from a2a_research.models.policy import (
     WorkflowPolicy as WorkflowPolicy,
 )
+
+__all__ = [
+    "A2AEnvelope",
+    "A2AMessage",
+    "AgentCard",
+    "AgentResult",
+    "AgentRole",
+    "AgentStatus",
+    "AnalystOutput",
+    "Artifact",
+    "ArtifactKind",
+    "Claim",
+    "DataArtifact",
+    "DocumentChunk",
+    "PresenterOutput",
+    "PolicyEffect",
+    "ResearchSession",
+    "ResearchSource",
+    "ResearcherOutput",
+    "RetrievedChunk",
+    "StreamArtifact",
+    "TaskStatus",
+    "TextArtifact",
+    "Verdict",
+    "VerifierOutput",
+    "WorkflowPolicy",
+    "WorkflowState",
+    "default_roles",
+    "get_agent_card",
+    "wrap_in_artifact",
+]
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +175,7 @@ class A2AMessage(BaseModel):
     recipient: AgentRole
     task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     payload: dict[str, Any] = Field(default_factory=dict)
+    _progress_reporter: Any = PrivateAttr(default=None)
 
 
 # ─── Agent Card (capability declaration) ─────────────────────────────────────

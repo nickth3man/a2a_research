@@ -6,6 +6,33 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      production:
+        patterns:
+          - "pocketflow"
+          - "pydantic*"
+          - "mesop"
+          - "chromadb"
+          - "openai"
+          - "anthropic"
+          - "google-genai"
+          - "ollama"
+          - "rich"
+      development:
+        patterns:
+          - "pytest*"
+          - "hypothesis"
+          - "ruff"
+          - "mypy"
+          - "ty"
+          - "pre-commit"
+          - "bandit"
+          - "pip-audit"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -13,3 +40,8 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"

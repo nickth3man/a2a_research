@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from a2a_research.agents import _parse_claims_from_analyst, _parse_verified_claims
 from a2a_research.models import (
+    AgentResult,
     AgentRole,
+    AgentStatus,
     Claim,
     DocumentChunk,
     ResearchSession,
@@ -197,3 +199,160 @@ class TestClaimParsing:
             fallback_claims,
         )
         assert [claim.id for claim in claims] == ["1"]
+
+    def test_parse_verified_claims_handles_non_json(self) -> None:
+        fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
+        claims = _parse_verified_claims("this is not json", fallback_claims)
+        assert len(claims) == 1
+        assert claims[0].id == "c1"
+
+    def test_parse_verified_claims_handles_partial_json(self) -> None:
+        fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
+        claims = _parse_verified_claims('{"other_key": "bad"}', fallback_claims)
+        assert len(claims) == 1
+        assert claims[0].id == "c1"
+
+    def test_parse_verified_claims_handles_empty_string(self) -> None:
+        fallback_claims = [Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)]
+        claims = _parse_verified_claims("", fallback_claims)
+        assert len(claims) == 1
+        assert claims[0].id == "c1"
+
+
+class TestAgentFallbacks:
+    def test_fallback_research_summary_with_empty_chunks(self) -> None:
+        from a2a_research.agents import _fallback_research_summary
+
+        summary = _fallback_research_summary("What is RAG?", [])
+        assert "No retrieved evidence" in summary
+        assert "What is RAG?" in summary
+
+    def test_fallback_verified_claims_with_empty_claims(self) -> None:
+        from a2a_research.agents import _fallback_verified_claims
+
+        claims = _fallback_verified_claims([], "provider error")
+        assert claims == []
+
+    def test_fallback_verified_claims_all_supported(self) -> None:
+        from a2a_research.agents import _fallback_verified_claims
+
+        input_claims = [
+            Claim(id="c1", text="Claim one.", verdict=Verdict.SUPPORTED, confidence=0.9),
+            Claim(id="c2", text="Claim two.", verdict=Verdict.SUPPORTED, confidence=0.8),
+        ]
+        claims = _fallback_verified_claims(input_claims, "rate limited")
+        assert len(claims) == 2
+        assert all(c.verdict == Verdict.INSUFFICIENT_EVIDENCE for c in claims)
+        assert all(c.confidence == 0.0 for c in claims)
+        assert all("rate limited" in c.evidence_snippets for c in claims)
+
+    def test_fallback_verified_claims_all_refuted(self) -> None:
+        from a2a_research.agents import _fallback_verified_claims
+
+        input_claims = [
+            Claim(id="c1", text="Claim one.", verdict=Verdict.REFUTED, confidence=0.9),
+        ]
+        claims = _fallback_verified_claims(input_claims, "provider down")
+        assert len(claims) == 1
+        assert claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
+        assert claims[0].confidence == 0.0
+
+    def test_researcher_invoke_handles_provider_request_error(self) -> None:
+        from a2a_research.agents import researcher_invoke
+        from a2a_research.providers import ProviderRequestError
+
+        session = ResearchSession(query="What is RAG?")
+        with (
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch(
+                "a2a_research.agents._call_llm",
+                side_effect=ProviderRequestError("provider failed"),
+            ),
+        ):
+            result = researcher_invoke(session)
+
+        assert result.role == AgentRole.RESEARCHER
+        assert result.status.value == "COMPLETED"
+        assert "fallback" in result.message.lower()
+        assert result.raw_content != ""
+
+    def test_analyst_invoke_handles_provider_request_error(self) -> None:
+        from a2a_research.agents import analyst_invoke
+        from a2a_research.providers import ProviderRequestError
+
+        session = ResearchSession(query="What is RAG?")
+        session.agent_results[AgentRole.RESEARCHER] = AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.COMPLETED,
+            raw_content="RAG is retrieval augmented generation.",
+        )
+        with patch(
+            "a2a_research.agents._call_llm", side_effect=ProviderRequestError("provider failed")
+        ):
+            result = analyst_invoke(session)
+
+        assert result.role == AgentRole.ANALYST
+        assert result.status.value == "COMPLETED"
+        assert "fallback" in result.message.lower()
+
+    def test_verifier_invoke_handles_provider_request_error(self) -> None:
+        from a2a_research.agents import verifier_invoke
+        from a2a_research.providers import ProviderRequestError
+
+        session = ResearchSession(query="What is RAG?")
+        session.agent_results[AgentRole.RESEARCHER] = AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.COMPLETED,
+            raw_content="RAG summary.",
+            citations=["doc1"],
+        )
+        session.agent_results[AgentRole.ANALYST] = AgentResult(
+            role=AgentRole.ANALYST,
+            status=AgentStatus.COMPLETED,
+            claims=[Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)],
+        )
+        with (
+            patch("a2a_research.agents.retrieve_chunks", return_value=_fake_chunks()),
+            patch(
+                "a2a_research.agents._call_llm",
+                side_effect=ProviderRequestError("provider failed"),
+            ),
+        ):
+            result = verifier_invoke(session)
+
+        assert result.role == AgentRole.VERIFIER
+        assert result.status.value == "COMPLETED"
+        assert "degraded" in result.message.lower() or "fallback" in result.message.lower()
+        assert len(result.claims) == 1
+        assert result.claims[0].verdict == Verdict.INSUFFICIENT_EVIDENCE
+
+    def test_presenter_invoke_handles_provider_request_error(self) -> None:
+        from a2a_research.agents import presenter_invoke
+        from a2a_research.providers import ProviderRequestError
+
+        session = ResearchSession(query="What is RAG?")
+        session.agent_results[AgentRole.RESEARCHER] = AgentResult(
+            role=AgentRole.RESEARCHER,
+            status=AgentStatus.COMPLETED,
+            raw_content="RAG summary.",
+            citations=["doc1"],
+        )
+        session.agent_results[AgentRole.ANALYST] = AgentResult(
+            role=AgentRole.ANALYST,
+            status=AgentStatus.COMPLETED,
+            claims=[Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)],
+        )
+        session.agent_results[AgentRole.VERIFIER] = AgentResult(
+            role=AgentRole.VERIFIER,
+            status=AgentStatus.COMPLETED,
+            claims=[Claim(id="c1", text="RAG uses retrieval.", verdict=Verdict.SUPPORTED)],
+        )
+        with patch(
+            "a2a_research.agents._call_llm", side_effect=ProviderRequestError("provider failed")
+        ):
+            result = presenter_invoke(session)
+
+        assert result.role == AgentRole.PRESENTER
+        assert result.status.value == "COMPLETED"
+        assert "fallback" in result.message.lower()
+        assert result.raw_content != ""

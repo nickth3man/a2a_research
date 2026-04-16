@@ -16,6 +16,16 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+__all__ = [
+    "ProgressGranularity",
+    "ProgressPhase",
+    "ProgressEvent",
+    "ProgressQueue",
+    "ProgressReporter",
+    "create_progress_reporter",
+    "drain_progress_while_running",
+]
+
 
 class ProgressGranularity(IntEnum):
     """User-selectable verbosity for progress updates."""

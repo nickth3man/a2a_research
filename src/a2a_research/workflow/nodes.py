@@ -76,7 +76,6 @@ class ActorNode(AsyncNode):
                 "total_steps": total_steps,
                 "granularity": granularity,
             }
-            payload["__progress_reporter__"] = progress_reporter
         logger.info(
             "Agent step start session_id=%s role=%s payload_keys=%s",
             session.id,
@@ -92,6 +91,10 @@ class ActorNode(AsyncNode):
             recipient=self.role,
             payload=payload,
         )
+        if progress_reporter is not None:
+            # Attach reporter directly to the message instance so it does not cross
+            # the A2A payload boundary (payload is serialized; this private attr is not).
+            object.__setattr__(message, "_progress_reporter", progress_reporter)
         client = A2AClient(message.sender)
         try:
             result = await asyncio.to_thread(client.send, message, session)

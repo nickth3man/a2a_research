@@ -59,8 +59,8 @@ All settings are environment variables. The system is **provider-agnostic** — 
 
 | Variable | Description | Default |
 |---|---|---|
-| `LLM_PROVIDER` | Vendor: `openai`, `anthropic`, `google`, `ollama` | `openai` |
-| `LLM_MODEL` | Model name (provider-specific) | `gpt-4o-mini` |
+| `LLM_PROVIDER` | Vendor: `openrouter`, `openai`, `anthropic`, `google`, `ollama` | `openrouter` |
+| `LLM_MODEL` | Model name (provider-specific) | `openrouter/elephant-alpha` |
 | `LLM_BASE_URL` | OpenAI-compatible base URL override (blank = provider default) | _(empty)_ |
 | `LLM_API_KEY` | API key for your chosen provider | _(required)_ |
 
@@ -68,8 +68,8 @@ All settings are environment variables. The system is **provider-agnostic** — 
 
 | Variable | Description | Default |
 |---|---|---|
-| `EMBEDDING_MODEL` | Embedding model name | `text-embedding-3-small` |
-| `EMBEDDING_PROVIDER` | Embedding vendor: `openai`, `ollama` | `openai` |
+| `EMBEDDING_MODEL` | Embedding model name | `perplexity/pplx-embed-v1-4b` |
+| `EMBEDDING_PROVIDER` | Embedding vendor: `openrouter`, `openai`, `ollama` | `openrouter` |
 | `EMBEDDING_BASE_URL` | Separate base URL for embeddings (blank = same as LLM_BASE_URL) | _(empty)_ |
 | `EMBEDDING_API_KEY` | Embedding API key (blank = same as LLM_API_KEY) | _(empty)_ |
 
@@ -96,7 +96,14 @@ All settings are environment variables. The system is **provider-agnostic** — 
 
 ### Provider Setup Examples
 
-**OpenAI** (default):
+**OpenRouter** (default):
+```bash
+LLM_PROVIDER=openrouter
+LLM_MODEL=openrouter/elephant-alpha
+LLM_API_KEY=sk-or-...
+```
+
+**OpenAI**:
 ```bash
 LLM_PROVIDER=openai
 LLM_MODEL=gpt-4o-mini

@@ -45,10 +45,13 @@ check: lint typecheck typecheck-ty
 	uv run ruff format --check src/ tests/
 
 clean:
-	rm -rf build/ dist/ *.egg-info .mypy_cache .ruff_cache .pytest_cache src/a2a_research/__pycache__ src/a2a_research/*/__pycache__ tests/__pycache__
+	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/__pycache__')]"
+	python -c "import shutil; [shutil.rmtree(d, ignore_errors=True) for d in ['build', 'dist', '.mypy_cache', '.ruff_cache', '.pytest_cache', 'htmlcov']]"
+	python -c "import glob, os; [os.remove(f) for f in glob.glob('*.egg-info') if os.path.isfile(f)]"
 
 mesop:
-	MESOP_STATE_SESSION_BACKEND=memory uv run mesop src/a2a_research/ui/app.py
+	python -c "import os; os.environ.setdefault('MESOP_STATE_SESSION_BACKEND', 'memory')"
+	uv run mesop src/a2a_research/ui/app.py
 
 ingest:
 	uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"

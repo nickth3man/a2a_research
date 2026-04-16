@@ -7,7 +7,6 @@ from a2a_research.ui.data_access import get_agent_label, get_all_roles
 from a2a_research.ui.primitives import card_box
 from a2a_research.ui.tokens import (
     AGENT_ROW_BG_IDLE,
-    AGENT_ROW_BG_RUNNING,
     BORDER_COLOR,
     BORDER_WIDTH,
     FONT_SIZE_BODY,
@@ -42,7 +41,6 @@ def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
     }
     status_icon = icon_map.get(result.status, "\u25cb")
     is_running = result.status == AgentStatus.RUNNING
-    row_bg = AGENT_ROW_BG_RUNNING if is_running else AGENT_ROW_BG_IDLE
     side = me.BorderSide(width=BORDER_WIDTH, color=BORDER_COLOR)
     left_border = (
         me.BorderSide(width=5, color=color, style="solid")
@@ -60,7 +58,7 @@ def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
             display="flex",
             align_items="center",
             gap=12,
-            background=PULSE_BG if is_running else row_bg,
+            background=PULSE_BG if is_running else AGENT_ROW_BG_IDLE,
             border=me.Border(
                 top=me.BorderSide(width=3, color=color),
                 right=side,

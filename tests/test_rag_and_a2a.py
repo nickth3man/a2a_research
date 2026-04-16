@@ -143,9 +143,29 @@ class TestRAGWithMocks:
             "distances": [[0.1, 0.5, 0.9]],
         }
 
+        mock_client = MagicMock(name="chroma_client")
+        mock_collection = MagicMock(name="chroma_collection")
+        mock_client.get_or_create_collection.return_value = mock_collection
+        mock_collection.count.return_value = 5
+        mock_collection.query.return_value = {
+            "documents": [["RAG is effective.", "RAG uses embeddings.", "RAG is from Facebook."]],
+            "metadatas": [
+                [
+                    {"source": "rag_accuracy", "chunk_index": 0, "title": "RAG Study"},
+                    {"source": "a2a_protocols", "chunk_index": 1, "title": "A2A Protocols"},
+                    {
+                        "source": "claim_verification",
+                        "chunk_index": 0,
+                        "title": "Claim Verification",
+                    },
+                ]
+            ],
+            "distances": [[0.1, 0.5, 0.9]],
+        }
+
         with (
-            patch("a2a_research.rag._chroma_client", mock_coll),
-            patch("a2a_research.rag._collection", mock_coll),
+            patch("a2a_research.rag._chroma_client", mock_client),
+            patch("a2a_research.rag._collection", mock_collection),
             patch("a2a_research.providers.get_embedder", return_value=mock_embedder),
         ):
             from a2a_research.rag import RetrievedChunk, retrieve_chunks

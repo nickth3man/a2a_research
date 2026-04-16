@@ -80,13 +80,20 @@ from a2a_research.rag import get_source_title, retrieve_chunks
 logger = get_logger(__name__)
 
 
+def _sanitize_query(query: str) -> str:
+    """Sanitize user query before interpolation into prompts."""
+    query = query.strip()
+    query = " ".join(query.split())
+    return query[:10000]
+
+
 def _extract_progress_context(
     message: A2AMessage | None,
 ) -> tuple[ProgressReporter | None, int, int, int]:
     """Extract (reporter, step_index, total_steps, granularity) from a message payload."""
     if message is None:
         return None, 0, 4, 1
-    reporter: ProgressReporter | None = message.payload.get("__progress_reporter__")
+    reporter: ProgressReporter | None = getattr(message, "_progress_reporter", None)
     ctx: dict[str, Any] = message.payload.get("progress_context") or {}
     return (
         reporter,
@@ -147,7 +154,7 @@ def _call_llm(system_prompt: str, user_content: str, *, stage: str) -> str:
         raise
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.info("LLM stage=%s completed elapsed_ms=%.1f", stage, elapsed_ms)
-    return str(response.content) if hasattr(response, "content") else str(response)
+    return (response.content or "") if hasattr(response, "content") else str(response)
 
 
 def _create_agent_result(
@@ -195,7 +202,9 @@ def _fallback_verified_claims(claims: list[Claim], reason: str) -> list[Claim]:
 
 
 def researcher_invoke(session: ResearchSession, message: A2AMessage | None = None) -> AgentResult:
-    query = str(message.payload.get("query", session.query) if message else session.query)
+    query = _sanitize_query(
+        str(message.payload.get("query", session.query) if message else session.query)
+    )
     reporter, step_index, total_steps, granularity = _extract_progress_context(message)
     emit = _create_substep_emitter(
         reporter, AgentRole.RESEARCHER, step_index, total_steps, granularity, 4
@@ -272,9 +281,10 @@ def analyst_invoke(session: ResearchSession, message: A2AMessage | None = None) 
         if message
         else researcher_result.raw_content
     )
+    query = _sanitize_query(session.query)
     user_ctx = (
         f"Research summary from Researcher:\n{research_summary}\n\n"
-        f"Original query: {session.query}\n\n"
+        f"Original query: {query}\n\n"
         "Decompose the query into atomic verifiable claims."
     )
     reporter, step_index, total_steps, granularity = _extract_progress_context(message)
@@ -373,7 +383,9 @@ def verifier_invoke(session: ResearchSession, message: A2AMessage | None = None)
         claims = [Claim.model_validate(item) for item in message.payload["claims"]]
     else:
         claims = analyst_result.claims
-    query = str(message.payload.get("query", session.query) if message else session.query)
+    query = _sanitize_query(
+        str(message.payload.get("query", session.query) if message else session.query)
+    )
 
     reporter, step_index, total_steps, granularity = _extract_progress_context(message)
     emit = _create_substep_emitter(
@@ -578,8 +590,9 @@ def presenter_invoke(session: ResearchSession, message: A2AMessage | None = None
             findings_ctx += f"  Sources: {', '.join(titles)}\n"
         findings_ctx += "\n"
 
+    query = _sanitize_query(session.query)
     user_ctx = (
-        f"Original query: {session.query}\n\n"
+        f"Original query: {query}\n\n"
         f"Verified findings:\n{findings_ctx}\n\n"
         f"Total sources used: "
         f"{len(set(verifier_result.citations + researcher_result.citations))}\n\n"

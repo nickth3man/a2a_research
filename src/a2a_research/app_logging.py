@@ -201,8 +201,6 @@ def setup_logging() -> None:
     _configure_named_logger("stderr", logging.ERROR)
     _configure_named_logger("stdout", level)
     _install_exception_hooks()
-    sys.stdout = _StreamToLogger(logging.getLogger("stdout"), level, _ORIGINAL_STDOUT)
-    sys.stderr = _StreamToLogger(logging.getLogger("stderr"), logging.ERROR, _ORIGINAL_STDERR)
 
     log_event(
         logging.getLogger(__name__),
@@ -214,6 +212,21 @@ def setup_logging() -> None:
         trace_log=_TRACE_LOG,
     )
     _CONFIGURED = True
+
+
+def redirect_stdio_to_logging() -> None:
+    """Opt-in redirection of sys.stdout/stderr to the logging system."""
+    sys.stdout = _StreamToLogger(logging.getLogger("stdout"), logging.INFO, _ORIGINAL_STDOUT)
+    sys.stderr = _StreamToLogger(logging.getLogger("stderr"), logging.ERROR, _ORIGINAL_STDERR)
+
+
+__all__ = [
+    "get_logger",
+    "install_asyncio_exception_logging",
+    "log_event",
+    "redirect_stdio_to_logging",
+    "setup_logging",
+]
 
 
 def get_logger(name: str) -> logging.Logger:

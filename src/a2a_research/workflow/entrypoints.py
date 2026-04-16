@@ -60,13 +60,23 @@ async def run_workflow(
         elapsed_ms = (perf_counter() - started_at) * 1000
         session.error = str(exc)
         logger.exception("Workflow failed session_id=%s elapsed_ms=%.1f", session.id, elapsed_ms)
-        raise
+        return session
 
 
 def run_workflow_sync(
     query: str,
     roles: list[AgentRole] | None = None,
 ) -> ResearchSession:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        msg = (
+            "run_workflow_sync cannot be called from a running event loop. "
+            "Use run_workflow_async instead."
+        )
+        raise RuntimeError(msg)
     return asyncio.run(run_workflow(query, roles))
 
 

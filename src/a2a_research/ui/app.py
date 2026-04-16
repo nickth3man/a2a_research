@@ -11,11 +11,18 @@ yields so the completed UI renders.
 
 import asyncio
 import logging
-from collections.abc import AsyncGenerator
+import os
+from collections.abc import AsyncGenerator, Callable
 from contextlib import suppress
 from dataclasses import field
+from typing import Any
 
 import mesop as me
+
+# Patch Mesop's static file serving to return 404 instead of 500 for missing
+# files such as /robots.txt (framework bug on Windows pip installs).
+import mesop.server.static_file_serving as _sfs
+from flask import Response as _Response
 
 from a2a_research.app_logging import (
     get_logger,
@@ -45,6 +52,20 @@ from a2a_research.ui.components import (
 from a2a_research.ui.data_access import get_agent_label
 from a2a_research.ui.session_state import get_session_error, has_progress, has_results
 from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
+
+_original_send_file_compressed = _sfs.send_file_compressed
+
+
+def _patched_send_file_compressed(path: str, disable_gzip_cache: bool) -> Any:
+    if not os.path.exists(path):
+        return _Response("Not found", status=404)
+    return _original_send_file_compressed(path, disable_gzip_cache)
+
+
+_send_file_compressed_patch: Callable[[str, bool], Any] = _patched_send_file_compressed
+# Monkey-patch to return 404 for missing static files (framework bug on Windows).
+# type: ignore[attr-defined] is needed because send_file_compressed is not declared as assignable.
+_sfs.send_file_compressed = _send_file_compressed_patch  # type: ignore[attr-defined,assignment]
 
 setup_logging()
 logger = get_logger(__name__)
@@ -95,8 +116,11 @@ def main_page() -> None:
         with me.box(style=_page_shell_style(state.loading)):
             log_event(logger, logging.DEBUG, "ui.component.render", component="PageHeader")
             PageHeader()
-            log_event(logger, logging.DEBUG, "ui.component.render", component="PageInstructions")
-            PageInstructions()
+            if not has_results(state.session):
+                log_event(
+                    logger, logging.DEBUG, "ui.component.render", component="PageInstructions"
+                )
+                PageInstructions()
 
             session_error = get_session_error(state.session)
             if session_error:
@@ -145,7 +169,7 @@ def main_page() -> None:
                         state="progress",
                     )
                     CardTimeline(state.session)
-                else:
+                elif not session_error:
                     log_event(
                         logger, logging.DEBUG, "ui.component.render", component="PageEmptyState"
                     )
@@ -390,10 +414,10 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     )
     yield
 
+    from a2a_research.workflow import run_workflow_async
+
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:
-        from a2a_research.workflow import run_workflow_async
-
         queue: ProgressQueue = asyncio.Queue()
         wf_task = asyncio.create_task(
             run_workflow_async(
