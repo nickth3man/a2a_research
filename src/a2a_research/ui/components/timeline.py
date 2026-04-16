@@ -1,0 +1,81 @@
+"""Agent pipeline timeline card."""
+
+import mesop as me
+
+from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.ui.primitives import card_box
+from a2a_research.ui.tokens import (
+    AGENT_ROW_BG_IDLE,
+    AGENT_ROW_BG_RUNNING,
+    BORDER_COLOR,
+    BORDER_WIDTH,
+    FONT_SIZE_BODY,
+    FONT_SIZE_SMALL,
+    FONT_SIZE_TINY,
+    SECTION_MARGIN_BOTTOM_SM,
+    SUBTITLE_MARGIN_BOTTOM,
+    TEXT_MUTED,
+    status_color,
+)
+
+AGENT_LABELS = {
+    AgentRole.RESEARCHER: "Researcher",
+    AgentRole.ANALYST: "Analyst",
+    AgentRole.VERIFIER: "Verifier",
+    AgentRole.PRESENTER: "Presenter",
+}
+ALL_ROLES = [AgentRole.RESEARCHER, AgentRole.ANALYST, AgentRole.VERIFIER, AgentRole.PRESENTER]
+
+
+@me.component
+def agent_timeline_card(session: ResearchSession) -> None:
+    with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_SM):
+        me.text("Agent Pipeline", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
+        for role in ALL_ROLES:
+            _render_agent_row(role, session.get_agent(role))
+
+
+def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
+    color = status_color(result.status)
+    label = AGENT_LABELS.get(role, role.value)
+    icon_map = {
+        AgentStatus.COMPLETED: "\u2713",
+        AgentStatus.RUNNING: "\u25b8",
+        AgentStatus.FAILED: "\u2717",
+        AgentStatus.PENDING: "\u25cb",
+    }
+    status_icon = icon_map.get(result.status, "\u25cb")
+    row_bg = AGENT_ROW_BG_IDLE if result.status != AgentStatus.RUNNING else AGENT_ROW_BG_RUNNING
+    side = me.BorderSide(width=BORDER_WIDTH, color=BORDER_COLOR)
+
+    with me.box(
+        style=me.Style(
+            display="flex",
+            align_items="center",
+            gap=12,
+            background=row_bg,
+            border=me.Border(
+                top=me.BorderSide(width=3, color=color),
+                right=side,
+                bottom=side,
+                left=side,
+            ),
+            padding=me.Padding(top=8, right=10, bottom=8, left=10),
+            margin=me.Margin(bottom=6),
+        )
+    ):
+        me.text(status_icon, style=me.Style(color=color, font_size="16px", width=20))
+        with me.box(style=me.Style(flex=1)):
+            me.text(label, style=me.Style(font_weight="bold", font_size=FONT_SIZE_BODY))
+            if result.message:
+                me.text(result.message, style=me.Style(color=TEXT_MUTED, font_size=FONT_SIZE_SMALL))
+        me.text(
+            result.status.value,
+            style=me.Style(
+                color="#fff",
+                font_size=FONT_SIZE_TINY,
+                background=color,
+                padding=me.Padding(top=2, bottom=2, left=8, right=8),
+                border_radius=10,
+            ),
+        )

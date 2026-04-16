@@ -22,10 +22,14 @@ from a2a_research.ui.components import (
     error_banner,
     loading_card,
     query_input_card,
+    render_empty_state,
+    render_header,
+    render_instructions,
     report_panel,
     sources_panel,
 )
 from a2a_research.ui.session_state import has_results
+from a2a_research.ui.tokens import PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
 
 setup_logging()
 logger = get_logger(__name__)
@@ -37,14 +41,14 @@ def main_page() -> None:
 
     with me.box(
         style=me.Style(
-            max_width=900,
+            max_width=PAGE_MAX_WIDTH,
             margin=me.Margin(left="auto", right="auto"),
-            padding=me.Padding(left=16, right=16, top=24, bottom=24),
-            font_family="system-ui, -apple-system, sans-serif",
+            padding=PAGE_PADDING,
+            font_family=PAGE_FONT_FAMILY,
         )
     ):
-        _render_header()
-        _render_instructions()
+        render_header()
+        render_instructions()
 
         if state.error:
             error_banner(state.error)
@@ -55,7 +59,7 @@ def main_page() -> None:
             if has_results(state.session):
                 _render_results(state.session)
             else:
-                _render_empty_state()
+                render_empty_state()
 
         query_input_card(
             on_submit=_on_submit,
@@ -72,68 +76,6 @@ class AppState:
     session: ResearchSession = field(default_factory=ResearchSession)
     loading: bool = False
     error: str | None = None
-
-
-def _render_header() -> None:
-    with me.box(
-        style=me.Style(
-            border=me.Border(
-                bottom=me.BorderSide(width=2, color="#e5e7eb"),
-            ),
-            padding=me.Padding(bottom=16),
-            margin=me.Margin(bottom=24),
-        )
-    ):
-        me.text("A2A Research System", type="headline-4")
-        me.text(
-            "Local-first 4-agent pipeline: Researcher → Analyst → Verifier → Presenter",
-            style=me.Style(font_size="14px", color="#6b7280", margin=me.Margin(top=4)),
-        )
-
-
-def _render_instructions() -> None:
-    with me.box(
-        style=me.Style(
-            background="#eff6ff",
-            border=me.Border(
-                top=me.BorderSide(width=1, color="#bfdbfe"),
-                right=me.BorderSide(width=1, color="#bfdbfe"),
-                bottom=me.BorderSide(width=1, color="#bfdbfe"),
-                left=me.BorderSide(width=1, color="#bfdbfe"),
-            ),
-            border_radius=8,
-            padding=me.Padding(top=14, right=14, bottom=14, left=14),
-            margin=me.Margin(bottom=24),
-        )
-    ):
-        me.markdown(
-            "**How it works:** Enter a research query to start a session. "
-            "The pipeline retrieves documents from the RAG corpus, decomposes claims, "
-            "verifies evidence, and renders a final markdown report — "
-            "all via in-process A2A-shaped agent contracts.",
-        )
-
-
-def _render_empty_state() -> None:
-    with me.box(
-        style=me.Style(
-            text_align="center",
-            background="#f9fafb",
-            border=me.Border(
-                top=me.BorderSide(width=1, color="#d1d5db"),
-                right=me.BorderSide(width=1, color="#d1d5db"),
-                bottom=me.BorderSide(width=1, color="#d1d5db"),
-                left=me.BorderSide(width=1, color="#d1d5db"),
-            ),
-            border_radius=10,
-            padding=me.Padding(top=48, right=24, bottom=48, left=24),
-            margin=me.Margin(bottom=20),
-        )
-    ):
-        me.text(
-            "No active session — enter a query above to begin.",
-            style=me.Style(color="#6b7280", font_size="15px"),
-        )
 
 
 def _render_results(session: ResearchSession) -> None:
