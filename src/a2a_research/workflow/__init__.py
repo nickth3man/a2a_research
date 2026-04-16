@@ -2,7 +2,7 @@
 
 Exports the composed ``AsyncFlow``, actor nodes, policy hooks, and convenience callers:
 
-- ``run_research_sync(query)`` — blocking entry used by the Mesop UI.
+- ``run_research_sync(query)`` — blocking entry for scripts, tests, and REPL use.
 - ``run_workflow_async`` / ``run_workflow`` — async orchestration with logging.
 - ``get_workflow`` / ``get_graph`` — access the built graph or a sync adapter.
 

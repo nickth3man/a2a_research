@@ -3,29 +3,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
 from a2a_research.ui.session_state import has_results
-
-
-@pytest.fixture
-def stub_mesop_box_runtime() -> None:
-    """Stub `me.box` tree used by main_page and nested components."""
-    node = MagicMock()
-    child = MagicMock()
-    child.MergeFrom = MagicMock()
-    node.children.add.return_value = child
-    ctx = MagicMock()
-    ctx.current_node.return_value = node
-    ctx.set_current_node = MagicMock()
-    rt = MagicMock()
-    rt.context.return_value = ctx
-    rt.debug_mode = False
-    with patch("mesop.component_helpers.helper.runtime", return_value=rt):
-        yield
 
 
 def _make_state(**kwargs: object) -> SimpleNamespace:

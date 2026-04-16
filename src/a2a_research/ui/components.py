@@ -6,7 +6,7 @@ state except via props and callbacks wired from ``app.py``.
 """
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import mesop as me
 
@@ -294,7 +294,8 @@ def report_panel(session: ResearchSession) -> None:
 def query_input_card(
     on_submit: Callable[[Any], Any],
     on_query_input: Callable[[Any], Any],
-    query_text: str,
+    *,
+    submit_disabled: int = 0,
 ) -> None:
     with me.box(
         style=me.Style(
@@ -319,7 +320,6 @@ def query_input_card(
         me.textarea(
             label="Enter your research question…",
             key="query",
-            value=query_text,
             rows=3,
             on_input=on_query_input,
             style=me.Style(margin=me.Margin(bottom=12)),
@@ -330,6 +330,7 @@ def query_input_card(
                 on_click=on_submit,
                 type="flat",
                 color="primary",
+                disabled=cast("bool", submit_disabled),
             )
 
 
@@ -353,8 +354,16 @@ def error_banner(error: str) -> None:
         )
     ):
         me.text(
-            f"Pipeline error: {error[:200]}…", style=me.Style(color="#dc2626", font_size="14px")
+            _error_banner_message(error),
+            style=me.Style(color="#dc2626", font_size="14px"),
         )
+
+
+def _error_banner_message(error: str, *, max_len: int = 200) -> str:
+    prefix = "Pipeline error: "
+    if len(error) <= max_len:
+        return prefix + error
+    return prefix + error[:max_len] + "…"
 
 
 @me.component

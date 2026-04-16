@@ -2,10 +2,6 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-
-import pytest
-
 from a2a_research.models import (
     AgentResult,
     AgentRole,
@@ -14,23 +10,6 @@ from a2a_research.models import (
     ResearchSession,
     Verdict,
 )
-
-
-@pytest.fixture
-def stub_mesop_component_runtime() -> None:
-    """Enough of `runtime().context().current_node()` for @me.component wrappers."""
-    node = MagicMock()
-    child = MagicMock()
-    child.MergeFrom = MagicMock()
-    node.children.add.return_value = child
-    ctx = MagicMock()
-    ctx.current_node.return_value = node
-    ctx.set_current_node = MagicMock()
-    rt = MagicMock()
-    rt.context.return_value = ctx
-    rt.debug_mode = False
-    with patch("mesop.component_helpers.helper.runtime", return_value=rt):
-        yield
 
 
 def test_agent_timeline_card_renders_rows(stub_mesop_component_runtime: None) -> None:
@@ -97,6 +76,13 @@ def test_error_banner_truncates(stub_mesop_component_runtime: None) -> None:
     error_banner("x" * 500)
 
 
+def test_error_banner_short_message_no_ellipsis(stub_mesop_component_runtime: None) -> None:
+    from a2a_research.ui import components as comp_mod
+
+    assert comp_mod._error_banner_message("short") == "Pipeline error: short"
+    assert not comp_mod._error_banner_message("short").endswith("…")
+
+
 def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import loading_card
 
@@ -115,5 +101,4 @@ def test_query_input_card(stub_mesop_component_runtime: None) -> None:
     query_input_card(
         on_submit=on_submit,
         on_query_input=on_input,
-        query_text="hi",
     )

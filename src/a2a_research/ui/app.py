@@ -4,12 +4,12 @@
 so Mesop registers the Pydantic model for serialization (optional/union session
 fields are skipped and break round-trips).
 
-The submit handler is a synchronous **generator**: it updates loading state, yields once
-so Mesop flushes a render, then runs ``run_research_sync``. A plain ``async def`` click
-handler would not show loading, because Mesop renders only after the coroutine completes.
+The submit handler is an **async generator**: it yields to show loading, awaits
+``run_workflow_async`` on Mesop's event loop (no nested ``asyncio.run``), then yields
+again so the completed UI renders.
 """
 
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from dataclasses import field
 
 import mesop as me
@@ -60,7 +60,7 @@ def main_page() -> None:
         query_input_card(
             on_submit=_on_submit,
             on_query_input=_on_query_input,
-            query_text=state.query_text,
+            submit_disabled=int(state.loading),
         )
 
 
@@ -148,19 +148,17 @@ def _on_query_input(e: me.InputEvent) -> None:
     state.query_text = e.value
 
 
-def _on_submit(e: me.ClickEvent) -> Generator[None, None, None]:
-    """Run research on click.
-
-    Mesop only renders coroutine handlers after the coroutine completes, so a loading
-    state would never appear. A sync generator yields once to flush loading UI, then
-    runs the blocking pipeline (same worker model as ``run_in_executor`` on the default
-    loop).
-    """
+async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
+    """Run research on click using Mesop's async-generator loading pattern."""
     state: AppState = me.state(AppState)
     query_text = state.query_text.strip()
 
     if not query_text:
         state.error = "Enter a research query before running the pipeline."
+        yield
+        return
+
+    if state.loading:
         return
 
     state.loading = True
@@ -170,9 +168,9 @@ def _on_submit(e: me.ClickEvent) -> Generator[None, None, None]:
     yield
 
     try:
-        from a2a_research.workflow import run_research_sync
+        from a2a_research.workflow import run_workflow_async
 
-        result = run_research_sync(query_text)
+        result = await run_workflow_async(query_text)
         state.session = result
         logger.info(
             "UI submit completed session_id=%s final_report_chars=%s",
@@ -184,3 +182,5 @@ def _on_submit(e: me.ClickEvent) -> Generator[None, None, None]:
         logger.exception("UI submit failed query=%r", query_text)
     finally:
         state.loading = False
+
+    yield

@@ -3,26 +3,18 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
 
 
-def _drain_on_submit(app_mod, mock_event: MagicMock | None = None) -> None:
-    gen = app_mod._on_submit(mock_event or MagicMock())
-    try:
-        next(gen)
-    except StopIteration:
-        return
-    try:
-        next(gen)
-    except StopIteration:
-        return
+async def _drain_on_submit(app_mod, mock_event: MagicMock | None = None) -> None:
+    agen = app_mod._on_submit(mock_event or MagicMock())
+    async for _ in agen:
+        pass
 
 
-def test_on_submit_empty_query_sets_error() -> None:
+async def test_on_submit_empty_query_sets_error() -> None:
     from a2a_research.ui import app as app_mod
 
     st = SimpleNamespace(
@@ -32,14 +24,12 @@ def test_on_submit_empty_query_sets_error() -> None:
         session=ResearchSession(),
     )
     with patch.object(app_mod.me, "state", return_value=st):
-        gen = app_mod._on_submit(MagicMock())
-        with pytest.raises(StopIteration):
-            next(gen)
+        await _drain_on_submit(app_mod)
     assert st.error is not None
     assert "query" in st.error.lower()
 
 
-def test_on_submit_success_updates_session() -> None:
+async def test_on_submit_success_updates_session() -> None:
     from a2a_research.ui import app as app_mod
 
     done = ResearchSession(
@@ -62,18 +52,19 @@ def test_on_submit_success_updates_session() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_sync",
+            "a2a_research.workflow.run_workflow_async",
+            new_callable=AsyncMock,
             return_value=done,
         ),
     ):
-        _drain_on_submit(app_mod)
+        await _drain_on_submit(app_mod)
 
     assert st.loading is False
     assert st.error is None
     assert st.session.final_report == "# Hello"
 
 
-def test_on_submit_exception_sets_error() -> None:
+async def test_on_submit_exception_sets_error() -> None:
     from a2a_research.ui import app as app_mod
 
     st = SimpleNamespace(
@@ -86,14 +77,63 @@ def test_on_submit_exception_sets_error() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_sync",
+            "a2a_research.workflow.run_workflow_async",
+            new_callable=AsyncMock,
             side_effect=RuntimeError("LLM down"),
         ),
     ):
-        _drain_on_submit(app_mod)
+        await _drain_on_submit(app_mod)
 
     assert st.loading is False
     assert "LLM down" in (st.error or "")
+
+
+async def test_on_submit_success_yields_twice() -> None:
+    """Loading flush + final UI flush."""
+    from a2a_research.ui import app as app_mod
+
+    done = ResearchSession(query="Q", final_report="x")
+    st = SimpleNamespace(
+        query_text="Q",
+        error=None,
+        loading=False,
+        session=ResearchSession(),
+    )
+    with (
+        patch.object(app_mod.me, "state", return_value=st),
+        patch(
+            "a2a_research.workflow.run_workflow_async",
+            new_callable=AsyncMock,
+            return_value=done,
+        ),
+    ):
+        agen = app_mod._on_submit(MagicMock())
+        yields = 0
+        async for _ in agen:
+            yields += 1
+    assert yields == 2
+
+
+async def test_on_submit_skips_when_already_loading() -> None:
+    from a2a_research.ui import app as app_mod
+
+    st = SimpleNamespace(
+        query_text="Q",
+        error=None,
+        loading=True,
+        session=ResearchSession(query="Q"),
+    )
+    mock_async = AsyncMock()
+    with (
+        patch.object(app_mod.me, "state", return_value=st),
+        patch(
+            "a2a_research.workflow.run_workflow_async",
+            new_callable=AsyncMock,
+            side_effect=mock_async,
+        ),
+    ):
+        await _drain_on_submit(app_mod)
+    mock_async.assert_not_called()
 
 
 def test_on_query_input_updates_state() -> None:
