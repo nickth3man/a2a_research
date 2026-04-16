@@ -1,0 +1,48 @@
+name: opencode-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run opencode review
+        uses: anomalyco/opencode/github@latest
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: openrouter/openrouter/elephant-alpha
+          use_github_token: true
+          share: false
+          prompt: |
+            You are reviewing this pull request. Be concise and actionable.
+
+            Focus on:
+            - Correctness and potential bugs (edge cases, null/undefined, race conditions)
+            - Security issues (injection, secrets, auth, unsafe deserialization)
+            - Performance regressions and obvious inefficiencies
+            - Code quality: readability, naming, duplication, dead code
+            - Tests: missing coverage for new logic or changed branches
+            - Breaking changes to public APIs or config
+
+            Rules:
+            - Only comment on issues you are confident about. No nits on style
+              already enforced by linters/formatters.
+            - Reference specific files and line numbers.
+            - If the PR looks good, say so briefly and approve in tone.
+            - Do not commit changes; leave a single summary review comment.
