@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 import pytest
 from a2a.types import Artifact, DataPart, Part, Task, TaskState, TaskStatus
 
-from a2a_research.agents.langgraph.fact_checker import nodes as fc_nodes
 from a2a_research.agents.langgraph.fact_checker import run_fact_check
+from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
 from a2a_research.models import AgentRole, Claim, Verdict
 
 
@@ -89,7 +89,7 @@ async def test_fact_checker_converges_in_first_round(monkeypatch: pytest.MonkeyP
         ],
     )
     monkeypatch.setattr(
-        fc_nodes,
+        fc_verify,
         "get_llm",
         lambda: _fake_llm(
             {
@@ -180,7 +180,7 @@ async def test_fact_checker_loops_on_needs_more(monkeypatch: pytest.MonkeyPatch)
     def _model_factory() -> Any:
         return _fake_llm(next(responses))
 
-    monkeypatch.setattr(fc_nodes, "get_llm", _model_factory)
+    monkeypatch.setattr(fc_verify, "get_llm", _model_factory)
 
     result = await run_fact_check(
         query="q",
@@ -227,7 +227,7 @@ async def test_fact_checker_respects_max_rounds(monkeypatch: pytest.MonkeyPatch)
     )
     # LLM never converges — always NEEDS_MORE + follow-ups.
     monkeypatch.setattr(
-        fc_nodes,
+        fc_verify,
         "get_llm",
         lambda: _fake_llm(
             {
@@ -284,7 +284,7 @@ async def test_fact_checker_marks_exhausted_and_sets_insufficient_when_all_provi
         llm_calls["count"] += 1
         raise AssertionError("verify_node must NOT call the LLM when no evidence is available")
 
-    monkeypatch.setattr(fc_nodes, "get_llm", _tripwire)
+    monkeypatch.setattr(fc_verify, "get_llm", _tripwire)
 
     result = await run_fact_check(
         query="q",
@@ -334,7 +334,7 @@ async def test_fact_checker_marks_exhausted_when_all_urls_fail_to_fetch(
     def _tripwire() -> Any:
         raise AssertionError("LLM must not be called on evidence-empty path")
 
-    monkeypatch.setattr(fc_nodes, "get_llm", _tripwire)
+    monkeypatch.setattr(fc_verify, "get_llm", _tripwire)
 
     result = await run_fact_check(
         query="q",

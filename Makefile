@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop ingest htmlcov
+.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -44,9 +44,6 @@ clean: ## Remove build artifacts and cache directories
 
 mesop: ## Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
 	export MESOP_STATE_SESSION_BACKEND=memory && uv run mesop src/a2a_research/ui/app.py
-
-ingest: ## Ingest the RAG corpus into ChromaDB
-	uv run python -c "from a2a_research.rag import ingest_corpus; print(f'Ingested {ingest_corpus()} chunks')"
 
 htmlcov: ## Generate HTML coverage report
 	uv run pytest --cov=src/a2a_research --cov-report=html

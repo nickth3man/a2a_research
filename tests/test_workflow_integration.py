@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2a_research.agents.langgraph.fact_checker import nodes as fc_nodes
+from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
 from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
 from a2a_research.agents.smolagents.reader import main as reader_main
@@ -83,7 +83,7 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # FactChecker LLM: one-round convergence
     monkeypatch.setattr(
-        fc_nodes,
+        fc_verify,
         "get_llm",
         lambda: _llm_stub(
             {
@@ -172,7 +172,7 @@ async def test_pipeline_aborts_when_search_providers_all_fail(
     def _fc_tripwire() -> Any:
         raise AssertionError("FactChecker LLM must not run when no evidence is available")
 
-    monkeypatch.setattr(fc_nodes, "get_llm", _fc_tripwire)
+    monkeypatch.setattr(fc_verify, "get_llm", _fc_tripwire)
 
     synth_agent.reset_agent_cache()
 

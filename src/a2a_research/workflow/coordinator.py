@@ -45,7 +45,7 @@ async def run_research_async(query: str) -> ResearchSession:
 
     try:
         await asyncio.wait_for(_drive(session, client, query), timeout=settings.workflow_timeout)
-    except TimeoutError:
+    except TimeoutError:  # asyncio.TimeoutError is the same class on Python 3.11+
         session.error = (
             f"Workflow timed out after {settings.workflow_timeout:.0f}s — partial results below."
         )

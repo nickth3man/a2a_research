@@ -1,28 +1,28 @@
-# A2A Research — Local-First 4-Agent Research System
+# A2A Research — 5-Agent Web Research & Verification
 
-**A research-and-verification pipeline** orchestrated by a modular PocketFlow runtime. Four agents — Researcher, Analyst, Verifier, Presenter — communicate through an in-process A2A client/server layer, with a registry-driven workflow that can be extended with new agents and alternate pipeline orderings without rewriting the orchestration core. The system ingests a local RAG corpus, decomposes user queries into verifiable claims, checks evidence, and renders a structured markdown report.
+**A research-and-verification pipeline** coordinated by an in-process [A2A](https://github.com/a2aproject/A2A/) registry and client. Five agents — Planner, Searcher, Reader, FactChecker, Synthesizer — run on a mix of runtimes (PocketFlow planner, smolagents search/read, LangGraph fact-check loop, Pydantic AI synthesis). The system uses live web search and page extraction instead of a local RAG corpus: it decomposes queries into claims, gathers evidence from the public web, verifies claims, and renders a structured markdown report.
 
 ---
 
 ## Architecture
 
 ```
-Researcher ──► Analyst ──► Verifier ──► Presenter
-    │                                    │
-    └──── PocketFlow AsyncFlow + A2A ───┘
+                    ┌── Searcher (web search)
+Planner ──► FactChecker ──┤── Reader (fetch + extract) ──► … loop … ──► Synthesizer
+                    └──────────────────────────────────────────────────┘
 ```
 
-| Agent | Role | Output |
-|---|---|---|
-| **Researcher** | Retrieves relevant chunks from the ChromaDB RAG corpus | `chunks + summary + citations` |
-| **Analyst** | Decomposes the query into atomic verifiable claims | `atomic claims list` |
-| **Verifier** | Assigns SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE verdicts | `verified claims with confidence` |
-| **Presenter** | Renders the final structured markdown report | `markdown report` |
+| Agent | Runtime | Role | Output |
+|---|---|---|---|
+| **Planner** | PocketFlow | Decomposes the user query into claims and seed search queries | `claims`, `seed_queries` |
+| **Searcher** | smolagents | Parallel Tavily + DuckDuckGo search | `hits`, `errors` |
+| **Reader** | smolagents | Fetches URLs and extracts main text (trafilatura) | `pages` |
+| **FactChecker** | LangGraph | Orchestrates search/read/LLM verify loop until evidence converges or search exhausts | `verified_claims`, `sources` |
+| **Synthesizer** | Pydantic AI | Structured report from verified claims + citations | `ReportOutput` → markdown |
 
-**Orchestration**: PocketFlow `AsyncFlow` + `AsyncNode` wrappers in `workflow/`.  
-**A2A Contracts**: In-process `A2AClient` → `A2AServer` dispatch with typed `A2AMessage` / `AgentResult` payloads, plus extensible envelope / policy / artifact models.  
-**RAG**: ChromaDB with sentence-chunked markdown corpus; semantic similarity retrieval.  
-**PocketFlow**: The bundled `pocketflow_reference` runtime powers both deterministic helper flows and the main research workflow runtime.  
+**Orchestration**: `workflow/coordinator.py` — `run_research_async` / `run_research_sync` drive the pipeline via `A2AClient` and `AgentRegistry`.  
+**A2A**: `a2a_research.a2a` — role-scoped `AgentExecutor` registration, agent cards, in-process task store.  
+**Evidence**: `a2a_research.tools` — `web_search`, `fetch_and_extract`.  
 **UI**: Mesop web app (`src/a2a_research/ui/app.py`).
 
 ---
@@ -37,13 +37,9 @@ make install
 # 2. Configure credentials
 # macOS/Linux: cp .env.example .env
 # Windows PowerShell: Copy-Item .env.example .env
-# Edit .env — set LLM_API_KEY and any provider-specific values
+# Edit .env — set LLM_API_KEY, optional TAVILY_API_KEY for better search
 
-# 3. Ingest the RAG corpus (one-time; idempotent — safe to re-run)
-make ingest
-# Or: uv run python -c "from a2a_research.rag import ensure_corpus_ingested; print(f'Ingested {ensure_corpus_ingested()} chunks')"
-
-# 4. Start the Mesop UI
+# 3. Start the Mesop UI
 make mesop
 # Or: uv run mesop src/a2a_research/ui/app.py
 # Opens at http://localhost:32123
@@ -57,7 +53,7 @@ make test
 
 ## Configuration (`.env`)
 
-All settings are environment variables. The system is **provider-agnostic** — pick your LLM and embedding provider independently.
+All settings are environment variables. The LLM stack is **provider-agnostic** (same `LLM_*` keys drive Planner, FactChecker, Searcher/Reader hosts, and the Pydantic AI Synthesizer).
 
 ### LLM Provider
 
@@ -65,31 +61,17 @@ All settings are environment variables. The system is **provider-agnostic** — 
 |---|---|---|
 | `LLM_PROVIDER` | Vendor: `openrouter`, `openai`, `anthropic`, `google`, `ollama` | `openrouter` |
 | `LLM_MODEL` | Model name (provider-specific) | `openrouter/elephant-alpha` |
-| `LLM_BASE_URL` | OpenAI-compatible base URL override (blank = provider default) | _(empty)_ |
-| `LLM_API_KEY` | API key for your chosen provider | _(required)_ |
+| `LLM_BASE_URL` | OpenAI-compatible base URL (OpenRouter/Ollama); optional for native Anthropic/Google | see `.env.example` |
+| `LLM_API_KEY` | API key for your chosen provider | _(required for cloud)_ |
 
-### Embeddings
-
-| Variable | Description | Default |
-|---|---|---|
-| `EMBEDDING_MODEL` | Embedding model name | `perplexity/pplx-embed-v1-4b` |
-| `EMBEDDING_PROVIDER` | Embedding vendor: `openrouter`, `openai`, `ollama` | `openrouter` |
-| `EMBEDDING_BASE_URL` | Separate base URL for embeddings (blank = same as LLM_BASE_URL) | _(empty)_ |
-| `EMBEDDING_API_KEY` | Embedding API key (blank = same as LLM_API_KEY) | _(empty)_ |
-
-### Vector Store (ChromaDB)
+### Web search & research loop
 
 | Variable | Description | Default |
 |---|---|---|
-| `CHROMA_PERSIST_DIR` | Persistent storage directory for ChromaDB | `data/chroma` |
-| `CHROMA_COLLECTION` | Collection name | `a2a_research` |
-
-### Chunking
-
-| Variable | Description | Default |
-|---|---|---|
-| `CHUNK_SIZE` | Target chunk size in characters (sentence-boundary aware) | `512` |
-| `CHUNK_OVERLAP` | Character overlap between adjacent chunks | `64` |
+| `TAVILY_API_KEY` | Tavily API key; blank = DuckDuckGo-only search | _(empty)_ |
+| `SEARCH_MAX_RESULTS` | Per-provider hit cap (Tavily + DDG merged) | `5` |
+| `RESEARCH_MAX_ROUNDS` | Max FactChecker loop rounds | `3` |
+| `WORKFLOW_TIMEOUT` | Coordinator timeout (seconds) | `180` |
 
 ### Application
 
@@ -135,62 +117,48 @@ LLM_API_KEY=sk-ant-...
 
 ## Data Flow
 
-### 1. Ingestion
-
-```python
-from a2a_research.rag import ingest_corpus
-count = ingest_corpus()  # idempotent
-```
-
-Reads all `.md` files from `data/corpus/`, splits on sentence boundaries with `CHUNK_SIZE` / `CHUNK_OVERLAP`, embeds via the configured provider, and upserts into ChromaDB. Re-running when the collection is already populated is safe (skips by default, force with `ingest_corpus(force=True)`).
-
-### 2. Research Pipeline
+### 1. Research pipeline (web evidence)
 
 ```
 User query
   │
   ▼
-Researcher ──► ChromaDB similarity search ──► chunks, ranked sources, summary
+Planner ──► LLM ──► claims + seed_queries
   │
   ▼
-Analyst ──► LLM decomposition ──► atomic claims
+FactChecker (LangGraph loop)
+  │     Searcher ──► Tavily + DDG ──► URLs
+  │     Reader ──► fetch + trafilatura ──► page text
+  │     Verify ──► LLM ──► verdicts / follow-up queries
+  │     (repeat until converged, max rounds, or search exhausted)
   │
   ▼
-Verifier ──► LLM verdict + confidence ──► verified claims (SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE)
-  │
-  ▼
-Presenter ──► LLM synthesis ──► structured markdown report
+Synthesizer ──► LLM (structured) ──► ReportOutput → markdown
 ```
 
-All LLM calls route through the shared `get_llm()` provider abstraction in `providers.py`. Swapping providers requires only `.env` changes, assuming the relevant optional provider package is installed.
+Planner, FactChecker verification, and Synthesizer call `get_llm()` in `providers.py`. Searcher/Reader use smolagents with OpenAI-compatible models from the same `LLM_*` settings.
 
-### 2.5. Modular Workflow Runtime
+### 2. Workflow entrypoints
 
-The main execution path now lives in `src/a2a_research/workflow/`:
+Public API:
 
-- `nodes.py` — PocketFlow `ActorNode` wrappers that invoke agents through the A2A layer
-- `builder.py` — declarative workflow builder for assembling an ordered role pipeline
-- `coordinator.py` — orchestration entrypoint for the default four-agent flow
-- `adapter.py` — sync/async compatibility adapter providing `invoke()` / `ainvoke()` interfaces
-- `policy.py` — workflow policy primitives for future routing and constraint logic
+```python
+from a2a_research.workflow import run_research_sync, run_research_async
+```
 
-The current default pipeline is still linear, but the runtime is now modular enough to:
-
-- add a new agent by registering a new role/handler pair,
-- change the workflow order without replacing the orchestration engine,
-- use the stable `from a2a_research.workflow import run_research_sync` import path.
+Implementation lives in `src/a2a_research/workflow/coordinator.py` (linear coordinator over `A2AClient`). Older PocketFlow builder/adapter modules may still exist for experiments; the Mesop UI and tests target `run_research_async`.
 
 ### 3. UI
 
 The Mesop app exposes five sections:
 
 - **Query input** — textarea at the bottom; submitting triggers the full pipeline
-- **Agent timeline** — per-role card showing status (PENDING → RUNNING → COMPLETED/FAILED) and the agent's log message
-- **Verified claims** — each claim shows verdict badge (✅ SUPPORTED / ❌ REFUTED / ⚠️ INSUFFICIENT_EVIDENCE), confidence percentage, sources, and evidence snippets
-- **Sources panel** — deduplicated citation list with index numbers
-- **Final report** — rendered markdown output from the Presenter agent
+- **Agent timeline** — per-role card for Planner, Searcher, Reader, FactChecker, Synthesizer (PENDING → RUNNING → COMPLETED/FAILED)
+- **Verified claims** — verdict badges (✅ SUPPORTED / ❌ REFUTED / ⚠️ INSUFFICIENT_EVIDENCE / …), confidence, sources, snippets
+- **Sources panel** — deduplicated URLs from the FactChecker
+- **Final report** — markdown from the Synthesizer (`session.final_report`)
 
-UI state now treats `ResearchSession` as the source of truth for progress and errors, so partially initialized sessions can render the timeline safely without being mistaken for final results.
+`ResearchSession` is the source of truth for timeline, errors, and outputs.
 
 ---
 
@@ -198,22 +166,17 @@ UI state now treats `ResearchSession` as the source of truth for progress and er
 
 ```
 src/a2a_research/
-├── agents/          # Agent invoke functions (researcher_invoke, analyst_invoke, verifier_invoke, presenter_invoke)
-├── a2a/             # In-process A2A contracts and registry-backed server/client helpers
-├── workflow/        # PocketFlow runtime (builder, actor nodes, coordinator, adapter, policy)
-├── rag/             # ChromaDB ingestion and semantic retrieval
-├── models/          # Pydantic domain types (ResearchSession, Claim, AgentResult, WorkflowState, Artifact, Envelope, Policy, …)
-├── prompts/         # Per-agent system prompts (RESEARCHER_PROMPT, ANALYST_PROMPT, VERIFIER_PROMPT, PRESENTER_PROMPT)
-├── helpers/         # Deterministic PocketFlow-style helpers (format_claim_verdict, build_markdown_report, …)
-├── ui/              # Mesop web app
-│   ├── __init__.py
-│   ├── app.py       # Page definition, state class, event handlers
-│   └── components.py # UI components (agent_timeline_card, claims_panel, sources_panel, report_panel, …)
-└── settings.py      # Typed settings from environment variables (pydantic-settings)
+├── agents/          # Planner (pocketflow), Searcher/Reader (smolagents), FactChecker (langgraph), Synthesizer (pydantic_ai)
+├── a2a/             # AgentRegistry, A2AClient, agent cards, task helpers
+├── workflow/        # run_research_* coordinator
+├── tools/           # web_search, fetch_and_extract
+├── models/          # ResearchSession, Claim, AgentRole, ReportOutput, WebSource, …
+├── providers.py     # get_llm() — shared LLM vendor abstraction
+├── ui/              # Mesop web app (app.py, components, …)
+└── settings.py      # pydantic-settings (`LLM_*`, Tavily, timeouts, …)
 
-data/corpus/         # Markdown files ingested into ChromaDB
-data/chroma/        # Persistent ChromaDB storage (gitignored)
-tests/              # Pytest suite (no API key required for unit tests)
+data/corpus/         # Optional sample markdown (not used by the default web pipeline)
+tests/               # Pytest suite (no API key required for unit tests)
 ```
 
 ---
@@ -247,15 +210,17 @@ uv run python -m a2a_research.agents.pydantic_ai "hi"
 uv run python -m a2a_research.agents.smolagents  "hi"
 ```
 
-Register as an A2A handler (reuses the same `.env` LLM settings):
+Replace a default agent by registering an `AgentExecutor` factory (a zero-argument callable that returns a new executor instance from `a2a.server.agent_execution`):
 
 ```python
-from a2a_research.a2a.server import register_a2a_agent
-from a2a_research.agents.pydantic_ai import chat_invoke
+from a2a_research.a2a import register_executor_factory
+from a2a_research.agents.pocketflow.planner.main import PlannerExecutor
 from a2a_research.models import AgentRole
 
-register_a2a_agent(AgentRole.RESEARCHER, chat_invoke)
+register_executor_factory(AgentRole.PLANNER, PlannerExecutor)
 ```
+
+Use any class or zero-argument callable that produces an executor; the built-in defaults are registered from `a2a_research.a2a.registry._register_defaults`.
 
 See each folder's `README.md` for framework-specific details (streaming hooks, multi-turn patterns, DI, and security notes).
 
@@ -264,10 +229,7 @@ See each folder's `README.md` for framework-specific details (streaming hooks, m
 ## Demo Flow
 
 ```bash
-# Ingest corpus (already done on first install)
-make ingest
-
-# Start UI
+# Start UI (ensure .env has LLM_API_KEY; optional TAVILY_API_KEY)
 make mesop
 # Open http://localhost:32123
 ```
@@ -276,18 +238,14 @@ make mesop
 
 ```python
 from a2a_research.workflow import run_research_sync
-from a2a_research.models import AgentRole
 
-session = run_research_sync("What is RAG and how does it reduce hallucinations?")
+session = run_research_sync("What is retrieval-augmented generation?")
 
-# Rendered markdown report from Presenter
 print(session.final_report)
 
-# Structured verified claims from Verifier
-for claim in session.get_agent(AgentRole.VERIFIER).claims:
+for claim in session.claims:
     print(f"{claim.verdict.value} ({claim.confidence:.0%}): {claim.text}")
 
-# Progress and failures live on the session too
 print(session.error)
 ```
 
@@ -312,7 +270,6 @@ $ make
   all             Run tests + all quality checks (CI-ready)
   clean           Remove build artifacts and cache directories
   mesop           Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
-  ingest          Ingest the RAG corpus into ChromaDB
   htmlcov         Generate HTML coverage report
 ```
 
