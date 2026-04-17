@@ -89,6 +89,7 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     _set_status(session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…")
     plan_task = await client.send(AgentRole.PLANNER, payload={"query": query})
     plan = _payload(plan_task)
+    plan_failed = _task_failed(plan_task)
     claims: list[Claim] = [
         c for c in (_coerce_claim(item) for item in (plan.get("claims") or [])) if c is not None
     ]
@@ -97,9 +98,20 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     _set_status(
         session,
         AgentRole.PLANNER,
-        AgentStatus.COMPLETED,
-        f"Extracted {len(claims)} claim(s).",
+        AgentStatus.FAILED if plan_failed else AgentStatus.COMPLETED,
+        ("Failed to decompose query." if plan_failed else f"Extracted {len(claims)} claim(s)."),
     )
+    if plan_failed:
+        session.error = "Planner failed to decompose query."
+        _set_status(session, AgentRole.SEARCHER, AgentStatus.FAILED, "Skipped: planner failed.")
+        _set_status(session, AgentRole.READER, AgentStatus.FAILED, "Skipped: planner failed.")
+        _set_status(
+            session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: planner failed."
+        )
+        _set_status(session, AgentRole.SYNTHESIZER, AgentStatus.FAILED, "Skipped: planner failed.")
+        session.report = None
+        session.final_report = _planner_failed_report(query)
+        return
 
     _set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
     _set_status(session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…")
@@ -192,21 +204,37 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         },
     )
     syn_data = _payload(syn_task)
+    syn_failed = _task_failed(syn_task)
     report = _coerce_report(syn_data.get("report"))
     session.report = report
     session.final_report = report.to_markdown() if report else ""
     _set_status(
         session,
         AgentRole.SYNTHESIZER,
-        AgentStatus.COMPLETED,
-        "Report synthesized.",
+        AgentStatus.FAILED if syn_failed else AgentStatus.COMPLETED,
+        "Failed to synthesize report." if syn_failed else "Report synthesized.",
     )
+    if syn_failed:
+        session.error = session.error or "Synthesizer failed to produce a report."
 
 
 def _task_failed(task: Any) -> bool:
     status = getattr(task, "status", None)
     state = getattr(status, "state", None)
     return state == TaskState.failed
+
+
+def _planner_failed_report(query: str) -> str:
+    return "\n".join(
+        [
+            "# Planner failed",
+            "",
+            f"**Query:** {query}",
+            "",
+            "The planner could not decompose this query into claims, so the pipeline stopped.",
+            "",
+        ]
+    )
 
 
 def _error_report(query: str, reason: str, errors: list[str]) -> str:
