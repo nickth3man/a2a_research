@@ -85,6 +85,8 @@ def _coerce_confidence(value: object, default: float = 0.5) -> float:
     if isinstance(value, str):
         try:
             raw = float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+            if raw > 1.0:
+                raw /= 100.0
             return max(0.0, min(1.0, raw))
         except ValueError:
             return default

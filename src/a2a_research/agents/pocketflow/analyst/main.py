@@ -127,7 +127,8 @@ def parse_claims_from_analyst(raw: str) -> list[Claim]:
     else:
         for i, item in enumerate(data.get("atomic_claims", [])):
             if isinstance(item, dict):
-                text = item.get("text", "").strip()
+                raw_text = item.get("text")
+                text = raw_text.strip() if isinstance(raw_text, str) else ""
                 if not text:
                     continue
                 claims.append(
