@@ -6,12 +6,11 @@ PocketFlow ``Flow`` used to assemble report sections without an LLM when needed.
 
 from __future__ import annotations
 
-import json
-import re
 from typing import Any, cast
 
 from pocketflow import Flow, Node
 
+from a2a_research.json_utils import parse_json_safely as parse_json_safely
 from a2a_research.models import (
     AgentResult,
     AgentRole,
@@ -127,22 +126,6 @@ def build_markdown_report(session: ResearchSession) -> str:
     Flow(start=header).run(shared)
     return "".join(shared["parts"])
 
-
-def parse_json_safely(content: str) -> dict[str, Any]:
-    content = content.strip()
-    fence_pattern = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```")
-    match = fence_pattern.search(content)
-    if match:
-        content = match.group(1)
-    else:
-        json_start = content.find("{")
-        json_end = content.rfind("}") + 1
-        if json_start != -1 and json_end > json_start:
-            content = content[json_start:json_end]
-    try:
-        return json.loads(content)
-    except json.JSONDecodeError:
-        return {}
 
 
 def extract_claims_from_llm_output(raw: str) -> list[Claim]:

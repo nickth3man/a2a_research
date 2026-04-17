@@ -6,6 +6,7 @@ PocketFlow runtime for the research pipeline. This package owns per-agent handle
 Each named agent folder contains the canonical 4-file PocketFlow-style layout (`main.py` / `flow.py` / `nodes.py` / `utils.py`) so it can be reasoned about — and, for `flow.py`, invoked — standalone. The top-level `flow.py` composes the four agent nodes into the full pipeline.
 
 ## STRUCTURE
+
 ```text
 agents/pocketflow/
 ├── __init__.py            # Public re-exports; importing this package triggers agent registration
@@ -45,6 +46,7 @@ agents/pocketflow/
 ```
 
 ## WHERE TO LOOK
+
 | Task | Location | Notes |
 |---|---|---|
 | Stable public imports | `__init__.py` | `run_research_sync`, `run_workflow_async`, `get_graph`, `create_pocketflow_workflow`, all `<role>_invoke` handlers |
@@ -63,6 +65,7 @@ agents/pocketflow/
 | Use sync adapter object | `utils/adapter.py` | `invoke` wraps `asyncio.run`; do not call from inside a running loop |
 
 ## CONVENTIONS
+
 - Each agent folder carries the 4-file PocketFlow layout: `main.py` (handler), `flow.py` (standalone single-node `AsyncFlow`), `nodes.py` (ActorNode factory for that role), `utils.py` (role-owned `SENDER` + `build_payload`, plus role-specific parsers where needed). `__init__.py` and `prompt.py` sit alongside them.
 - Handlers are registered on module import via `register_agent(...)`. Importing `a2a_research.agents.pocketflow` imports each subpackage and therefore populates the registry.
 - Agents must import utility *modules* (e.g. `from ..utils import llm as llm_utils; llm_utils.call_llm(...)`), not individual functions. This keeps mocks singular: `patch("a2a_research.agents.pocketflow.utils.llm.call_llm")` applies to every agent.
@@ -73,6 +76,7 @@ agents/pocketflow/
 - Role-specific A2A payload shape lives in the agent's own `utils.py`; the generic `ActorNode` in `utils/nodes.py` stays role-agnostic and dispatches through `utils/actor_helpers.py`.
 
 ## ANTI-PATTERNS
+
 - Do not put agent code directly in `agents/__init__.py`. That file is a thin re-export layer that delegates to `agents.pocketflow`.
 - Do not reach across agent folders. If two agents need the same helper, move it to `utils/`.
 - Do not import functions directly into agent modules (`from ..utils.llm import call_llm`). Import the module so a single `patch` can cover every call site.
@@ -83,6 +87,7 @@ agents/pocketflow/
 - Do not add role-specific branches to `utils/actor_helpers.py`. It is a pure dispatcher — put the branch's logic in the agent's own `utils.py`.
 
 ## EDGE NOTES
+
 - `utils/coordinator.py` is a compatibility surface; the generic `flow.py` + `entrypoints.py` path is the main architecture.
 - `utils/helpers.py` hosts deterministic presenter fallbacks (`build_markdown_report`, `format_claims_section`); reporting logic is intentionally co-located with formatting helpers so the Presenter agent can degrade gracefully when the LLM is rate-limited or returns empty content.
 - The A2A server (`a2a_research.a2a.server`) looks up handlers by role via lazy imports of `agents.pocketflow.<role>` (which re-exports `<role>_invoke` from `main.py`); changing a handler's module path requires updating `_build_server_registry`.
