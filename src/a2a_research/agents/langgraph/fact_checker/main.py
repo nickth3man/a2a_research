@@ -35,8 +35,8 @@ if TYPE_CHECKING:
     from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult, FactCheckState
 
 logger = get_logger(__name__)
-
 __all__ = ["FactCheckerExecutor", "run_fact_check"]
+
 
 async def run_fact_check(
     query: str,
