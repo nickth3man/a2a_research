@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, cast
+from typing import Any
 
 
 def parse_json_safely(content: str) -> dict[str, Any]:
@@ -28,6 +28,7 @@ def parse_json_safely(content: str) -> dict[str, Any]:
         if json_start != -1 and json_end > json_start:
             content = content[json_start:json_end]
     try:
-        return cast("dict[str, Any]", json.loads(content))
+        parsed = json.loads(content)
     except json.JSONDecodeError:
         return {}
+    return parsed if isinstance(parsed, dict) else {}
