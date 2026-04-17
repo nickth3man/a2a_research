@@ -127,7 +127,6 @@ def build_markdown_report(session: ResearchSession) -> str:
     return "".join(shared["parts"])
 
 
-
 def extract_claims_from_llm_output(raw: str) -> list[Claim]:
     data = parse_json_safely(raw)
     if not data:
