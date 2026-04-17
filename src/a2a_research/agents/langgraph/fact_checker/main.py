@@ -1,8 +1,7 @@
 """A2A AgentExecutor for the FactChecker role.
 
 Consumes ``{query, claims, seed_queries}`` and emits ``{verified_claims, sources}``.
-The graph internally dispatches A2A messages to Searcher and Reader via a
-module-level :class:`A2AClient` (the registry is shared).
+Runs the LangGraph loop using a module-level :class:`A2AClient` (shared registry).
 """
 
 from __future__ import annotations
@@ -21,10 +20,10 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
-from a2a.utils import new_task
 from pydantic import ValidationError
 
 from a2a_research.a2a import A2AClient
+from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.graph import build_fact_check_graph
 from a2a_research.app_logging import get_logger
 from a2a_research.models import Claim, WebSource
@@ -33,12 +32,11 @@ from a2a_research.settings import settings
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
 
-    from a2a_research.agents.langgraph.fact_checker.state import FactCheckState
+    from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult, FactCheckState
 
 logger = get_logger(__name__)
 
 __all__ = ["FactCheckerExecutor", "run_fact_check"]
-
 
 async def run_fact_check(
     query: str,
@@ -47,7 +45,7 @@ async def run_fact_check(
     *,
     client: A2AClient | None = None,
     max_rounds: int | None = None,
-) -> dict[str, Any]:
+) -> FactCheckRunResult:
     """Execute the FactChecker graph end-to-end; return ``{verified_claims, sources}``."""
     active_client = client or A2AClient()
     graph = build_fact_check_graph(active_client)
@@ -81,13 +79,13 @@ async def run_fact_check(
         "sources": list(unique_sources.values()),
         "errors": errors,
         "search_exhausted": bool(final_state.get("search_exhausted")),
-        "rounds": final_state.get("round", 0),
+        "rounds": int(final_state.get("round") or 0),
     }
 
 
 class FactCheckerExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        task = context.current_task or new_task(context.message)  # type: ignore[arg-type]
+        task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
@@ -96,10 +94,10 @@ class FactCheckerExecutor(AgentExecutor):
         seed_queries = _coerce_str_list(payload.get("seed_queries") or [])
 
         try:
-            result = await run_fact_check(query, claims, seed_queries)
+            result: FactCheckRunResult = await run_fact_check(query, claims, seed_queries)
             error_text: str | None = None
-            exhausted = bool(result.get("search_exhausted"))
-            errors_list = list(result.get("errors") or [])
+            exhausted = bool(result["search_exhausted"])
+            errors_list = list(result["errors"])
             if exhausted and not result["sources"]:
                 status = TaskState.failed
                 error_text = "FactChecker could not gather web evidence — " + (
@@ -132,8 +130,8 @@ class FactCheckerExecutor(AgentExecutor):
                                 c.model_dump(mode="json") for c in result["verified_claims"]
                             ],
                             "sources": [s.model_dump(mode="json") for s in result["sources"]],
-                            "errors": list(result.get("errors") or []),
-                            "search_exhausted": bool(result.get("search_exhausted")),
+                            "errors": list(result["errors"]),
+                            "search_exhausted": bool(result["search_exhausted"]),
                             "rounds": result["rounds"],
                         }
                     )

@@ -9,7 +9,7 @@ Linear first pass, then conditional loop-back based on :func:`route`:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
 
@@ -26,7 +26,8 @@ __all__ = ["build_fact_check_graph"]
 
 def build_fact_check_graph(client: Any) -> Any:
     """Compile the FactChecker graph, closing over an :class:`A2AClient`."""
-    graph: StateGraph[FactCheckState, Any, Any, Any] = StateGraph(FactCheckState)
+    # ty's TypedDict vs LangGraph's StateLike protocol do not align; runtime is correct.
+    graph = StateGraph(cast("Any", FactCheckState))
     graph.add_node("ask_searcher", build_ask_searcher_node(client))
     graph.add_node("ask_reader", build_ask_reader_node(client))
     graph.add_node("verify", build_verify_node())

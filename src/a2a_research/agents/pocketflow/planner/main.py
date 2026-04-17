@@ -20,8 +20,8 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
-from a2a.utils import new_task
 
+from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pocketflow.planner.flow import plan
 from a2a_research.app_logging import get_logger
 
@@ -35,7 +35,7 @@ __all__ = ["PlannerExecutor"]
 
 class PlannerExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
-        task = context.current_task or new_task(context.message)  # type: ignore[arg-type]
+        task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
         query = _extract_query(context)

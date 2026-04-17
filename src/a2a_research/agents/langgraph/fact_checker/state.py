@@ -14,7 +14,15 @@ from typing import Annotated, TypedDict
 from a2a_research.models import Claim, WebSource  # noqa: TC001
 from a2a_research.tools import PageContent, WebHit  # noqa: TC001
 
-__all__ = ["FactCheckState"]
+__all__ = ["FactCheckRunResult", "FactCheckState"]
+
+
+class FactCheckRunResult(TypedDict):
+    verified_claims: list[Claim]
+    sources: list[WebSource]
+    errors: list[str]
+    search_exhausted: bool
+    rounds: int
 
 
 class FactCheckState(TypedDict, total=False):
