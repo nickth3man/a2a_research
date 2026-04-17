@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from a2a_research.agents.pocketflow.registry import register_agent
+from a2a_research.agents.pocketflow.utils.registry import register_agent
 from a2a_research.models import AgentRole
 
-from .agent import presenter_invoke
+from .main import presenter_invoke
 
 register_agent(
     AgentRole.PRESENTER,

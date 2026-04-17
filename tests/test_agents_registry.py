@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from a2a_research.agents.pocketflow.registry import (
+from a2a_research.agents.pocketflow.utils.registry import (
     AgentRegistry,
     AgentSpec,
     get_agent_handler,

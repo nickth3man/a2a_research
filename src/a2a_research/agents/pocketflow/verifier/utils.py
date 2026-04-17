@@ -1,13 +1,30 @@
-"""Verifier output parsers — JSON-first with a permissive line-oriented fallback."""
+"""Verifier role-specific helpers.
+
+- :data:`SENDER` / :func:`build_payload` — A2A dispatch metadata.
+- :func:`parse_verified_claims` plus its supporting parsers — JSON-first with a
+  permissive line-oriented fallback.
+"""
 
 from __future__ import annotations
 
 import json
 import re
+from typing import Any
 
 from a2a_research.agents.pocketflow.utils.helpers import normalize_claim_id
-from a2a_research.models import Claim, Verdict, VerifierOutput
+from a2a_research.models import AgentRole, Claim, ResearchSession, Verdict, VerifierOutput
 from a2a_research.providers import parse_structured_response
+
+SENDER: AgentRole = AgentRole.ANALYST
+
+
+def build_payload(session: ResearchSession) -> dict[str, Any]:
+    analyst = session.get_agent(AgentRole.ANALYST)
+    return {
+        "claims": [c.model_dump() for c in analyst.claims],
+        "query": session.query,
+        "retrieved_chunks": [chunk.model_dump(mode="json") for chunk in session.retrieved_chunks],
+    }
 
 
 def _parse_structured(raw: str) -> list[Claim] | None:
@@ -54,12 +71,23 @@ def _parse_raw_json(raw: str) -> list[Claim] | None:
 
 
 def _coerce_confidence(value: object, default: float = 0.5) -> float:
-    """Best-effort numeric coercion for LLM-emitted confidence values."""
+    """Best-effort numeric coercion for LLM-emitted confidence values.
+
+    Normalises values on the 0-100 scale (e.g. ``85`` → ``0.85``) and clamps
+    the result to [0.0, 1.0] to satisfy the :class:`~a2a_research.models.Claim`
+    field constraint.
+    """
     if isinstance(value, (int, float)):
-        return float(value)
+        raw = float(value)
+        if raw > 1.0:
+            raw /= 100.0
+        return max(0.0, min(1.0, raw))
     if isinstance(value, str):
         try:
-            return float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+            raw = float(value.strip().rstrip("%")) / (100.0 if "%" in value else 1.0)
+            if raw > 1.0:
+                raw /= 100.0
+            return max(0.0, min(1.0, raw))
         except ValueError:
             return default
     return default

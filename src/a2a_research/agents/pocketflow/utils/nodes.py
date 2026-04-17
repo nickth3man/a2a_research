@@ -8,7 +8,7 @@ from typing import Any
 
 from pocketflow import AsyncNode
 
-from a2a_research.agents.pocketflow.actor_helpers import (
+from a2a_research.agents.pocketflow.utils.actor_helpers import (
     build_payload,
     get_sender_for_role,
 )
@@ -104,6 +104,8 @@ class ActorNode(AsyncNode):
             # Attach reporter directly to the message instance so it does not cross
             # the A2A payload boundary (payload is serialized; this private attr is not).
             object.__setattr__(message, "_progress_reporter", progress_reporter)
+        # Store the message so post_async can reuse it without rebuilding the payload.
+        prep_res["message"] = message
         client = A2AClient(message.sender)
         try:
             result = await asyncio.to_thread(client.send, message, session)
@@ -161,7 +163,7 @@ class ActorNode(AsyncNode):
         session.agent_results[self.role] = exec_res
         session.error = exec_res.message if exec_res.status == AgentStatus.FAILED else None
 
-        message = A2AMessage(
+        message: A2AMessage = prep_res.get("message") or A2AMessage(
             sender=get_sender_for_role(self.role),
             recipient=self.role,
             payload=build_payload(self.role, session),

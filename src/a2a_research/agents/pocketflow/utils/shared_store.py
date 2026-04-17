@@ -4,13 +4,17 @@ PocketFlow's core abstraction pairs a directed graph with a Shared Store — a d
 that every node can read from (prep) and write to (post). Centralising the
 contract here means any change to the dict's shape is visible in one place.
 
-Schema keys
------------
+Schema keys (initialised by :func:`build_shared_store`)
+--------------------------------------------------------
 
-- ``session``           — :class:`~a2a_research.models.ResearchSession`
-- ``messages``          — list of :class:`~a2a_research.models.A2AMessage` recorded by nodes
-- ``current_agent``     — :class:`~a2a_research.models.AgentRole` or ``None``
-- ``progress_reporter`` — optional callable injected by the UI to forward events
+- ``session``       — :class:`~a2a_research.models.ResearchSession`
+- ``messages``      — list of :class:`~a2a_research.models.A2AMessage` recorded by nodes
+- ``current_agent`` — :class:`~a2a_research.models.AgentRole` or ``None``
+
+Optional keys injected by callers after construction
+-----------------------------------------------------
+
+- ``progress_reporter``   — optional callable forwarding :class:`~a2a_research.progress.ProgressEvent`
 - ``progress_granularity`` — int granularity level for progress events (1..3)
 """
 

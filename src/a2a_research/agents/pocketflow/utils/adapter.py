@@ -9,7 +9,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from .flow import get_workflow
+from ..flow import get_workflow
 
 if TYPE_CHECKING:
     from a2a_research.models import ResearchSession, WorkflowState

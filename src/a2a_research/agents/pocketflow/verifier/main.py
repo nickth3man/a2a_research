@@ -25,8 +25,8 @@ from a2a_research.models import (
 )
 from a2a_research.providers import ProviderRequestError
 
-from .parsers import parse_verified_claims
 from .prompt import VERIFIER_PROMPT
+from .utils import parse_verified_claims
 
 if TYPE_CHECKING:
     from collections.abc import Callable

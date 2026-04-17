@@ -1,6 +1,6 @@
 """Builder — constructs the PocketFlow ``AsyncFlow`` and shared store for the pipeline.
 
-``build_workflow`` wires :class:`~a2a_research.agents.pocketflow.nodes.ActorNode` instances
+``build_workflow`` wires :class:`~a2a_research.agents.pocketflow.utils.nodes.ActorNode` instances
 in role order (or a custom ``roles`` list). ``get_workflow`` returns the cached default graph.
 """
 
@@ -12,7 +12,7 @@ from pocketflow import AsyncFlow
 
 from a2a_research.models import AgentRole, default_roles
 
-from .nodes import ActorNode, create_actor_node
+from .utils.nodes import ActorNode, create_actor_node
 from .utils.shared_store import build_shared_store
 
 

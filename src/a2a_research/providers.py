@@ -79,7 +79,7 @@ def parse_structured_response(
     content: str, schema: type[StructuredOutputT]
 ) -> StructuredOutputT | None:
     """Parse provider output into a Pydantic schema when valid JSON is available."""
-    from a2a_research.agents.pocketflow.utils.helpers import parse_json_safely
+    from a2a_research.json_utils import parse_json_safely
 
     data = parse_json_safely(content)
     if not data:

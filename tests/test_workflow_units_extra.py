@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from a2a_research.agents.pocketflow.adapter import SyncWorkflowAdapter
-from a2a_research.agents.pocketflow.nodes import ActorNode
+from a2a_research.agents.pocketflow.utils.adapter import SyncWorkflowAdapter
+from a2a_research.agents.pocketflow.utils.nodes import ActorNode
 from a2a_research.models import (
     AgentResult,
     AgentRole,
@@ -58,10 +58,10 @@ async def test_run_coordinator_runs_flow() -> None:
     flow = MagicMock()
     flow.run_async = AsyncMock()
     with patch(
-        "a2a_research.agents.pocketflow.coordinator.build_coordinator",
+        "a2a_research.agents.pocketflow.utils.coordinator.build_coordinator",
         return_value=flow,
     ):
-        from a2a_research.agents.pocketflow.coordinator import run_coordinator
+        from a2a_research.agents.pocketflow.utils.coordinator import run_coordinator
 
         session = ResearchSession(query="coord")
         out = await run_coordinator(session)
@@ -70,14 +70,14 @@ async def test_run_coordinator_runs_flow() -> None:
 
 
 def test_build_coordinator_returns_flow() -> None:
-    from a2a_research.agents.pocketflow.coordinator import build_coordinator
+    from a2a_research.agents.pocketflow.utils.coordinator import build_coordinator
 
     flow = build_coordinator()
     assert flow is not None
 
 
 def test_pipeline_order_policy_validate_transition() -> None:
-    from a2a_research.agents.pocketflow.policy import PipelineOrderPolicy
+    from a2a_research.agents.pocketflow.utils.policy import PipelineOrderPolicy
 
     policy = PipelineOrderPolicy(name="pipeline_order")
     assert policy.validate_transition(None, AgentRole.RESEARCHER.value) is True
@@ -139,17 +139,17 @@ async def test_actor_post_async_presenter_sets_final_report() -> None:
 
 def test_adapter_get_graph_factory() -> None:
     with patch(
-        "a2a_research.agents.pocketflow.adapter.get_workflow",
+        "a2a_research.agents.pocketflow.utils.adapter.get_workflow",
         return_value=(MagicMock(), {}),
     ):
-        from a2a_research.agents.pocketflow.adapter import get_graph as adapter_get_graph
+        from a2a_research.agents.pocketflow.utils.adapter import get_graph as adapter_get_graph
 
         adapter = adapter_get_graph()
     assert isinstance(adapter, SyncWorkflowAdapter)
 
 
 def test_actor_build_payload_unknown_role_returns_empty() -> None:
-    from a2a_research.agents.pocketflow.actor_helpers import build_payload
+    from a2a_research.agents.pocketflow.utils.actor_helpers import build_payload
 
     _ = ActorNode(role=cast("AgentRole", "nonstandard_role"))
     payload = build_payload(cast("Any", "nonstandard_role"), ResearchSession(query="q"))

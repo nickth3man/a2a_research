@@ -127,10 +127,14 @@ def parse_claims_from_analyst(raw: str) -> list[Claim]:
     else:
         for i, item in enumerate(data.get("atomic_claims", [])):
             if isinstance(item, dict):
+                raw_text = item.get("text")
+                text = raw_text.strip() if isinstance(raw_text, str) else ""
+                if not text:
+                    continue
                 claims.append(
                     Claim(
                         id=normalize_claim_id(item.get("id"), f"clm_{i}"),
-                        text=item.get("text", ""),
+                        text=text,
                         verdict=Verdict.INSUFFICIENT_EVIDENCE,
                     )
                 )
