@@ -1,19 +1,35 @@
-"""Formatting utilities for UI components.
+"""Formatting utilities for UI components."""
 
-Reusable string transformation functions to decouple formatting logic from presentation.
-"""
+from __future__ import annotations
+
+from urllib.parse import urlparse
+
+from a2a_research.models import Verdict
 
 
 def format_source_display(src: str) -> str:
-    """Format a source identifier for display.
-
-    Normalizes source names by replacing underscores and hyphens with spaces,
-    then converting to title case for human-readable display.
-
-    Args:
-        src: The raw source identifier (e.g., "arxiv_paper-2024").
-
-    Returns:
-        The formatted display name (e.g., "Arxiv Paper 2024").
-    """
+    """Format a URL or source identifier for compact display."""
+    if src.startswith(("http://", "https://")):
+        parsed = urlparse(src)
+        host = parsed.netloc or src
+        path = (parsed.path or "").rstrip("/")
+        if not path or path == "/":
+            return host
+        tail = path.rsplit("/", 1)[-1][:60]
+        return f"{host}/{tail}" if tail else host
     return src.replace("_", " ").replace("-", " ").title()
+
+
+def format_claim_verdict(verdict: Verdict) -> str:
+    """Render a verdict as a short label with a status glyph."""
+    if verdict == Verdict.SUPPORTED:
+        return "[SUPPORTED]"
+    if verdict == Verdict.REFUTED:
+        return "[REFUTED]"
+    if verdict == Verdict.NEEDS_MORE_EVIDENCE:
+        return "[NEEDS MORE]"
+    return "[INSUFFICIENT]"
+
+
+def format_confidence(confidence: float) -> str:
+    return f"{confidence:.0%}"

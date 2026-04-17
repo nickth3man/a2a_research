@@ -11,14 +11,10 @@ from a2a_research.providers import (
     AnthropicProvider,
     ChatResponse,
     GoogleProvider,
-    OllamaEmbeddings,
     OllamaProvider,
-    OpenAIEmbeddings,
     OpenAIProvider,
     ProviderRateLimitError,
     ProviderRequestError,
-    get_embedder,
-    get_embedding_provider,
     get_llm,
     get_llm_provider,
     parse_structured_response,
@@ -56,30 +52,6 @@ class TestProviderSelection:
             get_llm_provider()
 
 
-class TestEmbeddingProviderSelection:
-    @pytest.mark.parametrize(
-        "provider_name,expected_class",
-        [
-            ("openai", OpenAIEmbeddings),
-            ("openrouter", OpenAIEmbeddings),
-            ("ollama", OllamaEmbeddings),
-        ],
-    )
-    def test_get_embedding_provider_returns_correct_class(
-        self, provider_name: str, expected_class: type
-    ):
-        with patch("a2a_research.providers.settings.embedding.provider", provider_name):
-            provider = get_embedding_provider()
-            assert isinstance(provider, expected_class)
-
-    def test_get_embedding_provider_raises_on_unknown_provider(self):
-        with (
-            patch("a2a_research.providers.settings.embedding.provider", "unknown"),
-            pytest.raises(ValueError, match="Unknown embedding provider"),
-        ):
-            get_embedding_provider()
-
-
 class TestSingletonBehavior:
     def test_get_llm_returns_cached_provider(self):
         reset_provider_singletons()
@@ -109,17 +81,6 @@ class TestSingletonBehavior:
 
             assert mock_get_provider.call_count == 2
             assert first is second is mock_model
-
-    def test_get_embedder_caches_provider_between_calls(self):
-        """Repeated calls must return the same embedder instance; dropping this cache
-        would re-instantiate the SDK client (and its HTTP session) on every retrieval."""
-        reset_provider_singletons()
-        with patch("a2a_research.providers.get_embedding_provider") as mock_get:
-            mock_get.return_value = MagicMock()
-            first = get_embedder()
-            second = get_embedder()
-        assert first is second
-        mock_get.assert_called_once()
 
 
 class TestErrorTranslation:
@@ -327,52 +288,6 @@ class TestAnthropicChatMessageShaping:
             result = provider.get_model().invoke([{"role": "user", "content": "ping"}])
 
         assert result.content == ""
-
-
-class TestOpenAIEmbeddingsSuccessPath:
-    def test_embed_documents_returns_vectors_in_order(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com"
-            mock_client.embeddings.create.return_value = MagicMock(
-                data=[MagicMock(embedding=[0.1, 0.2]), MagicMock(embedding=[0.3, 0.4])]
-            )
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            embedder = OpenAIEmbeddings(model="emb", api_key="k", base_url="https://e.com")
-            out = embedder.embed_documents(["doc one", "doc two"])
-
-        assert out == [[0.1, 0.2], [0.3, 0.4]]
-        call_kwargs = mock_client.embeddings.create.call_args.kwargs
-        assert call_kwargs["input"] == ["doc one", "doc two"]
-        assert call_kwargs["model"] == "emb"
-
-    def test_embed_query_returns_single_vector(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com"
-            mock_client.embeddings.create.return_value = MagicMock(
-                data=[MagicMock(embedding=[0.5, 0.6, 0.7])]
-            )
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            embedder = OpenAIEmbeddings(model="emb", api_key="k")
-            out = embedder.embed_query("q")
-
-        assert out == [0.5, 0.6, 0.7]
-        call_kwargs = mock_client.embeddings.create.call_args.kwargs
-        assert call_kwargs["input"] == ["q"]
-
-    def test_embed_query_wraps_provider_error(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com"
-            mock_client.embeddings.create.side_effect = Exception("boom")
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            embedder = OpenAIEmbeddings(model="emb", api_key="k")
-            with pytest.raises(ProviderRequestError, match="boom"):
-                embedder.embed_query("q")
 
 
 class TestLoadAttrErrorMessages:

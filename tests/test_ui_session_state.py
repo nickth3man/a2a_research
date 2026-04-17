@@ -18,8 +18,8 @@ class TestHasResults:
         s = ResearchSession(
             query="q",
             agent_results={
-                AgentRole.RESEARCHER: AgentResult(
-                    role=AgentRole.RESEARCHER,
+                AgentRole.PLANNER: AgentResult(
+                    role=AgentRole.PLANNER,
                     status=AgentStatus.RUNNING,
                 ),
             },
@@ -31,12 +31,12 @@ class TestHasResults:
         s = ResearchSession(
             query="q",
             agent_results={
-                AgentRole.RESEARCHER: AgentResult(
-                    role=AgentRole.RESEARCHER,
+                AgentRole.PLANNER: AgentResult(
+                    role=AgentRole.PLANNER,
                     status=AgentStatus.COMPLETED,
                 ),
-                AgentRole.ANALYST: AgentResult(
-                    role=AgentRole.ANALYST,
+                AgentRole.SEARCHER: AgentResult(
+                    role=AgentRole.SEARCHER,
                     status=AgentStatus.COMPLETED,
                 ),
             },
@@ -47,8 +47,8 @@ class TestHasResults:
         s = ResearchSession(
             query="q",
             agent_results={
-                AgentRole.RESEARCHER: AgentResult(
-                    role=AgentRole.RESEARCHER,
+                AgentRole.PLANNER: AgentResult(
+                    role=AgentRole.PLANNER,
                     status=AgentStatus.FAILED,
                 ),
             },
@@ -59,12 +59,12 @@ class TestHasResults:
         s = ResearchSession(
             query="q",
             agent_results={
-                AgentRole.RESEARCHER: AgentResult(
-                    role=AgentRole.RESEARCHER,
+                AgentRole.PLANNER: AgentResult(
+                    role=AgentRole.PLANNER,
                     status=AgentStatus.COMPLETED,
                 ),
-                AgentRole.ANALYST: AgentResult(
-                    role=AgentRole.ANALYST,
+                AgentRole.SEARCHER: AgentResult(
+                    role=AgentRole.SEARCHER,
                     status=AgentStatus.RUNNING,
                 ),
             },
@@ -86,8 +86,8 @@ class TestResearchSessionJsonRoundTrip:
         original = ResearchSession(
             query="What is RAG?",
             agent_results={
-                AgentRole.VERIFIER: AgentResult(
-                    role=AgentRole.VERIFIER,
+                AgentRole.FACT_CHECKER: AgentResult(
+                    role=AgentRole.FACT_CHECKER,
                     status=AgentStatus.COMPLETED,
                     message="ok",
                 ),
@@ -98,7 +98,7 @@ class TestResearchSessionJsonRoundTrip:
         restored = ResearchSession.model_validate(dumped)
         assert restored.query == original.query
         assert restored.final_report == original.final_report
-        assert restored.agent_results[AgentRole.VERIFIER].status == AgentStatus.COMPLETED
+        assert restored.agent_results[AgentRole.FACT_CHECKER].status == AgentStatus.COMPLETED
 
     def test_model_validate_rejects_bad_shape(self) -> None:
         with pytest.raises(ValidationError):

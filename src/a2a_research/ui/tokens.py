@@ -133,9 +133,9 @@ GRANULARITY_SELECTED_SHADOW = "0 1px 3px rgba(0,0,0,0.15)"
 
 # --- Example queries (single source of truth) ---
 EXAMPLE_QUERIES: list[str] = [
-    "What is the A2A protocol?",
-    "How do LLM agents collaborate?",
-    "What are RAG evaluation metrics?",
+    "When did the James Webb Space Telescope launch and what is its primary mirror diameter?",
+    "What are the main differences between the A2A protocol and MCP?",
+    "What year was the transformer architecture paper published, and who are the authors?",
 ]
 
 # --- Agent timeline rows ---

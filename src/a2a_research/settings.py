@@ -3,12 +3,10 @@
 Prefixes (Pydantic ``BaseSettings``):
 
 - ``LLM_*`` — chat model provider, model id, base URL, API key.
-- ``EMBEDDING_*`` — embedding provider, model, URLs, key.
-- ``CHROMA_*`` — vector DB path and collection name.
-- ``CHUNK_*`` — RAG chunk size and overlap (see :class:`RAGSettings`).
 
 Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``, ``MESOP_PORT``,
-``WORKFLOW_TIMEOUT``.
+``WORKFLOW_TIMEOUT``, ``TAVILY_API_KEY``, ``SEARCH_MAX_RESULTS``,
+``RESEARCH_MAX_ROUNDS``.
 
 Mesop reads additional ``MESOP_*`` variables (for example
 ``MESOP_STATE_SESSION_BACKEND``) via its own library config.
@@ -26,14 +24,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _ENV_FILE = _PROJECT_ROOT / ".env"
 
-__all__ = [
-    "AppSettings",
-    "ChromaSettings",
-    "EmbeddingSettings",
-    "LLMSettings",
-    "RAGSettings",
-    "settings",
-]
+__all__ = ["AppSettings", "LLMSettings", "settings"]
 
 
 class LLMSettings(BaseSettings):
@@ -64,68 +55,6 @@ class LLMSettings(BaseSettings):
     )
 
 
-class EmbeddingSettings(BaseSettings):
-    """Embedding model configuration."""
-
-    model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
-        env_file_encoding="utf-8",
-        env_prefix="EMBEDDING_",
-        extra="ignore",
-    )
-
-    model: str = Field(
-        default="perplexity/pplx-embed-v1-4b",
-        description="Embedding model name.",
-    )
-    provider: str = Field(
-        default="openrouter",
-        description="Embedding provider: openrouter | openai | ollama",
-    )
-    base_url: str = Field(
-        default="",
-        description="Separate base URL for embeddings (blank = same as LLM).",
-    )
-    api_key: str = Field(
-        default="",
-        description="Embedding API key (blank = same as LLM_API_KEY).",
-    )
-
-
-class ChromaSettings(BaseSettings):
-    """ChromaDB vector-store configuration."""
-
-    model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
-        env_file_encoding="utf-8",
-        env_prefix="CHROMA_",
-        extra="ignore",
-    )
-
-    persist_dir: Path = Field(
-        default=_PROJECT_ROOT / "data" / "chroma",
-        description="Directory for persistent ChromaDB storage.",
-    )
-    collection: str = Field(
-        default="a2a_research",
-        description="Default ChromaDB collection name.",
-    )
-
-
-class RAGSettings(BaseSettings):
-    """RAG chunking parameters."""
-
-    model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
-        env_file_encoding="utf-8",
-        env_prefix="CHUNK_",
-        extra="ignore",
-    )
-
-    size: int = Field(default=512, description="Chunk size in tokens.")
-    overlap: int = Field(default=64, description="Overlap between chunks.")
-
-
 def _expected_prefixed_keys(settings_cls: type[BaseSettings]) -> set[str]:
     prefix = str(settings_cls.model_config.get("env_prefix") or "").upper()
     return {f"{prefix}{name}".upper() for name in settings_cls.model_fields}
@@ -135,10 +64,10 @@ _EXPECTED_DOTENV_KEYS = {
     "LOG_LEVEL",
     "MESOP_PORT",
     "WORKFLOW_TIMEOUT",
+    "TAVILY_API_KEY",
+    "SEARCH_MAX_RESULTS",
+    "RESEARCH_MAX_ROUNDS",
     *_expected_prefixed_keys(LLMSettings),
-    *_expected_prefixed_keys(EmbeddingSettings),
-    *_expected_prefixed_keys(ChromaSettings),
-    *_expected_prefixed_keys(RAGSettings),
 }
 
 _PASSTHROUGH_PREFIXES = ("MESOP_",)
@@ -168,7 +97,8 @@ def _validate_dotenv_keys() -> None:
         logging.getLogger(__name__).warning(
             "Unknown keys in .env: %s. "
             "Allowed project keys are LOG_LEVEL, MESOP_PORT, WORKFLOW_TIMEOUT, "
-            "and keys under the LLM_, EMBEDDING_, CHROMA_, and CHUNK_ prefixes. "
+            "TAVILY_API_KEY, SEARCH_MAX_RESULTS, RESEARCH_MAX_ROUNDS, "
+            "and keys under the LLM_ prefix. "
             "MESOP_* keys are allowed as passthrough.",
             rendered,
         )
@@ -192,14 +122,27 @@ class AppSettings(BaseSettings):
         description="Default port for the Mesop UI in app tooling (env: MESOP_PORT).",
     )
     workflow_timeout: float = Field(
-        default=120.0,
+        default=180.0,
         description="Maximum workflow runtime in seconds before returning a partial timed-out session.",
+    )
+    tavily_api_key: str = Field(
+        default="",
+        description="Tavily API key for web search; blank = DuckDuckGo-only mode (env: TAVILY_API_KEY).",
+    )
+    search_max_results: int = Field(
+        default=5,
+        ge=1,
+        le=25,
+        description="Per-provider result cap for the parallel Tavily + DDG search (env: SEARCH_MAX_RESULTS).",
+    )
+    research_max_rounds: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Maximum number of FactChecker loop rounds (env: RESEARCH_MAX_ROUNDS).",
     )
 
     llm: LLMSettings = Field(default_factory=LLMSettings)
-    embedding: EmbeddingSettings = Field(default_factory=EmbeddingSettings)
-    chroma: ChromaSettings = Field(default_factory=ChromaSettings)
-    rag: RAGSettings = Field(default_factory=RAGSettings)
 
     @model_validator(mode="after")
     def validate_dotenv_contract(self) -> AppSettings:

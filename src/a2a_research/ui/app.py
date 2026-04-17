@@ -42,13 +42,7 @@ from a2a_research.app_logging import (
     log_event,
     setup_logging,
 )
-from a2a_research.models import AgentStatus, ResearchSession
-from a2a_research.progress import (
-    ProgressEvent,
-    ProgressPhase,
-    ProgressQueue,
-    drain_progress_while_running,
-)
+from a2a_research.models import ResearchSession
 from a2a_research.ui.components import (
     BannerError,
     CardLoading,
@@ -61,7 +55,6 @@ from a2a_research.ui.components import (
     PanelReport,
     PanelSources,
 )
-from a2a_research.ui.data_access import get_agent_label
 from a2a_research.ui.session_state import get_session_error, has_progress, has_results
 from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
 
@@ -234,63 +227,11 @@ def _render_error_banner(error: str) -> None:
     BannerError(error, on_retry=_on_retry)
 
 
-def _progress_fraction(evt: ProgressEvent) -> float:
-    total = max(evt.total_steps, 1)
-    if evt.phase in (ProgressPhase.STEP_COMPLETED, ProgressPhase.STEP_FAILED):
-        return min(1.0, (evt.step_index + 1) / total)
-    if evt.phase == ProgressPhase.STEP_STARTED:
-        return min(1.0, evt.step_index / total)
-    denom = max(evt.substep_total, 1)
-    return min(1.0, (evt.step_index + evt.substep_index / denom) / total)
-
-
-def _format_substep_line(evt: ProgressEvent, granularity: int) -> str:
-    if evt.detail and granularity >= 3:
-        return f"{evt.substep_label} ({evt.detail})"
-    return evt.substep_label
-
-
-def _handle_progress_event(state: AppState, evt: ProgressEvent) -> None:
-    log_event(
-        logger,
-        logging.INFO,
-        "ui.progress.event",
-        role=evt.role,
-        phase=evt.phase,
-        step_index=evt.step_index,
-        total_steps=evt.total_steps,
-        substep_index=evt.substep_index,
-        substep_total=evt.substep_total,
-        substep_label=evt.substep_label,
-        detail=evt.detail,
-    )
-    state.progress_pct = _progress_fraction(evt)
-    granularity = state.progress_granularity
-    label = _format_substep_line(evt, granularity)
-    state.current_substep = label
-
-    agent_label = get_agent_label(evt.role)
-    state.progress_step_label = f"Step {evt.step_index + 1} of {evt.total_steps} — {agent_label}"
-
-    if evt.phase == ProgressPhase.STEP_STARTED:
-        state.progress_running_substeps = []
-    elif evt.phase == ProgressPhase.STEP_SUBSTEP and granularity >= 2:
-        state.progress_running_substeps = [*state.progress_running_substeps, label]
-
-    state.session.ensure_agent_results()
-    result = state.session.agent_results[evt.role]
-    if evt.phase == ProgressPhase.STEP_STARTED or evt.phase == ProgressPhase.STEP_SUBSTEP:
-        state.session.agent_results[evt.role] = result.model_copy(
-            update={"status": AgentStatus.RUNNING, "message": label}
-        )
-    elif evt.phase == ProgressPhase.STEP_COMPLETED:
-        state.session.agent_results[evt.role] = result.model_copy(
-            update={"status": AgentStatus.COMPLETED, "message": label}
-        )
-    elif evt.phase == ProgressPhase.STEP_FAILED:
-        state.session.agent_results[evt.role] = result.model_copy(
-            update={"status": AgentStatus.FAILED, "message": label}
-        )
+def _initialize_progress_state(state: AppState) -> None:
+    """Reset progress-related UI state for a fresh run."""
+    state.progress_running_substeps = []
+    state.current_substep = ""
+    state.progress_step_label = "Running the 5-agent research pipeline\u2026"
 
 
 def _render_results(session: ResearchSession) -> None:
@@ -412,20 +353,16 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     )
     yield
 
-    from a2a_research.agents.pocketflow import run_workflow_async
+    from a2a_research.workflow import run_research_async
 
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:
-        queue: ProgressQueue = asyncio.Queue()
-        wf_task = asyncio.create_task(
-            run_workflow_async(
-                query_text,
-                progress_queue=queue,
-                granularity=state.progress_granularity,
-            )
-        )
-        async for evt in drain_progress_while_running(queue, wf_task):
-            _handle_progress_event(state, evt)
+        wf_task = asyncio.create_task(run_research_async(query_text))
+        # Coarse-grained progress: yield periodically so the UI stays responsive
+        # while the pipeline runs; granular per-agent events are a future task.
+        while not wf_task.done():
+            await asyncio.sleep(0.5)
+            state.progress_pct = min(0.95, state.progress_pct + 0.02)
             yield
 
         state.session = wf_task.result()

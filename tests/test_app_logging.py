@@ -29,7 +29,7 @@ class TestNormalizeLogValue:
 
     def test_dict_recursively_normalizes(self) -> None:
         normalize = logging_module._normalize_log_value
-        assert normalize({"role": AgentRole.RESEARCHER}) == {"role": "researcher"}
+        assert normalize({"role": AgentRole.PLANNER}) == {"role": "planner"}
 
     def test_list_recursively_normalizes(self) -> None:
         normalize = logging_module._normalize_log_value
@@ -40,16 +40,16 @@ class TestNormalizeLogValue:
 
     def test_pydantic_model_dumped(self) -> None:
         normalize = logging_module._normalize_log_value
-        result = normalize(AgentRole.ANALYST)
-        assert result == "analyst"
+        result = normalize(AgentRole.SEARCHER)
+        assert result == "searcher"
 
     def test_object_with_attributes_is_normalized_via___dict__(self) -> None:
         class Foo:
             def __init__(self) -> None:
-                self.role = AgentRole.RESEARCHER
+                self.role = AgentRole.PLANNER
 
         normalize = logging_module._normalize_log_value
-        assert normalize(Foo()) == {"role": "researcher"}
+        assert normalize(Foo()) == {"role": "planner"}
 
 
 class TestLogEvent:
@@ -62,7 +62,7 @@ class TestLogEvent:
                 logger,
                 logging.INFO,
                 "test.event",
-                role=AgentRole.RESEARCHER,
+                role=AgentRole.PLANNER,
                 status=AgentStatus.COMPLETED,
                 path=Path("/tmp"),
                 nested={"items": [1, 2]},
@@ -70,7 +70,7 @@ class TestLogEvent:
 
         record = next(r for r in caplog.records if r.name == "test.logger")
         assert "test.event" in record.message
-        assert '"role": "researcher"' in record.message
+        assert '"role": "planner"' in record.message
 
 
 class TestSetupLogging:

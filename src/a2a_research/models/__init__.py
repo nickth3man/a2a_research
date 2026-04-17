@@ -1,21 +1,21 @@
 """Pydantic domain models shared across agents, workflow, and UI.
 
 Single source of truth for:
-- agents/     (agent I/O and session mutation)
-- rag/        (chunk and retrieval types)
-- workflow/   (PocketFlow shared store)
-- a2a/        (in-process message contracts)
-- ui/         (Mesop ``@stateclass`` fields — keep nested models concrete for Mesop serialization)
 
+- agents/     (per-agent I/O and session mutation)
+- workflow/   (top-level orchestrator state)
+- a2a/        (in-process A2A registry + client)
+- ui/         (Mesop ``@stateclass`` fields — keep nested models concrete for Mesop serialization)
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from a2a_research.models.artifact import (
     Artifact as Artifact,
@@ -35,7 +35,6 @@ from a2a_research.models.artifact import (
 from a2a_research.models.artifact import (
     wrap_in_artifact as wrap_in_artifact,
 )
-from a2a_research.models.envelope import A2AEnvelope as A2AEnvelope
 from a2a_research.models.policy import (
     PolicyEffect as PolicyEffect,
 )
@@ -44,33 +43,25 @@ from a2a_research.models.policy import (
 )
 
 __all__ = [
-    "A2AEnvelope",
-    "A2AMessage",
-    "AgentCard",
     "AgentResult",
     "AgentRole",
     "AgentStatus",
-    "AnalystOutput",
     "Artifact",
     "ArtifactKind",
+    "Citation",
     "Claim",
     "DataArtifact",
-    "DocumentChunk",
     "PolicyEffect",
-    "PresenterOutput",
+    "ReportOutput",
+    "ReportSection",
     "ResearchSession",
-    "ResearchSource",
-    "ResearcherOutput",
-    "RetrievedChunk",
     "StreamArtifact",
     "TaskStatus",
     "TextArtifact",
     "Verdict",
-    "VerifierOutput",
+    "WebSource",
     "WorkflowPolicy",
-    "WorkflowState",
     "default_roles",
-    "get_agent_card",
     "wrap_in_artifact",
 ]
 
@@ -81,13 +72,15 @@ class Verdict(StrEnum):
     SUPPORTED = "SUPPORTED"
     REFUTED = "REFUTED"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    NEEDS_MORE_EVIDENCE = "NEEDS_MORE_EVIDENCE"
 
 
 class AgentRole(StrEnum):
-    RESEARCHER = "researcher"
-    ANALYST = "analyst"
-    VERIFIER = "verifier"
-    PRESENTER = "presenter"
+    PLANNER = "planner"
+    SEARCHER = "searcher"
+    READER = "reader"
+    FACT_CHECKER = "fact_checker"
+    SYNTHESIZER = "synthesizer"
 
 
 class AgentStatus(StrEnum):
@@ -111,7 +104,7 @@ class Claim(BaseModel):
     id: str = Field(default_factory=lambda: f"clm_{uuid.uuid4().hex[:8]}")
     text: str
     confidence: float = Field(ge=0.0, le=1.0, default=0.5)
-    verdict: Verdict = Verdict.INSUFFICIENT_EVIDENCE
+    verdict: Verdict = Verdict.NEEDS_MORE_EVIDENCE
     sources: list[str] = Field(default_factory=list)
     evidence_snippets: list[str] = Field(default_factory=list)
 
@@ -126,9 +119,56 @@ class Claim(BaseModel):
             normalized = str(value).strip()
             if normalized:
                 return normalized
-
         msg = "Claim id must be a non-empty string."
         raise ValueError(msg)
+
+
+class WebSource(BaseModel):
+    """A web resource discovered during research (URL-level citation)."""
+
+    url: str
+    title: str = ""
+    excerpt: str = ""
+    accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class Citation(BaseModel):
+    """Inline citation attached to a report section."""
+
+    url: str
+    title: str = ""
+    quote: str = ""
+
+
+class ReportSection(BaseModel):
+    heading: str
+    body: str
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class ReportOutput(BaseModel):
+    """Structured final report produced by the Synthesizer."""
+
+    title: str
+    summary: str
+    sections: list[ReportSection] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+
+    def to_markdown(self) -> str:
+        """Render the report as markdown (used by UI report panel)."""
+        parts: list[str] = [f"# {self.title}", "", self.summary.strip(), ""]
+        for section in self.sections:
+            parts.append(f"## {section.heading}")
+            parts.append("")
+            parts.append(section.body.strip())
+            parts.append("")
+        if self.citations:
+            parts.append("## Sources")
+            parts.append("")
+            for i, c in enumerate(self.citations, 1):
+                label = c.title or c.url
+                parts.append(f"{i}. [{label}]({c.url})")
+        return "\n".join(parts).strip() + "\n"
 
 
 class AgentResult(BaseModel):
@@ -141,11 +181,17 @@ class AgentResult(BaseModel):
 
 
 def default_roles() -> list[AgentRole]:
+    """Pipeline order: Planner → FactChecker (team loop) → Synthesizer.
+
+    Searcher + Reader run inside the FactChecker loop, not at the top level,
+    but they are included here so the UI timeline can display their status.
+    """
     return [
-        AgentRole.RESEARCHER,
-        AgentRole.ANALYST,
-        AgentRole.VERIFIER,
-        AgentRole.PRESENTER,
+        AgentRole.PLANNER,
+        AgentRole.SEARCHER,
+        AgentRole.READER,
+        AgentRole.FACT_CHECKER,
+        AgentRole.SYNTHESIZER,
     ]
 
 
@@ -154,10 +200,11 @@ class ResearchSession(BaseModel):
     query: str = ""
     roles: list[AgentRole] = Field(default_factory=default_roles)
     agent_results: dict[AgentRole, AgentResult] = Field(default_factory=dict)
-    retrieved_chunks: list[RetrievedChunk] = Field(default_factory=list)
+    sources: list[WebSource] = Field(default_factory=list)
+    claims: list[Claim] = Field(default_factory=list)
+    report: ReportOutput | None = None
     final_report: str = ""
     error: str | None = None
-    source_titles: dict[str, str] = Field(default_factory=dict)
 
     def get_agent(self, role: AgentRole) -> AgentResult:
         return self.agent_results.get(role, AgentResult(role=role))
@@ -165,123 +212,3 @@ class ResearchSession(BaseModel):
     def ensure_agent_results(self) -> None:
         for role in self.roles:
             self.agent_results.setdefault(role, AgentResult(role=role))
-
-
-# ─── A2A Message Contract ─────────────────────────────────────────────────────
-
-
-class A2AMessage(BaseModel):
-    sender: AgentRole
-    recipient: AgentRole
-    task_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    payload: dict[str, Any] = Field(default_factory=dict)
-    _progress_reporter: Any = PrivateAttr(default=None)
-
-
-# ─── Agent Card (capability declaration) ─────────────────────────────────────
-
-
-class AgentCard(BaseModel):
-    name: str
-    role: AgentRole
-    description: str
-    version: str = "1.0.0"
-    input_schema: dict[str, str] = Field(default_factory=dict)
-    output_schema: dict[str, str] = Field(default_factory=dict)
-    skills: list[str] = Field(default_factory=list)
-
-
-AGENT_CARDS: dict[AgentRole, AgentCard] = {
-    AgentRole.RESEARCHER: AgentCard(
-        name="Researcher",
-        role=AgentRole.RESEARCHER,
-        description="Retrieves and ranks relevant documents from the RAG corpus",
-        skills=["retrieval", "search", "rag", "document ranking", "semantic search"],
-        input_schema={"query": "str"},
-        output_schema={"retrieved_chunks": "list", "ranked_sources": "list"},
-    ),
-    AgentRole.ANALYST: AgentCard(
-        name="Analyst",
-        role=AgentRole.ANALYST,
-        description="Decomposes complex claims into atomic verifiable sub-claims",
-        skills=["analysis", "decomposition", "claim splitting"],
-        input_schema={"text": "str"},
-        output_schema={"atomic_claims": "list"},
-    ),
-    AgentRole.VERIFIER: AgentCard(
-        name="Verifier",
-        role=AgentRole.VERIFIER,
-        description="Assigns SUPPORTED / REFUTED / INSUFFICIENT_EVIDENCE verdicts",
-        skills=["verification", "fact-checking", "evidence assessment"],
-        input_schema={"claims": "list", "evidence": "list"},
-        output_schema={"sub_claim_verifications": "list", "overall_verdict": "Verdict"},
-    ),
-    AgentRole.PRESENTER: AgentCard(
-        name="Presenter",
-        role=AgentRole.PRESENTER,
-        description="Synthesizes findings into structured, beautifully formatted output",
-        skills=["synthesis", "presentation", "formatting", "reporting"],
-        input_schema={"verifications": "list", "sources": "list"},
-        output_schema={"report": "StructuredReport", "formatted_output": "str"},
-    ),
-}
-
-
-def get_agent_card(role: AgentRole) -> AgentCard:
-    return AGENT_CARDS[role]
-
-
-# ─── RAG Domain Objects ───────────────────────────────────────────────────────
-
-
-class DocumentChunk(BaseModel):
-    id: str
-    content: str
-    source: str
-    chunk_index: int = 0
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class RetrievedChunk(BaseModel):
-    chunk: DocumentChunk
-    score: float = Field(ge=0.0, le=1.0, default=0.0)
-
-
-class ResearchSource(BaseModel):
-    id: str
-    title: str
-    content: str = ""
-    relevance_score: float = Field(ge=0.0, le=1.0, default=0.0)
-
-
-# ─── Agent Output Schemas ─────────────────────────────────────────────────────
-
-
-class ResearcherOutput(BaseModel):
-    retrieved_chunks: list[RetrievedChunk] = Field(default_factory=list)
-    ranked_sources: list[ResearchSource] = Field(default_factory=list)
-    research_summary: str = ""
-
-
-class AnalystOutput(BaseModel):
-    atomic_claims: list[Claim] = Field(default_factory=list)
-    decomposition_summary: str = ""
-
-
-class VerifierOutput(BaseModel):
-    verified_claims: list[Claim] = Field(default_factory=list)
-    verification_summary: str = ""
-
-
-class PresenterOutput(BaseModel):
-    report: str = ""
-    formatted_output: str = ""
-
-
-# ─── Workflow State ────────────────────────────────────────────────────────────
-
-
-class WorkflowState(BaseModel):
-    session: ResearchSession
-    current_agent: AgentRole | None = None
-    messages: list[A2AMessage] = Field(default_factory=list)

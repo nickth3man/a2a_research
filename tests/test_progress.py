@@ -21,7 +21,7 @@ async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> None
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
         phase=ProgressPhase.STEP_STARTED,
-        role=AgentRole.RESEARCHER,
+        role=AgentRole.PLANNER,
         step_index=0,
         total_steps=4,
         substep_label="Researcher started.",
@@ -52,7 +52,7 @@ async def test_drain_progress_drains_trailing_events_after_workflow_done() -> No
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
         phase=ProgressPhase.STEP_COMPLETED,
-        role=AgentRole.RESEARCHER,
+        role=AgentRole.PLANNER,
         step_index=0,
         total_steps=4,
         substep_label="Researcher completed.",
@@ -81,7 +81,7 @@ async def test_create_progress_reporter_schedules_put_on_target_loop() -> None:
 
     event = ProgressEvent(
         phase=ProgressPhase.STEP_STARTED,
-        role=AgentRole.RESEARCHER,
+        role=AgentRole.PLANNER,
         step_index=0,
         total_steps=4,
         substep_label="start",

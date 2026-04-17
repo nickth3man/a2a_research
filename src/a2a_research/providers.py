@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from importlib import import_module
 from time import perf_counter
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -28,8 +28,6 @@ __all__ = [
     "ProviderRateLimitError",
     "ProviderRequestError",
     "StructuredOutputT",
-    "get_embedder",
-    "get_embedding_provider",
     "get_llm",
     "get_llm_provider",
     "parse_structured_response",
@@ -378,117 +376,6 @@ class OllamaProvider(LLMProvider):
         )
 
 
-class EmbeddingProvider(ABC):
-    @abstractmethod
-    def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
-
-    @abstractmethod
-    def embed_query(self, text: str) -> list[float]: ...
-
-
-class OpenAIEmbeddings(EmbeddingProvider):
-    def __init__(
-        self,
-        model: str | None = None,
-        api_key: str | None = None,
-        base_url: str | None = None,
-    ):
-        self.model = model or settings.embedding.model
-        self.api_key = api_key or settings.embedding.api_key or settings.llm.api_key
-        base = base_url or settings.embedding.base_url or settings.llm.base_url
-        self._base_url = base
-
-        openai = _load_attr("openai", "OpenAI", "pip install openai")
-        kwargs: dict[str, Any] = {"api_key": self.api_key}
-        if self._base_url:
-            kwargs["base_url"] = self._base_url
-        self._client = openai(**kwargs)
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        endpoint = f"{_base_url_to_str(self._client.base_url)}/embeddings"
-        started_at = _log_request_start("embeddings", "openai-compatible", self.model, endpoint)
-        try:
-            response = self._client.embeddings.create(input=texts, model=self.model)
-        except Exception as exc:
-            _log_request_failure(
-                started_at, "embeddings", "openai-compatible", self.model, endpoint
-            )
-            _raise_provider_error(
-                exc,
-                provider="OpenAI-compatible provider",
-                model=self.model,
-                endpoint=endpoint,
-            )
-        _log_request_success(started_at, "embeddings", "openai-compatible", self.model, endpoint)
-        return [item.embedding for item in response.data]
-
-    def embed_query(self, text: str) -> list[float]:
-        endpoint = f"{_base_url_to_str(self._client.base_url)}/embeddings"
-        started_at = _log_request_start("embeddings", "openai-compatible", self.model, endpoint)
-        try:
-            response = self._client.embeddings.create(input=[text], model=self.model)
-        except Exception as exc:
-            _log_request_failure(
-                started_at, "embeddings", "openai-compatible", self.model, endpoint
-            )
-            _raise_provider_error(
-                exc,
-                provider="OpenAI-compatible provider",
-                model=self.model,
-                endpoint=endpoint,
-            )
-        _log_request_success(started_at, "embeddings", "openai-compatible", self.model, endpoint)
-        return cast("list[float]", response.data[0].embedding)
-
-
-class OllamaEmbeddings(EmbeddingProvider):
-    def __init__(
-        self,
-        model: str | None = None,
-        base_url: str | None = None,
-    ):
-        self.model = model or settings.embedding.model
-        self.base_url = base_url or settings.embedding.base_url or "http://localhost:11434"
-        self._embeddings = _load_attr("ollama", "embeddings", "pip install ollama")
-
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        endpoint = f"{self.base_url.rstrip('/')}/api/embeddings"
-        started_at = _log_request_start("embeddings", "ollama", self.model, endpoint)
-        try:
-            result = [
-                cast("list[float]", self._embeddings(model=self.model, prompt=text)["embedding"])
-                for text in texts
-            ]
-        except Exception as exc:
-            _log_request_failure(started_at, "embeddings", "ollama", self.model, endpoint)
-            _raise_provider_error(
-                exc,
-                provider="Ollama",
-                model=self.model,
-                endpoint=endpoint,
-            )
-        _log_request_success(started_at, "embeddings", "ollama", self.model, endpoint)
-        return result
-
-    def embed_query(self, text: str) -> list[float]:
-        endpoint = f"{self.base_url.rstrip('/')}/api/embeddings"
-        started_at = _log_request_start("embeddings", "ollama", self.model, endpoint)
-        try:
-            result = cast(
-                "list[float]", self._embeddings(model=self.model, prompt=text)["embedding"]
-            )
-        except Exception as exc:
-            _log_request_failure(started_at, "embeddings", "ollama", self.model, endpoint)
-            _raise_provider_error(
-                exc,
-                provider="Ollama",
-                model=self.model,
-                endpoint=endpoint,
-            )
-        _log_request_success(started_at, "embeddings", "ollama", self.model, endpoint)
-        return result
-
-
 _PROVIDER_MAP: dict[str, type[LLMProvider]] = {
     "openai": OpenAIProvider,
     # OpenRouter is OpenAI-compatible; routes to OpenAIProvider using LLM_BASE_URL
@@ -496,13 +383,6 @@ _PROVIDER_MAP: dict[str, type[LLMProvider]] = {
     "anthropic": AnthropicProvider,
     "google": GoogleProvider,
     "ollama": OllamaProvider,
-}
-
-_EMBEDDING_MAP: dict[str, type[EmbeddingProvider]] = {
-    "openai": OpenAIEmbeddings,
-    # OpenRouter exposes /v1/embeddings at the same base URL as chat
-    "openrouter": OpenAIEmbeddings,
-    "ollama": OllamaEmbeddings,
 }
 
 
@@ -515,17 +395,7 @@ def get_llm_provider() -> LLMProvider:
     return provider_class()
 
 
-def get_embedding_provider() -> EmbeddingProvider:
-    provider_name = settings.embedding.provider.lower()
-    provider_class = _EMBEDDING_MAP.get(provider_name)
-    if provider_class is None:
-        msg = f"Unknown embedding provider: {provider_name}. Supported: {list(_EMBEDDING_MAP)}"
-        raise ValueError(msg)
-    return provider_class()
-
-
 _llm_provider: LLMProvider | None = None
-_embedding_provider: EmbeddingProvider | None = None
 
 
 def get_llm() -> ChatModel:
@@ -535,14 +405,6 @@ def get_llm() -> ChatModel:
     return _llm_provider.get_model()
 
 
-def get_embedder() -> EmbeddingProvider:
-    global _embedding_provider
-    if _embedding_provider is None:
-        _embedding_provider = get_embedding_provider()
-    return _embedding_provider
-
-
 def reset_provider_singletons() -> None:
-    global _embedding_provider, _llm_provider
+    global _llm_provider
     _llm_provider = None
-    _embedding_provider = None

@@ -1,59 +1,39 @@
-"""In-process A2A-style contracts used by the PocketFlow orchestration path.
+"""In-process A2A layer built on the official ``a2a-sdk`` protocol types.
 
-Provides a small server/client façade over registered callables (see ``register_a2a_agent``), so :class:`~a2a_research.agents.pocketflow.utils.nodes.ActorNode` can
-dispatch by :class:`~a2a_research.models.AgentRole` without HTTP.
+Public surface:
+- :func:`get_registry` — lazily builds the five-agent :class:`AgentRegistry`.
+- :class:`A2AClient` — sends a :class:`Message` to a registered role, returns the final Task.
+- :func:`build_message`, :func:`extract_data_payloads`, :func:`extract_text` — helpers.
+- :data:`AGENT_CARDS` — per-role :class:`AgentCard` for discovery and UI labels.
 """
 
 from __future__ import annotations
 
-from a2a_research.a2a.server import (
-    A2AClient as A2AClient,
+from a2a_research.a2a.cards import AGENT_CARDS, get_card
+from a2a_research.a2a.client import (
+    A2AClient,
+    build_message,
+    extract_data_payloads,
+    extract_text,
 )
-from a2a_research.a2a.server import (
-    A2AServer as A2AServer,
-)
-from a2a_research.a2a.server import (
-    get_a2a_handler as get_a2a_handler,
-)
-from a2a_research.a2a.server import (
-    get_server_registry as get_server_registry,
-)
-from a2a_research.a2a.server import (
-    register_a2a_agent as register_a2a_agent,
-)
-from a2a_research.a2a.server import (
-    reset_server_registry as reset_server_registry,
-)
-from a2a_research.models import (
-    A2AMessage as A2AMessage,
-)
-from a2a_research.models import (
-    AgentCard as AgentCard,
-)
-from a2a_research.models import (
-    AgentResult as AgentResult,
-)
-from a2a_research.models import (
-    AgentRole as AgentRole,
-)
-from a2a_research.models import (
-    AgentStatus as AgentStatus,
-)
-from a2a_research.models import (
-    get_agent_card as get_agent_card,
+from a2a_research.a2a.registry import (
+    AgentRegistry,
+    get_registry,
+    register_executor,
+    register_executor_factory,
+    reset_registry,
 )
 
 __all__ = [
+    "AGENT_CARDS",
     "A2AClient",
-    "A2AMessage",
-    "A2AServer",
-    "AgentCard",
-    "AgentResult",
-    "AgentRole",
-    "AgentStatus",
-    "get_a2a_handler",
-    "get_agent_card",
-    "get_server_registry",
-    "register_a2a_agent",
-    "reset_server_registry",
+    "AgentRegistry",
+    "build_message",
+    "extract_data_payloads",
+    "extract_text",
+    "get_card",
+    "get_registry",
+    "register_executor",
+    "register_executor_factory",
+    "reset_registry",
 ]

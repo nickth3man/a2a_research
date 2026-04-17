@@ -44,8 +44,8 @@ async def test_on_submit_success_updates_session() -> None:
     done = ResearchSession(
         query="Q",
         agent_results={
-            AgentRole.PRESENTER: AgentResult(
-                role=AgentRole.PRESENTER,
+            AgentRole.SYNTHESIZER: AgentResult(
+                role=AgentRole.SYNTHESIZER,
                 status=AgentStatus.COMPLETED,
             ),
         },
@@ -65,7 +65,7 @@ async def test_on_submit_success_updates_session() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.agents.pocketflow.run_workflow_async",
+            "a2a_research.workflow.run_research_async",
             new_callable=AsyncMock,
             return_value=done,
         ),
@@ -94,7 +94,7 @@ async def test_on_submit_exception_sets_error() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.agents.pocketflow.run_workflow_async",
+            "a2a_research.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=RuntimeError("LLM down"),
         ),
@@ -122,7 +122,7 @@ async def test_on_submit_cancelled_sets_recoverable_error() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.agents.pocketflow.run_workflow_async",
+            "a2a_research.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=asyncio.CancelledError(),
         ),
@@ -152,7 +152,7 @@ async def test_on_submit_success_yields_twice() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.agents.pocketflow.run_workflow_async",
+            "a2a_research.workflow.run_research_async",
             new_callable=AsyncMock,
             return_value=done,
         ),
@@ -181,7 +181,7 @@ async def test_on_submit_skips_when_already_loading() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.agents.pocketflow.run_workflow_async",
+            "a2a_research.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=mock_async,
         ),

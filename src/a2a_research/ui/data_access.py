@@ -1,60 +1,35 @@
 """Data access layer for UI components.
 
-This module decouples UI components from the agent pipeline structure by providing
-data accessor functions that handle the details of which agents provide which data.
+Decouples Mesop components from the new 5-agent pipeline shape.
 """
 
-from a2a_research.models import AGENT_CARDS, AgentRole, Claim, ResearchSession, default_roles
+from __future__ import annotations
+
+from a2a_research.a2a.cards import AGENT_CARDS
+from a2a_research.models import AgentRole, Claim, ResearchSession, default_roles
 
 
 def get_all_citations(session: ResearchSession) -> list[str]:
-    """Aggregate all citations from researcher and verifier agents.
-
-    Removes duplicates while preserving order.
-
-    Args:
-        session: The research session containing agent results.
-
-    Returns:
-        List of unique citation strings from all relevant agents.
-    """
-    researcher = session.get_agent(AgentRole.RESEARCHER)
-    verifier = session.get_agent(AgentRole.VERIFIER)
-    return list(dict.fromkeys(researcher.citations + verifier.citations))
+    """Deduplicated URL list (session.sources preserves first-seen order)."""
+    seen: dict[str, None] = {}
+    for source in session.sources:
+        seen.setdefault(source.url, None)
+    return list(seen.keys())
 
 
 def get_verified_claims(session: ResearchSession) -> list[Claim]:
-    """Get verified claims from the verifier agent.
-
-    Args:
-        session: The research session containing agent results.
-
-    Returns:
-        List of claims from the verifier agent.
-    """
-    return session.get_agent(AgentRole.VERIFIER).claims
+    """Verified claims — populated by the FactChecker via the coordinator."""
+    return list(session.claims)
 
 
 def get_agent_label(role: AgentRole) -> str:
-    """Get the display label for an agent role.
-
-    Looks up the label from AGENT_CARDS for a single source of truth.
-
-    Args:
-        role: The agent role to look up.
-
-    Returns:
-        The display name for the agent role.
-    """
+    """Display label for an agent role (driven by the A2A AgentCard name)."""
     card = AGENT_CARDS.get(role)
     return card.name if card else role.value
 
 
 def get_all_roles(session: ResearchSession | None = None) -> list[AgentRole]:
-    """Get agent roles in session pipeline order.
-
-    Falls back to the default pipeline when the session has not been initialized.
-    """
+    """Return roles in pipeline order (session override falls back to defaults)."""
     if session and session.roles:
         return session.roles
     return default_roles()

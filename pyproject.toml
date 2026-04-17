@@ -22,13 +22,20 @@ dependencies = [
     "rich>=15.0.0",
     # UI
     "mesop>=1.2.7",
-    # Vector store
-    "chromadb>=1.5.7",
     # LLM providers (direct SDKs)
     "openai>=2.32.0",
     "anthropic>=0.95.0",
     "google-genai>=1.73.1",
     "ollama>=0.6.1",
+    "langgraph>=0.3.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "pydantic-ai>=0.0.14",
+    "smolagents[openai]>=1.0.0",
+    "a2a-sdk>=0.2.0",
+    "tavily-python>=0.5.0",
+    "duckduckgo-search>=7.0.0",
+    "trafilatura>=1.12.0",
 ]
 
 [project.urls]
@@ -78,6 +85,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/a2a_research/ui/**" = ["T20"]
+"src/a2a_research/workflow/__main__.py" = ["T20"]
 "tests/**" = ["T20", "TCH002"]
 
 [tool.ruff.format]
@@ -145,6 +153,16 @@ disallow_untyped_defs = false
 disallow_untyped_calls = false
 warn_return_any = false
 disable_error_code = ["type-arg"]
+
+[[tool.mypy.overrides]]
+module = "a2a_research.agents.smolagents.*"
+disallow_untyped_calls = false
+disable_error_code = ["misc", "no-untyped-call"]
+
+[[tool.mypy.overrides]]
+module = "a2a_research.agents.langgraph.*"
+disallow_untyped_calls = false
+disable_error_code = ["union-attr"]
 
 [tool.pyright]
 include = ["src", "tests"]

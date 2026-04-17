@@ -218,6 +218,49 @@ tests/              # Pytest suite (no API key required for unit tests)
 
 ---
 
+## Example Chat Agent Scaffolds (other frameworks)
+
+`src/a2a_research/agents/` also ships three reference **basic chat agents** built on alternative frameworks — not wired into the research pipeline by default, but ready to be registered as A2A handlers when you want to experiment with a different runtime.
+
+| Folder | Framework | Canonical primitive | Highlight |
+|---|---|---|---|
+| `agents/langgraph/` | [LangGraph](https://github.com/langchain-ai/langgraph) | `StateGraph` + `MessagesState` + `InMemorySaver` | Multi-turn memory via `thread_id=session.id` |
+| `agents/pydantic_ai/` | [Pydantic AI](https://github.com/pydantic/pydantic-ai) | `Agent(model, instructions=…)` with `OpenAIChatModel` | Typed, `deps_type` for request-scoped context |
+| `agents/smolagents/` | [smolagents](https://github.com/huggingface/smolagents) | `ToolCallingAgent(tools=[], …)` with `OpenAIServerModel` | No Python execution; see folder README for the `CodeAgent` security note |
+
+Each folder exposes the same surface:
+
+```python
+from a2a_research.agents.langgraph import chat_invoke  # or pydantic_ai / smolagents
+from a2a_research.models import ResearchSession
+
+session = ResearchSession(query="What is RAG?")
+result = chat_invoke(session)
+print(result.raw_content)
+```
+
+Run the standalone CLI demo per framework:
+
+```bash
+uv run python -m a2a_research.agents.langgraph   "hi"
+uv run python -m a2a_research.agents.pydantic_ai "hi"
+uv run python -m a2a_research.agents.smolagents  "hi"
+```
+
+Register as an A2A handler (reuses the same `.env` LLM settings):
+
+```python
+from a2a_research.a2a.server import register_a2a_agent
+from a2a_research.agents.pydantic_ai import chat_invoke
+from a2a_research.models import AgentRole
+
+register_a2a_agent(AgentRole.RESEARCHER, chat_invoke)
+```
+
+See each folder's `README.md` for framework-specific details (streaming hooks, multi-turn patterns, DI, and security notes).
+
+---
+
 ## Demo Flow
 
 ```bash

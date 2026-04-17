@@ -16,8 +16,8 @@ def test_agent_timeline_card_renders_rows(stub_mesop_component_runtime: None) ->
     from a2a_research.ui.components import CardTimeline
 
     session = ResearchSession(query="q")
-    session.agent_results[AgentRole.RESEARCHER] = AgentResult(
-        role=AgentRole.RESEARCHER,
+    session.agent_results[AgentRole.PLANNER] = AgentResult(
+        role=AgentRole.PLANNER,
         status=AgentStatus.COMPLETED,
         message="Retrieved 3 chunks",
     )
@@ -34,8 +34,8 @@ def test_claims_panel_with_claim(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import PanelClaims
 
     session = ResearchSession(query="q")
-    session.agent_results[AgentRole.VERIFIER] = AgentResult(
-        role=AgentRole.VERIFIER,
+    session.agent_results[AgentRole.FACT_CHECKER] = AgentResult(
+        role=AgentRole.FACT_CHECKER,
         status=AgentStatus.COMPLETED,
         claims=[
             Claim(
@@ -55,8 +55,8 @@ def test_sources_panel_empty_and_with_citations(stub_mesop_component_runtime: No
 
     PanelSources(ResearchSession(query="q"))
     session = ResearchSession(query="q")
-    session.agent_results[AgentRole.RESEARCHER] = AgentResult(
-        role=AgentRole.RESEARCHER,
+    session.agent_results[AgentRole.PLANNER] = AgentResult(
+        role=AgentRole.PLANNER,
         status=AgentStatus.COMPLETED,
         citations=["rag_accuracy"],
     )

@@ -1,4 +1,4 @@
-"""Shared Mesop test doubles (component/box runtime stub)."""
+"""Shared fixtures: Mesop runtime stubs + global singleton reset."""
 
 from __future__ import annotations
 
@@ -34,20 +34,11 @@ def stub_mesop_box_runtime(stub_mesop_component_runtime: None) -> None:
 @pytest.fixture(autouse=True)
 def _reset_global_singletons():
     """Reset module-level singletons between tests to prevent state leakage."""
-    from a2a_research.a2a.server import reset_server_registry
+    from a2a_research.a2a import reset_registry
     from a2a_research.providers import reset_provider_singletons
 
     reset_provider_singletons()
-    reset_server_registry()
-
-    import a2a_research.rag as rag_module
-
-    rag_module._chroma_client = None
-    rag_module._collection = None
-
+    reset_registry()
     yield
-
     reset_provider_singletons()
-    reset_server_registry()
-    rag_module._chroma_client = None
-    rag_module._collection = None
+    reset_registry()

@@ -1,0 +1,116 @@
+"""A2A AgentExecutor for the Planner role.
+
+Consumes ``{query}`` (string or DataPart) and returns a Task with a DataArtifact
+of ``{claims, seed_queries}`` — the handoff shape the FactChecker expects.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import TYPE_CHECKING
+
+from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.types import (
+    Artifact,
+    DataPart,
+    Part,
+    TaskArtifactUpdateEvent,
+    TaskState,
+    TaskStatus,
+    TaskStatusUpdateEvent,
+    TextPart,
+)
+from a2a.utils import new_task
+
+from a2a_research.agents.pocketflow.planner.flow import plan
+from a2a_research.app_logging import get_logger
+
+if TYPE_CHECKING:
+    from a2a.server.events import EventQueue
+
+logger = get_logger(__name__)
+
+__all__ = ["PlannerExecutor"]
+
+
+class PlannerExecutor(AgentExecutor):
+    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        task = context.current_task or new_task(context.message)  # type: ignore[arg-type]
+        await event_queue.enqueue_event(task)
+
+        query = _extract_query(context)
+
+        try:
+            claims, seed_queries = await plan(query)
+            status = TaskState.completed
+            error_text: str | None = None
+        except Exception as exc:
+            logger.exception("Planner failed task_id=%s", task.id)
+            claims, seed_queries = [], []
+            status = TaskState.failed
+            error_text = str(exc)
+
+        artifact = Artifact(
+            artifact_id="plan",
+            name="plan",
+            parts=[
+                Part(
+                    root=DataPart(
+                        data={
+                            "query": query,
+                            "claims": [c.model_dump(mode="json") for c in claims],
+                            "seed_queries": seed_queries,
+                        }
+                    )
+                )
+            ],
+        )
+        await event_queue.enqueue_event(
+            TaskArtifactUpdateEvent(
+                task_id=task.id,
+                context_id=task.context_id,
+                artifact=artifact,
+                append=False,
+                last_chunk=True,
+            )
+        )
+        await event_queue.enqueue_event(
+            TaskStatusUpdateEvent(
+                task_id=task.id,
+                context_id=task.context_id,
+                status=TaskStatus(state=status),
+                final=True,
+                metadata={"error": error_text} if error_text else None,
+            )
+        )
+        logger.info(
+            "Planner task_id=%s claims=%s seeds=%s",
+            task.id,
+            len(claims),
+            len(seed_queries),
+        )
+
+    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        pass
+
+
+def _extract_query(context: RequestContext) -> str:
+    if context.message is None:
+        return ""
+    text_parts: list[str] = []
+    for part in context.message.parts:
+        root = getattr(part, "root", part)
+        if isinstance(root, DataPart):
+            query = root.data.get("query")
+            if isinstance(query, str) and query.strip():
+                return query.strip()
+        elif isinstance(root, TextPart) and root.text.strip():
+            text_parts.append(root.text.strip())
+    joined = "\n".join(text_parts).strip()
+    try:
+        data = json.loads(joined) if joined else None
+    except (ValueError, TypeError):
+        data = None
+    if isinstance(data, dict) and isinstance(data.get("query"), str):
+        return str(data["query"]).strip()
+    return joined

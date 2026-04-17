@@ -89,8 +89,8 @@ def test_main_page_results() -> None:
     session = ResearchSession(
         query="Q",
         agent_results={
-            AgentRole.PRESENTER: AgentResult(
-                role=AgentRole.PRESENTER,
+            AgentRole.SYNTHESIZER: AgentResult(
+                role=AgentRole.SYNTHESIZER,
                 status=AgentStatus.COMPLETED,
             ),
         },

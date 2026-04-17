@@ -1,48 +1,17 @@
-"""Agent implementations for the 4-agent research pipeline.
+"""Five framework-specific research agents.
 
-Re-exports the public PocketFlow runtime API from
-:mod:`a2a_research.agents.pocketflow` so downstream code can say
-``from a2a_research.agents import researcher_invoke`` without caring whether an
-agent lives in its own subpackage or is composed through PocketFlow.
+Each role lives in a subpackage named after its framework + role:
 
-Order: Researcher → Analyst → Verifier → Presenter. Each step:
+- :mod:`a2a_research.agents.pocketflow.planner` — query decomposition
+- :mod:`a2a_research.agents.smolagents.searcher` — parallel web search
+- :mod:`a2a_research.agents.smolagents.reader` — URL fetch + extraction
+- :mod:`a2a_research.agents.langgraph.fact_checker` — bounded verification loop
+- :mod:`a2a_research.agents.pydantic_ai.synthesizer` — structured report
 
-- Reads the shared :class:`~a2a_research.models.ResearchSession` and prior outputs.
-- Calls the LLM (or deterministic fallback on
-  :class:`~a2a_research.providers.ProviderRequestError`).
-- Writes its :class:`~a2a_research.models.AgentResult` back into ``session.agent_results``.
+Each subpackage exposes an ``AgentExecutor`` subclass that plugs into the
+in-process A2A registry in :mod:`a2a_research.a2a`.
 """
 
 from __future__ import annotations
 
-from a2a_research.agents.pocketflow import (
-    AgentRegistry,
-    AgentSpec,
-    analyst_invoke,
-    get_agent_handler,
-    get_agent_spec,
-    get_registry,
-    parse_claims_from_analyst,
-    parse_verified_claims,
-    presenter_invoke,
-    register_agent,
-    researcher_invoke,
-    run_research_sync,
-    verifier_invoke,
-)
-
-__all__ = [
-    "AgentRegistry",
-    "AgentSpec",
-    "analyst_invoke",
-    "get_agent_handler",
-    "get_agent_spec",
-    "get_registry",
-    "parse_claims_from_analyst",
-    "parse_verified_claims",
-    "presenter_invoke",
-    "register_agent",
-    "researcher_invoke",
-    "run_research_sync",
-    "verifier_invoke",
-]
+__all__: list[str] = []
