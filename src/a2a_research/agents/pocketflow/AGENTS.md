@@ -1,6 +1,7 @@
 # POCKETFLOW AGENTS KNOWLEDGE BASE
 
 ## OVERVIEW
+
 PocketFlow runtime for the research pipeline. This package owns per-agent handlers (Researcher → Analyst → Verifier → Presenter), the shared agent registry, the composed `AsyncFlow`, sync/async entrypoints, and shared utilities. The A2A protocol surface lives in a sibling package (`a2a_research.a2a`); this package registers handlers for the in-process A2A dispatch layer.
 
 Each named agent folder contains the canonical 4-file PocketFlow-style layout (`main.py` / `flow.py` / `nodes.py` / `utils.py`) so it can be reasoned about — and, for `flow.py`, invoked — standalone. The top-level `flow.py` composes the four agent nodes into the full pipeline.
