@@ -80,6 +80,9 @@ class ClassifyNode(AsyncNode):
             raw,
             elapsed_ms=(perf_counter() - started) * 1000,
             model=settings.llm.model,
+            prompt_tokens=getattr(response, "prompt_tokens", None),
+            completion_tokens=getattr(response, "completion_tokens", None),
+            finish_reason=getattr(response, "finish_reason", ""),
         )
 
         data = parse_json_safely(raw)
@@ -132,6 +135,9 @@ class _BaseDecomposeNode(AsyncNode):
             raw,
             elapsed_ms=(perf_counter() - started) * 1000,
             model=settings.llm.model,
+            prompt_tokens=getattr(response, "prompt_tokens", None),
+            completion_tokens=getattr(response, "completion_tokens", None),
+            finish_reason=getattr(response, "finish_reason", ""),
         )
         return {"raw": raw, "error": None}
 

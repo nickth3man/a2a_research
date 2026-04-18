@@ -1,5 +1,6 @@
 """Error and loading banners."""
 
+import html
 from collections.abc import Callable
 from typing import Any
 
@@ -70,12 +71,15 @@ def _error_banner_message(error: str, *, max_length: int = 200) -> str:
     return prefix + error[:max_length] + "\u2026"
 
 
-@me.component
-def CardLoading(  # noqa: N802
+def CardLoading(
     progress_step_label: str,
     session: ResearchSession,
     running_substeps: list[str],
-    activity_by_role: dict[str, list[str]],
+    activity_by_role: dict[str, list[str]] | None = None,
+    retry_counts: dict[str, int] | None = None,
+    error_counts: dict[str, int] | None = None,
+    show_verbose_prompts: int = 1,
+    on_toggle_verbose: Callable[[Any], Any] | None = None,
 ) -> None:
     """Per-agent live activity feed rendered while the pipeline runs."""
     with me.box(style=LOADING_CARD_STYLE):
@@ -103,18 +107,35 @@ def CardLoading(  # noqa: N802
                 progress_step_label or "Pipeline starting",
                 style=me.Style(font_weight="bold", font_size="13px", color="#92400e"),
             )
+            if on_toggle_verbose is not None:
+                me.button(
+                    "Verbose: ON" if show_verbose_prompts else "Verbose: OFF",
+                    on_click=on_toggle_verbose,
+                    type="flat",
+                )
 
         for role in _ROLE_ORDER:
             label = _role_label(role)
             agent = session.agent_results.get(role)
             status = agent.status if agent else AgentStatus.PENDING
             lines = activity_by_role.get(label, [])
-            _AgentActivityPanel(label=label, status=status, lines=lines)
+            _AgentActivityPanel(
+                label=label,
+                status=status,
+                lines=lines,
+                retry_count=(retry_counts or {}).get(label, 0),
+                error_count=(error_counts or {}).get(label, 0),
+                show_verbose_prompts=show_verbose_prompts,
+            )
 
 
-@me.component
-def _AgentActivityPanel(  # noqa: N802
-    label: str, status: AgentStatus, lines: list[str]
+def _AgentActivityPanel(
+    label: str,
+    status: AgentStatus,
+    lines: list[str],
+    retry_count: int = 0,
+    error_count: int = 0,
+    show_verbose_prompts: bool = True,
 ) -> None:
     icon, color = _STATUS_ICON[status]
     with me.box(
@@ -143,6 +164,28 @@ def _AgentActivityPanel(  # noqa: N802
                 status.value,
                 style=me.Style(font_size="11px", color=color, text_transform="uppercase"),
             )
+            if retry_count:
+                me.text(
+                    f"↻ {retry_count}",
+                    style=me.Style(
+                        font_size="11px",
+                        color="#f59e0b",
+                        background="#fffbeb",
+                        padding=me.Padding.symmetric(horizontal=4, vertical=2),
+                        border_radius=4,
+                    ),
+                )
+            if error_count:
+                me.text(
+                    f"✗ {error_count}",
+                    style=me.Style(
+                        font_size="11px",
+                        color="#dc2626",
+                        background="#fef2f2",
+                        padding=me.Padding.symmetric(horizontal=4, vertical=2),
+                        border_radius=4,
+                    ),
+                )
         if not lines:
             me.text(
                 "(no activity yet)",
@@ -163,4 +206,25 @@ def _AgentActivityPanel(  # noqa: N802
             )
         ):
             for line in reversed(lines):
-                me.text(line, style=me.Style(margin=me.Margin(bottom=2)))
+                if " — " in line and len(line) > 250:
+                    parts = line.split(" — ", 1)
+                    summary = parts[0]
+                    body = parts[1]
+                    is_warning = "rate_limit" in line.lower() or "claim_verdict" in line.lower()
+                    color = "#d97706" if is_warning else "#1e293b"
+                    if not show_verbose_prompts:
+                        me.text(
+                            summary,
+                            style=me.Style(margin=me.Margin(bottom=2), color=color),
+                        )
+                        continue
+                    safe_body = html.escape(body[:4096])
+                    if len(body) > 4096:
+                        safe_body += "\n...[truncated]"
+                    html_content = (
+                        f'<details><summary style="color:{color}">{html.escape(summary)}</summary>'
+                        f'<pre style="color:{color};white-space:pre-wrap">{safe_body}</pre></details>'
+                    )
+                    me.html(html_content)
+                else:
+                    me.text(line, style=me.Style(margin=me.Margin(bottom=2)))

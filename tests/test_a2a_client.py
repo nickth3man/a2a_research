@@ -123,3 +123,32 @@ async def test_build_message_includes_text_and_data() -> None:
     msg = build_message(text="hello", data={"k": 1})
     kinds = [getattr(part.root, "kind", None) for part in msg.parts]
     assert "text" in kinds and "data" in kinds
+
+
+@pytest.mark.asyncio
+async def test_client_send_includes_handoff_from_when_from_role_provided(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    from a2a_research.a2a import client as client_module
+
+    shared_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=_echo_app()), base_url="http://echo.test"
+    )
+
+    def _client_factory(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        return shared_client
+
+    monkeypatch.setattr(client_module.httpx, "AsyncClient", _client_factory)
+
+    registry = AgentRegistry(searcher_url="http://echo.test")
+    client = A2AClient(registry)
+    result = await client.send(
+        AgentRole.SEARCHER,
+        payload={"hello": "world", "session_id": "s123"},
+        from_role=AgentRole.PLANNER,
+    )
+
+    assert isinstance(result, Task)
+    echoed = extract_data_payloads(result)[0]["echoed"][0]
+    assert echoed.get("handoff_from") == "planner"
+    await shared_client.aclose()

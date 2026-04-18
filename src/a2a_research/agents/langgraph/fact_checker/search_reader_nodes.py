@@ -53,6 +53,7 @@ def build_ask_searcher_node() -> Any:
         task = await client.send(
             AgentRole.SEARCHER,
             payload={"queries": queries, "session_id": session_id},
+            from_role=AgentRole.FACT_CHECKER,
         )
         data = extract_data_payload_or_warn(task)
         raw_hits = data.get("hits") or []
@@ -125,6 +126,7 @@ def build_ask_reader_node() -> Any:
                 "session_id": session_id,
                 "claims": [claim.model_dump(mode="json") for claim in (state.get("claims") or [])],
             },
+            from_role=AgentRole.FACT_CHECKER,
         )
         data = extract_data_payload_or_warn(task)
         raw_pages = data.get("pages") or []

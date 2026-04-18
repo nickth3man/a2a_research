@@ -108,6 +108,17 @@ class FactCheckerExecutor(AgentExecutor):
 
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+            emit_handoff(
+                direction="received",
+                role=AgentRole.FACT_CHECKER,
+                peer_role=handoff_from,
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(str(payload)),
+                session_id=session_id,
+            )
         query = str(payload.get("query") or "")
         claims = _coerce_claims(payload.get("claims") or [])
         seed_queries = _coerce_str_list(payload.get("seed_queries") or [])

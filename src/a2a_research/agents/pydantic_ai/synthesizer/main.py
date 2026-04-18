@@ -98,6 +98,16 @@ async def synthesize(
         preview = result.output.model_dump_json() if hasattr(result.output, "model_dump_json") else str(result.output)
     except Exception:  # noqa: BLE001
         preview = str(result.output)
+
+    prompt_tokens = None
+    completion_tokens = None
+    finish_reason = ""
+    if hasattr(result, "usage") and result.usage:
+        usage = result.usage()
+        if usage:
+            prompt_tokens = getattr(usage, "request_tokens", None) or getattr(usage, "prompt_tokens", None)
+            completion_tokens = getattr(usage, "response_tokens", None) or getattr(usage, "completion_tokens", None)
+
     emit_llm_response(
         AgentRole.SYNTHESIZER,
         "synthesize",
@@ -105,6 +115,9 @@ async def synthesize(
         elapsed_ms=(perf_counter() - started) * 1000,
         model=_app_settings.llm.model,
         session_id=session_id,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        finish_reason=finish_reason,
     )
     return report
 
@@ -116,6 +129,17 @@ class SynthesizerExecutor(AgentExecutor):
 
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+            emit_handoff(
+                direction="received",
+                role=AgentRole.SYNTHESIZER,
+                peer_role=handoff_from,
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(str(payload)),
+                session_id=session_id,
+            )
         query = str(payload.get("query") or "")
         claims = _coerce_claims(payload.get("verified_claims") or payload.get("claims") or [])
         sources = _coerce_sources(payload.get("sources") or [])

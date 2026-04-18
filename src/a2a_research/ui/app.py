@@ -84,16 +84,20 @@ class AppState:
     # on every progress event. Drives the live per-agent activity panel that
     # replaced the coarse percentage bar.
     activity_by_role: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    show_verbose_prompts: bool = True
+    retry_counts: dict[str, int] = dataclasses.field(default_factory=dict)
+    error_counts: dict[str, int] = dataclasses.field(default_factory=dict)
 
 
 def _state_snapshot(state: AppState) -> dict[str, object]:
+    activity_by_role = getattr(state, "activity_by_role", {})
     return {
         "query_text": state.query_text,
         "loading": state.loading,
         "progress_step_label": state.progress_step_label,
         "current_substep": state.current_substep,
         "running_substeps": list(state.progress_running_substeps),
-        "activity_counts": {role: len(lines) for role, lines in state.activity_by_role.items()},
+        "activity_counts": {role: len(lines) for role, lines in activity_by_role.items()},
         "session": {
             "id": state.session.id,
             "query": state.session.query,
@@ -142,14 +146,18 @@ def main_page() -> None:
                     progress_step_label=state.progress_step_label,
                     progress_substep_label=state.current_substep,
                     activity_counts={
-                        role: len(lines) for role, lines in state.activity_by_role.items()
+                        role: len(lines) for role, lines in getattr(state, "activity_by_role", {}).items()
                     },
                 )
                 CardLoading(
                     progress_step_label=state.progress_step_label,
                     session=state.session,
                     running_substeps=state.progress_running_substeps,
-                    activity_by_role=state.activity_by_role,
+                    activity_by_role=getattr(state, "activity_by_role", {}),
+                    retry_counts=getattr(state, "retry_counts", {}),
+                    error_counts=getattr(state, "error_counts", {}),
+                    show_verbose_prompts=1 if getattr(state, "show_verbose_prompts", True) else 0,
+                    on_toggle_verbose=_on_toggle_verbose,
                 )
             else:
                 if has_results(state.session):
@@ -241,6 +249,8 @@ def _initialize_progress_state(state: AppState) -> None:
     state.current_substep = ""
     state.progress_step_label = "Running the 5-agent research pipeline\u2026"
     state.activity_by_role = {}
+    state.retry_counts = {}
+    state.error_counts = {}
 
 
 def _append_activity(state: AppState, role_label: str, icon: str, text: str) -> None:
@@ -297,6 +307,8 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         state.current_substep = display
         state.progress_step_label = f"{role_label}…"
         _append_activity(state, role_label, "·", display)
+        if event.substep_label == "rate_limit":
+            state.retry_counts[role_label] = state.retry_counts.get(role_label, 0) + 1
         return
 
     if event.phase == ProgressPhase.STEP_COMPLETED:
@@ -321,6 +333,7 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         state.progress_step_label = f"{role_label} failed"
         state.current_substep = display
         _append_activity(state, role_label, "✗", f"failed — {display}")
+        state.error_counts[role_label] = state.error_counts.get(role_label, 0) + 1
 
 
 def _render_results(session: ResearchSession) -> None:
@@ -498,6 +511,11 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
         state.progress_running_substeps = []
 
     yield
+
+
+def _on_toggle_verbose(e: me.CheckboxChangeEvent) -> None:
+    state: AppState = me.state(AppState)
+    state.show_verbose_prompts = e.checked
 
 
 async def _on_retry(e: me.ClickEvent) -> AsyncGenerator[None, None]:

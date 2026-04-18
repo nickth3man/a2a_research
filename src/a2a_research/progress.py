@@ -44,7 +44,7 @@ _session_var: contextvars.ContextVar[str] = contextvars.ContextVar(
     "a2a_research_session_id", default=""
 )
 
-PROMPT_DETAIL_MAX_CHARS = 1200
+PROMPT_DETAIL_MAX_CHARS = 4096
 
 
 def current_session_id() -> str:

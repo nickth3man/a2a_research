@@ -92,6 +92,7 @@ def build_verify_node() -> Any:
             session_id=session_id,
         )
         started = perf_counter()
+        response = None
         try:
             model = get_llm()
             response = await model.ainvoke(
@@ -111,6 +112,9 @@ def build_verify_node() -> Any:
             elapsed_ms=(perf_counter() - started) * 1000,
             model=settings.llm.model,
             session_id=session_id,
+            prompt_tokens=getattr(response, "prompt_tokens", None),
+            completion_tokens=getattr(response, "completion_tokens", None),
+            finish_reason=getattr(response, "finish_reason", ""),
         )
         new_claims, follow_ups = parse_verifier(raw, fallback=claims)
         old_by_id = {c.id: c for c in claims}

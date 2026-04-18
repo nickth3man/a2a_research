@@ -48,6 +48,17 @@ class PlannerExecutor(AgentExecutor):
         query = _extract_query(context)
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+            emit_handoff(
+                direction="received",
+                role=AgentRole.PLANNER,
+                peer_role=handoff_from,
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(str(payload)),
+                session_id=session_id,
+            )
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.PLANNER, 0, 5, "planner_started")
         emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.PLANNER, 0, 5, "decompose")
 

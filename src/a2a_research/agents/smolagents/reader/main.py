@@ -53,6 +53,17 @@ class ReaderExecutor(AgentExecutor):
 
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+            emit_handoff(
+                direction="received",
+                role=AgentRole.READER,
+                peer_role=handoff_from,
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(str(payload)),
+                session_id=session_id,
+            )
         urls = _coerce_str_list(payload.get("urls") or payload.get("url"))
         max_chars_raw = payload.get("max_chars")
         max_chars = int(max_chars_raw) if isinstance(max_chars_raw, (int, str)) else 8000

@@ -40,6 +40,10 @@ class ChatResponse:
     """Simple response wrapper compatible with the existing agent interface."""
 
     content: str
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    finish_reason: str = ""
+    model: str = ""
 
 
 def parse_structured_response(
@@ -161,7 +165,17 @@ class OpenRouterChatModel:
         _log_request_success(started_at, "chat", self._model, endpoint)
         assert response is not None
         content = response.choices[0].message.content or ""
-        return ChatResponse(content=content)
+        usage = getattr(response, "usage", None)
+        prompt_tokens = getattr(usage, "prompt_tokens", None) if usage else None
+        completion_tokens = getattr(usage, "completion_tokens", None) if usage else None
+        finish_reason = getattr(response.choices[0], "finish_reason", "") if response.choices else ""
+        return ChatResponse(
+            content=content,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            finish_reason=finish_reason,
+            model=self._model,
+        )
 
 
 _llm: OpenRouterChatModel | None = None

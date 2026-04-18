@@ -199,6 +199,17 @@ class SearcherExecutor(AgentExecutor):
 
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+            emit_handoff(
+                direction="received",
+                role=AgentRole.SEARCHER,
+                peer_role=handoff_from,
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(str(payload)),
+                session_id=session_id,
+            )
         queries = _coerce_str_list(payload.get("queries"))
         query_raw = payload.get("query")
         if not queries and isinstance(query_raw, str):

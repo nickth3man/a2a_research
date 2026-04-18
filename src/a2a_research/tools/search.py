@@ -25,6 +25,8 @@ import httpx
 from pydantic import BaseModel, Field
 
 from a2a_research.app_logging import get_logger, log_event
+from a2a_research.models import AgentRole
+from a2a_research.progress import current_session_id, emit_rate_limit
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
@@ -185,6 +187,15 @@ async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str
                     query,
                     attempt + 1,
                     delay,
+                )
+                emit_rate_limit(
+                    AgentRole.SEARCHER,
+                    provider="brave",
+                    attempt=attempt + 1,
+                    max_attempts=_BRAVE_MAX_RETRIES,
+                    delay_sec=delay,
+                    reason=f"HTTP 429 query={query}",
+                    session_id=current_session_id(),
                 )
                 await asyncio.sleep(delay)
             assert response is not None

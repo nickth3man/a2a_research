@@ -88,12 +88,10 @@ def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import CardLoading
 
     CardLoading(
-        progress_pct=0.4,
         progress_step_label="Step 2 of 4",
-        progress_substep_label="Calling LLM…",
         session=ResearchSession(query="Q"),
-        granularity=2,
         running_substeps=["Calling LLM…"],
+        activity_by_role={},
     )
 
 

@@ -162,6 +162,7 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
             "claims": [c.model_dump(mode="json") for c in claims],
             "seed_queries": seed_queries,
         },
+        from_role=AgentRole.PLANNER,
     )
     fc_data = _payload(fc_task)
     verified: list[Claim] = [
@@ -263,6 +264,7 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
             "verified_claims": [c.model_dump(mode="json") for c in (verified or claims)],
             "sources": [s.model_dump(mode="json") for s in sources],
         },
+        from_role=AgentRole.FACT_CHECKER,
     )
     syn_data = _payload(syn_task)
     syn_failed = _task_failed(syn_task)

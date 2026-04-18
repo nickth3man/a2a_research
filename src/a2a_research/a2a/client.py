@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 import warnings
@@ -151,8 +152,23 @@ class A2AClient:
         text: str = "",
         task_id: str | None = None,
         context_id: str | None = None,
+        from_role: AgentRole | None = None,
     ) -> Task | Message:
-        message = build_message(text=text, data=payload, task_id=task_id, context_id=context_id)
+        send_payload = dict(payload) if payload is not None else None
+        if from_role is not None and send_payload is not None:
+            send_payload["handoff_from"] = str(from_role.value)
+        message = build_message(text=text, data=send_payload, task_id=task_id, context_id=context_id)
+        session_id = send_payload.get("session_id") if send_payload else None
+        if session_id and from_role is not None:
+            emit_handoff(
+                direction="sent",
+                role=from_role,
+                peer_role=role,
+                payload_keys=sorted(send_payload.keys()),
+                payload_bytes=len(str(send_payload)),
+                payload_preview=json.dumps(send_payload, default=str)[:400],
+                session_id=str(session_id),
+            )
         request = SendMessageRequest(
             id=str(uuid.uuid4()),
             params=MessageSendParams(message=message),
@@ -163,7 +179,7 @@ class A2AClient:
             role.value,
             url,
             task_id,
-            sorted(payload or {}),
+            sorted(send_payload or {}),
         )
         if self._registry.has_handler(role):
             handler = self._registry.get_handler(role)
