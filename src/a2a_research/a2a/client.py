@@ -29,7 +29,13 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["A2AClient", "build_message", "extract_data_payloads", "extract_text"]
+__all__ = [
+    "A2AClient",
+    "build_message",
+    "extract_data_payload_or_warn",
+    "extract_data_payloads",
+    "extract_text",
+]
 
 
 def build_message(
@@ -86,6 +92,21 @@ def extract_text(task_or_message: Task | Message) -> str:
             if isinstance(root, TextPart):
                 chunks.append(root.text)
     return "\n".join(chunk for chunk in chunks if chunk)
+
+
+def extract_data_payload_or_warn(task_or_message: Task | Message) -> dict[str, Any]:
+    payloads = extract_data_payloads(task_or_message)
+    if not payloads:
+        return {}
+    if len(payloads) == 1:
+        return payloads[0]
+    merged: dict[str, Any] = {}
+    for payload in payloads:
+        merged.update(payload)
+    logger.warning(
+        "Multiple data payloads found (%s); merging with later keys winning.", len(payloads)
+    )
+    return merged
 
 
 class A2AClient:

@@ -13,6 +13,7 @@ from a2a_research.a2a.cards import AGENT_CARDS, get_card
 from a2a_research.a2a.client import (
     A2AClient,
     build_message,
+    extract_data_payload_or_warn,
     extract_data_payloads,
     extract_text,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "A2AClient",
     "AgentRegistry",
     "build_message",
+    "extract_data_payload_or_warn",
     "extract_data_payloads",
     "extract_text",
     "get_card",

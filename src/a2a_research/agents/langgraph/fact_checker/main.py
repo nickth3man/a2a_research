@@ -23,6 +23,7 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
+from a2a.utils import new_agent_text_message
 from pydantic import ValidationError
 
 from a2a_research.a2a import A2AClient
@@ -57,6 +58,7 @@ async def run_fact_check(
     graph = build_fact_check_graph(active_client)
     initial_state: FactCheckState = {
         "session_id": session_id,
+        "_client": active_client,
         "query": query,
         "claims": list(claims),
         "evidence": [],
@@ -181,9 +183,11 @@ class FactCheckerExecutor(AgentExecutor):
             TaskStatusUpdateEvent(
                 task_id=task.id,
                 context_id=task.context_id,
-                status=TaskStatus(state=status),
+                status=TaskStatus(
+                    state=status,
+                    message=new_agent_text_message(error_text) if error_text else None,
+                ),
                 final=True,
-                metadata={"error": error_text} if error_text else None,
             )
         )
         emit(

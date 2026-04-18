@@ -23,17 +23,21 @@ from a2a_research.agents.langgraph.fact_checker.state import FactCheckState
 
 __all__ = ["build_fact_check_graph"]
 
+_COMPILED_GRAPH: Any | None = None
+
 
 def build_fact_check_graph(client: Any) -> Any:
-    """Compile the FactChecker graph, closing over an :class:`A2AClient`."""
-    # ty's TypedDict vs LangGraph's StateLike protocol do not align; runtime is correct.
-    graph = StateGraph(cast("Any", FactCheckState))
-    graph.add_node("ask_searcher", build_ask_searcher_node(client))
-    graph.add_node("ask_reader", build_ask_reader_node(client))
-    graph.add_node("verify", build_verify_node())
+    """Compile the FactChecker graph once; the client is passed via state."""
+    global _COMPILED_GRAPH
+    if _COMPILED_GRAPH is None:
+        graph = StateGraph(cast("Any", FactCheckState))
+        graph.add_node("ask_searcher", build_ask_searcher_node())
+        graph.add_node("ask_reader", build_ask_reader_node())
+        graph.add_node("verify", build_verify_node())
 
-    graph.add_edge(START, "ask_searcher")
-    graph.add_edge("ask_searcher", "ask_reader")
-    graph.add_edge("ask_reader", "verify")
-    graph.add_conditional_edges("verify", route, {"continue": "ask_searcher", "done": END})
-    return graph.compile()
+        graph.add_edge(START, "ask_searcher")
+        graph.add_edge("ask_searcher", "ask_reader")
+        graph.add_edge("ask_reader", "verify")
+        graph.add_conditional_edges("verify", route, {"continue": "ask_searcher", "done": END})
+        _COMPILED_GRAPH = graph.compile()
+    return _COMPILED_GRAPH

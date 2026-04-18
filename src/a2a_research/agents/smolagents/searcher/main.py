@@ -36,6 +36,8 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
+from a2a.utils import new_agent_text_message
+from pydantic import BaseModel, Field
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.searcher.agent import build_agent
@@ -51,15 +53,19 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["SearcherExecutor", "build_http_app", "search_queries"]
+__all__ = ["SearcherBatchResult", "SearcherExecutor", "build_http_app", "search_queries"]
 
 
-async def search_queries(
-    queries: list[str], *, session_id: str = ""
-) -> tuple[list[WebHit], list[str], list[str]]:
+class SearcherBatchResult(BaseModel):
+    hits: list[WebHit] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    providers_successful: list[str] = Field(default_factory=list)
+
+
+async def search_queries(queries: list[str], *, session_id: str = "") -> SearcherBatchResult:
     """Run the smolagents Searcher tool-calling loop for ``queries``."""
     if not queries:
-        return [], [], []
+        return SearcherBatchResult()
 
     prompt = (
         "Queries to search:\n"
@@ -121,7 +127,11 @@ async def search_queries(
         len(errors),
         sorted(successful_providers),
     )
-    return hits, errors, sorted(successful_providers)
+    return SearcherBatchResult(
+        hits=hits,
+        errors=errors,
+        providers_successful=sorted(successful_providers),
+    )
 
 
 def _derive_status(
@@ -153,8 +163,11 @@ class SearcherExecutor(AgentExecutor):
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.SEARCHER, 1, 5, "searcher_started")
 
         try:
-            hits, errors, successful_providers = await search_queries(
-                queries, session_id=session_id
+            batch = await search_queries(queries, session_id=session_id)
+            hits, errors, successful_providers = (
+                batch.hits,
+                batch.errors,
+                batch.providers_successful,
             )
         except Exception as exc:
             logger.exception("Searcher crashed task_id=%s", task.id)
@@ -191,9 +204,11 @@ class SearcherExecutor(AgentExecutor):
             TaskStatusUpdateEvent(
                 task_id=task.id,
                 context_id=task.context_id,
-                status=TaskStatus(state=status),
+                status=TaskStatus(
+                    state=status,
+                    message=new_agent_text_message(error_text) if error_text else None,
+                ),
                 final=True,
-                metadata={"error": error_text} if error_text else None,
             )
         )
         emit(

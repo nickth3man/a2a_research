@@ -17,7 +17,7 @@ from typing import Any
 from a2a.types import TaskState
 from pydantic import ValidationError
 
-from a2a_research.a2a import A2AClient, extract_data_payloads, get_registry
+from a2a_research.a2a import A2AClient, extract_data_payload_or_warn, get_registry
 from a2a_research.app_logging import get_logger
 from a2a_research.models import (
     AgentResult,
@@ -336,8 +336,7 @@ def _error_report(query: str, reason: str, errors: list[str]) -> str:
 def _payload(task: Any) -> dict[str, Any]:
     if task is None:
         return {}
-    payloads = extract_data_payloads(task)
-    return payloads[0] if payloads else {}
+    return extract_data_payload_or_warn(task)
 
 
 def _set_status(
@@ -374,7 +373,8 @@ def _coerce_claim(raw: Any) -> Claim | None:
     if isinstance(raw, dict):
         try:
             return Claim.model_validate(raw)
-        except ValidationError:
+        except ValidationError as exc:
+            logger.warning("Failed to coerce claim from payload: %s", exc)
             return None
     return None
 
@@ -385,7 +385,8 @@ def _coerce_source(raw: Any) -> WebSource | None:
     if isinstance(raw, dict):
         try:
             return WebSource.model_validate(raw)
-        except ValidationError:
+        except ValidationError as exc:
+            logger.warning("Failed to coerce source from payload: %s", exc)
             return None
     return None
 
@@ -396,6 +397,7 @@ def _coerce_report(raw: Any) -> ReportOutput | None:
     if isinstance(raw, dict):
         try:
             return ReportOutput.model_validate(raw)
-        except ValidationError:
+        except ValidationError as exc:
+            logger.warning("Failed to coerce report from payload: %s", exc)
             return None
     return None

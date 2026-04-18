@@ -26,6 +26,7 @@ from a2a.types import (
     TaskStatusUpdateEvent,
     TextPart,
 )
+from a2a.utils import new_agent_text_message
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.reader.agent import build_agent
@@ -99,9 +100,11 @@ class ReaderExecutor(AgentExecutor):
             TaskStatusUpdateEvent(
                 task_id=task.id,
                 context_id=task.context_id,
-                status=TaskStatus(state=status),
+                status=TaskStatus(
+                    state=status,
+                    message=new_agent_text_message(error_text) if error_text else None,
+                ),
                 final=True,
-                metadata={"error": error_text} if error_text else None,
             )
         )
         emit(

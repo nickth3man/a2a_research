@@ -11,6 +11,7 @@ from a2a.types import Task, TaskState
 from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads
 from a2a_research.agents.smolagents.searcher import SearcherExecutor
 from a2a_research.agents.smolagents.searcher import main as searcher_main
+from a2a_research.agents.smolagents.searcher.main import SearcherBatchResult
 from a2a_research.models import AgentRole
 
 
@@ -144,8 +145,9 @@ async def test_searcher_dedupes_hits_from_agent(monkeypatch: pytest.MonkeyPatch)
         ),
     )
 
-    hits, errors, providers = await searcher_main.search_queries(["a", "b"])
-    assert len(hits) == 1
-    assert hits[0].url == "https://same.example"
-    assert errors == []
-    assert sorted(providers) == ["duckduckgo", "tavily"]
+    batch = await searcher_main.search_queries(["a", "b"])
+    assert isinstance(batch, SearcherBatchResult)
+    assert len(batch.hits) == 1
+    assert batch.hits[0].url == "https://same.example"
+    assert batch.errors == []
+    assert sorted(batch.providers_successful) == ["duckduckgo", "tavily"]

@@ -26,6 +26,7 @@ class FactCheckRunResult(TypedDict):
 
 
 class FactCheckState(TypedDict, total=False):
+    _client: object
     session_id: str
     query: str
     claims: list[Claim]

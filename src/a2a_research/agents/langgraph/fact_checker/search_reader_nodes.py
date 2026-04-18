@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any, cast
 
 from a2a_research.agents.langgraph.fact_checker.node_support import (
     task_error_metadata,
@@ -14,16 +14,14 @@ from a2a_research.models import AgentRole, WebSource
 from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import PageContent, WebHit
 
-if TYPE_CHECKING:
-    from a2a_research.a2a import A2AClient
-
 logger = get_logger(__name__)
 
 __all__ = ["build_ask_reader_node", "build_ask_searcher_node"]
 
 
-def build_ask_searcher_node(client: A2AClient) -> Any:
+def build_ask_searcher_node() -> Any:
     async def ask_searcher(state: FactCheckState) -> dict[str, Any]:
+        client = cast("Any", state.get("_client"))
         queries = list(state.get("pending_queries") or [])
         session_id = str(state.get("session_id") or "")
         round_number = int(state.get("round") or 0) + 1
@@ -35,7 +33,7 @@ def build_ask_searcher_node(client: A2AClient) -> Any:
                 "errors": [],
                 "search_exhausted": True,
             }
-        from a2a_research.a2a import extract_data_payloads
+        from a2a_research.a2a import extract_data_payload_or_warn
 
         emit(
             session_id,
@@ -50,8 +48,7 @@ def build_ask_searcher_node(client: A2AClient) -> Any:
             AgentRole.SEARCHER,
             payload={"queries": queries, "session_id": session_id},
         )
-        payloads = extract_data_payloads(task)
-        data = payloads[0] if payloads else {}
+        data = extract_data_payload_or_warn(task)
         raw_hits = data.get("hits") or []
         raw_errors = data.get("errors") or []
         providers_successful = data.get("providers_successful") or []
@@ -84,14 +81,15 @@ def build_ask_searcher_node(client: A2AClient) -> Any:
     return ask_searcher
 
 
-def build_ask_reader_node(client: A2AClient) -> Any:
+def build_ask_reader_node() -> Any:
     async def ask_reader(state: FactCheckState) -> dict[str, Any]:
+        client = cast("Any", state.get("_client"))
         urls = list(state.get("pending_urls") or [])
         session_id = str(state.get("session_id") or "")
         round_number = int(state.get("round") or 0) + 1
         if not urls:
             return {"evidence": [], "sources": [], "errors": [], "pending_urls": []}
-        from a2a_research.a2a import extract_data_payloads
+        from a2a_research.a2a import extract_data_payload_or_warn
 
         emit(
             session_id,
@@ -110,8 +108,7 @@ def build_ask_reader_node(client: A2AClient) -> Any:
                 "claims": [claim.model_dump(mode="json") for claim in (state.get("claims") or [])],
             },
         )
-        payloads = extract_data_payloads(task)
-        data = payloads[0] if payloads else {}
+        data = extract_data_payload_or_warn(task)
         raw_pages = data.get("pages") or []
         pages = [PageContent.model_validate(p) for p in raw_pages if p]
 

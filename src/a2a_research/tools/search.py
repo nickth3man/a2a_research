@@ -1,4 +1,4 @@
-"""Parallel web search over Tavily + DuckDuckGo.
+"""Parallel web search over Tavily + DDGS.
 
 Both providers run concurrently via :func:`asyncio.gather`; DDG is synchronous
 so it runs in a worker thread.
@@ -85,7 +85,7 @@ async def _search_tavily(query: str, max_results: int) -> tuple[list[WebHit], st
 
 
 def _search_ddg_sync(query: str, max_results: int) -> list[WebHit]:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 
     raw = DDGS().text(query, max_results=max_results) or []
     hits: list[WebHit] = []
