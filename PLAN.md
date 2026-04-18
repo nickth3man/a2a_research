@@ -533,7 +533,7 @@ Every phase ends with a passing commit. If a later phase introduces an unrecover
 - [x] Phase 5 — `c2d98e921d44e8c179766d5183d975dded4651ea` — HTTP split with real a2a-sdk
 - [x] Phase 6 — `f8d35e8f7752e63620314387abd2a86a75270207` — correctness hardening & nits
 - [x] Phase 7 — `2417354efc0d4d6d57a198090dd70231d59eea0a` — documentation
-- [ ] Phase 8 — `<sha>` — final verification
+- [x] Phase 8 — `0eb40a8c7fe2fed1f0de6b1149c9532ec72f1cc8` — final verification
 
 ---
 
