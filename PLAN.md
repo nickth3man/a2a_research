@@ -528,7 +528,7 @@ Every phase ends with a passing commit. If a later phase introduces an unrecover
 
 - [x] Phase 1 — `02f283f81428d2ae219653c186648ed222080654` — foundation & cleanup
 - [x] Phase 2 — `390eb8009ba0c6ae3ba80eb59c8930ba5cc121fa` — OpenRouter-only async LLM
-- [ ] Phase 3 — `<sha>` — progress events wired
+- [x] Phase 3 — `17c80420cb0bd51a59753513078b1fcfe2f603e5` — progress events wired
 - [ ] Phase 4 — `<sha>` — frameworks earn their keep
 - [ ] Phase 5 — `<sha>` — HTTP split with real a2a-sdk
 - [ ] Phase 6 — `<sha>` — correctness hardening & nits
