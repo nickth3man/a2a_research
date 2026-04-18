@@ -1,7 +1,7 @@
 [project]
 name = "a2a-research"
 version = "0.1.0"
-description = "Local-first 4-agent A2A research system with PocketFlow orchestration"
+description = "5-agent A2A research and verification pipeline (HTTP-orchestrated, OpenRouter-backed)"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"

@@ -1,15 +1,33 @@
-# A2A Research — 5-Agent Web Research & Verification
+# A2A Research — 5-Agent HTTP-Orchestrated Web Research & Verification
 
-**A research-and-verification pipeline** coordinated by an in-process [A2A](https://github.com/a2aproject/A2A/) registry and client. Five agents — Planner, Searcher, Reader, FactChecker, Synthesizer — run on a mix of runtimes (PocketFlow planner, smolagents search/read, LangGraph fact-check loop, Pydantic AI synthesis). The system uses live web search and page extraction instead of a local RAG corpus: it decomposes queries into claims, gathers evidence from the public web, verifies claims, and renders a structured markdown report.
+**A research-and-verification pipeline** coordinated by an HTTP [A2A](https://github.com/a2aproject/A2A/) client and independent agent services. Five agents — Planner, Searcher, Reader, FactChecker, Synthesizer — run on a mix of runtimes (PocketFlow planner, smolagents search/read, LangGraph fact-check loop, Pydantic AI synthesis). The system uses live web search and page extraction instead of a local RAG corpus: it decomposes queries into claims, gathers evidence from the public web, verifies claims, and renders a structured markdown report.
 
 ---
 
 ## Architecture
 
 ```
-                    ┌── Searcher (web search)
-Planner ──► FactChecker ──┤── Reader (fetch + extract) ──► … loop … ──► Synthesizer
-                    └──────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│ Mesop UI (one process)                                         │
+│   └─ drains ProgressQueue, renders timeline                    │
+└────────────┬───────────────────────────────────────────────────┘
+             │ run_research_async (in-process, UI host)
+             ▼
+┌────────────────────────────────────────────────────────────────┐
+│ Coordinator (same process as UI)                               │
+│   HTTP A2A Client ──► Planner       :10001                     │
+│   HTTP A2A Client ──► FactChecker   :10004  ◄─ peer A2A ──┐    │
+│   HTTP A2A Client ──► Synthesizer   :10005                │    │
+└────────────┬───────────────────────────────────────────────┼───┘
+             │                                               │
+             ▼                                               │
+      Planner :10001                                         │
+                                                             │
+      Synthesizer :10005                                     │
+                                                             │
+      FactChecker :10004                                     │
+          │   HTTP A2A Client ──► Searcher  :10002 ──────────┤
+          │   HTTP A2A Client ──► Reader    :10003 ──────────┘
 ```
 
 | Agent | Runtime | Role | Output |
@@ -20,8 +38,8 @@ Planner ──► FactChecker ──┤── Reader (fetch + extract) ──►
 | **FactChecker** | LangGraph | Orchestrates search/read/LLM verify loop until evidence converges or search exhausts | `verified_claims`, `sources` |
 | **Synthesizer** | Pydantic AI | Structured report from verified claims + citations | `ReportOutput` → markdown |
 
-**Orchestration**: `workflow/coordinator.py` — `run_research_async` / `run_research_sync` drive the pipeline via `A2AClient` and `AgentRegistry`.  
-**A2A**: `a2a_research.a2a` — role-scoped `AgentExecutor` registration, agent cards, in-process task store.  
+**Orchestration**: `workflow/coordinator.py` — `run_research_async` / `run_research_sync` drive the pipeline via an HTTP `A2AClient`.  
+**A2A**: `a2a_research.a2a` — agent cards, client utilities, and task helpers.  
 **Evidence**: `a2a_research.tools` — `web_search`, `fetch_and_extract`.  
 **UI**: Mesop web app (`src/a2a_research/ui/app.py`).
 
@@ -178,51 +196,6 @@ src/a2a_research/
 data/corpus/         # Optional sample markdown (not used by the default web pipeline)
 tests/               # Pytest suite (no API key required for unit tests)
 ```
-
----
-
-## Example Chat Agent Scaffolds (other frameworks)
-
-`src/a2a_research/agents/` also ships three reference **basic chat agents** built on alternative frameworks — not wired into the research pipeline by default, but ready to be registered as A2A handlers when you want to experiment with a different runtime.
-
-| Folder | Framework | Canonical primitive | Highlight |
-|---|---|---|---|
-| `agents/langgraph/` | [LangGraph](https://github.com/langchain-ai/langgraph) | `StateGraph` + `MessagesState` + `InMemorySaver` | Multi-turn memory via `thread_id=session.id` |
-| `agents/pydantic_ai/` | [Pydantic AI](https://github.com/pydantic/pydantic-ai) | `Agent(model, instructions=…)` with `OpenAIChatModel` | Typed, `deps_type` for request-scoped context |
-| `agents/smolagents/` | [smolagents](https://github.com/huggingface/smolagents) | `ToolCallingAgent(tools=[], …)` with `OpenAIServerModel` | No Python execution; see folder README for the `CodeAgent` security note |
-
-Each folder exposes the same surface:
-
-```python
-from a2a_research.agents.langgraph import chat_invoke  # or pydantic_ai / smolagents
-from a2a_research.models import ResearchSession
-
-session = ResearchSession(query="What is RAG?")
-result = chat_invoke(session)
-print(result.raw_content)
-```
-
-Run the standalone CLI demo per framework:
-
-```bash
-uv run python -m a2a_research.agents.langgraph   "hi"
-uv run python -m a2a_research.agents.pydantic_ai "hi"
-uv run python -m a2a_research.agents.smolagents  "hi"
-```
-
-Replace a default agent by registering an `AgentExecutor` factory (a zero-argument callable that returns a new executor instance from `a2a.server.agent_execution`):
-
-```python
-from a2a_research.a2a import register_executor_factory
-from a2a_research.agents.pocketflow.planner.main import PlannerExecutor
-from a2a_research.models import AgentRole
-
-register_executor_factory(AgentRole.PLANNER, PlannerExecutor)
-```
-
-Use any class or zero-argument callable that produces an executor; the built-in defaults are registered from `a2a_research.a2a.registry._register_defaults`.
-
-See each folder's `README.md` for framework-specific details (streaming hooks, multi-turn patterns, DI, and security notes).
 
 ---
 

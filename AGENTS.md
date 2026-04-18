@@ -1,3 +1,0 @@
-# AGENTS
-
-All Python source files must not exceed 200 lines to promote maintainable, readable, and modular code.

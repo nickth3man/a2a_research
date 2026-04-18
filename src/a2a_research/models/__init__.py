@@ -4,7 +4,7 @@ Single source of truth for:
 
 - agents/     (per-agent I/O and session mutation)
 - workflow/   (top-level orchestrator state)
-- a2a/        (in-process A2A registry + client)
+- a2a/        (A2A client payloads, cards, and task helpers)
 - ui/         (Mesop ``@stateclass`` fields — keep nested models concrete for Mesop serialization)
 """
 
@@ -17,52 +17,19 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from a2a_research.models.artifact import (
-    Artifact as Artifact,
-)
-from a2a_research.models.artifact import (
-    ArtifactKind as ArtifactKind,
-)
-from a2a_research.models.artifact import (
-    DataArtifact as DataArtifact,
-)
-from a2a_research.models.artifact import (
-    StreamArtifact as StreamArtifact,
-)
-from a2a_research.models.artifact import (
-    TextArtifact as TextArtifact,
-)
-from a2a_research.models.artifact import (
-    wrap_in_artifact as wrap_in_artifact,
-)
-from a2a_research.models.policy import (
-    PolicyEffect as PolicyEffect,
-)
-from a2a_research.models.policy import (
-    WorkflowPolicy as WorkflowPolicy,
-)
-
 __all__ = [
     "AgentResult",
     "AgentRole",
     "AgentStatus",
-    "Artifact",
-    "ArtifactKind",
     "Citation",
     "Claim",
-    "DataArtifact",
-    "PolicyEffect",
     "ReportOutput",
     "ReportSection",
     "ResearchSession",
-    "StreamArtifact",
     "TaskStatus",
-    "TextArtifact",
     "Verdict",
     "WebSource",
-    "WorkflowPolicy",
     "default_roles",
-    "wrap_in_artifact",
 ]
 
 # ─── Enums ────────────────────────────────────────────────────────────────────
