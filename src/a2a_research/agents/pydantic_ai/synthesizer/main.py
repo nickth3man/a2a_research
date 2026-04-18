@@ -33,6 +33,7 @@ from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pydantic_ai.synthesizer import agent as _agent
 from a2a_research.agents.pydantic_ai.synthesizer.card import SYNTHESIZER_CARD
 from a2a_research.app_logging import get_logger
+from a2a_research.citation_sanitize import sanitize_report_output
 from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
 from a2a_research.progress import ProgressPhase, emit
 
@@ -81,7 +82,7 @@ async def synthesize(
     prompt = _build_prompt(query, claims, sources)
     emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.SYNTHESIZER, 4, 5, "llm_call")
     result = await agent.run(prompt)
-    return result.output
+    return sanitize_report_output(result.output, sources, claims)
 
 
 class SynthesizerExecutor(AgentExecutor):

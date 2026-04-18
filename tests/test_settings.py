@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 import a2a_research.settings as settings_module
 from a2a_research.settings import AppSettings, LLMSettings
@@ -40,6 +41,7 @@ class TestValidateDotenvKeys:
             "LLM_BASE_URL=https://example.com\n"
             "LLM_API_KEY=k\n"
             "TAVILY_API_KEY=tvly-...\n"
+            "BRAVE_API_KEY=brave-...\n"
             "SEARCH_MAX_RESULTS=5\n"
             "RESEARCH_MAX_ROUNDS=3\n"
         )
@@ -83,7 +85,7 @@ class TestAppSettings:
         assert llm.base_url == "https://openrouter.ai/api/v1"
         assert isinstance(llm.api_key, str)
 
-    def test_llm_provider_is_no_longer_an_expected_env_key(
+    def test_llm_provider_legacy_key_does_not_warn(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         env_file = tmp_path / ".env"
@@ -92,19 +94,51 @@ class TestAppSettings:
         with patch("a2a_research.settings._ENV_FILE", env_file):
             settings_module._validate_dotenv_keys()
 
-        assert "Unknown keys in .env: LLM_PROVIDER" in caplog.text
+        assert "Unknown keys in .env" not in caplog.text
 
     def test_new_research_fields(self, tmp_path: Path) -> None:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
-        # Pydantic-settings binds env_file at class-definition time, so we also
-        # override ``TAVILY_API_KEY`` via os.environ to guarantee the default path.
         with (
             patch("a2a_research.settings._ENV_FILE", empty_env),
             patch("a2a_research.settings.dotenv_values", return_value={}),
-            patch.dict("os.environ", {"TAVILY_API_KEY": ""}, clear=True),
+            patch.dict(
+                "os.environ",
+                {"LLM_API_KEY": "k", "TAVILY_API_KEY": "t", "BRAVE_API_KEY": "b"},
+                clear=True,
+            ),
         ):
             s = AppSettings()
-        assert s.research_max_rounds == 3
+        assert s.research_max_rounds == 5
         assert s.search_max_results == 5
-        assert s.tavily_api_key == ""
+        assert s.tavily_api_key == "t"
+        assert s.brave_api_key == "b"
+
+    def test_app_settings_requires_llm_and_tavily_keys(self, tmp_path: Path) -> None:
+        empty_env = tmp_path / ".env"
+        empty_env.write_text("")
+        with (
+            patch("a2a_research.settings._ENV_FILE", empty_env),
+            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch.dict("os.environ", {"LLM_API_KEY": "", "TAVILY_API_KEY": "x"}, clear=True),
+            pytest.raises(ValidationError, match="LLM_API_KEY"),
+        ):
+            AppSettings()
+        with (
+            patch("a2a_research.settings._ENV_FILE", empty_env),
+            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch.dict("os.environ", {"LLM_API_KEY": "x", "TAVILY_API_KEY": ""}, clear=True),
+            pytest.raises(ValidationError, match="TAVILY_API_KEY"),
+        ):
+            AppSettings()
+        with (
+            patch("a2a_research.settings._ENV_FILE", empty_env),
+            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch.dict(
+                "os.environ",
+                {"LLM_API_KEY": "x", "TAVILY_API_KEY": "x", "BRAVE_API_KEY": ""},
+                clear=True,
+            ),
+            pytest.raises(ValidationError, match="BRAVE_API_KEY"),
+        ):
+            AppSettings()

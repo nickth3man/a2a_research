@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -31,7 +32,7 @@ from a2a.utils import new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.reader.agent import build_agent
 from a2a_research.agents.smolagents.reader.card import READER_CARD
-from a2a_research.app_logging import get_logger
+from a2a_research.app_logging import get_logger, log_event
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
@@ -119,6 +120,18 @@ class ReaderExecutor(AgentExecutor):
             detail=f"urls={len(urls)} pages={len(pages)}",
         )
         logger.info("Reader task_id=%s urls=%s pages=%s", task.id, len(urls), len(pages))
+        log_event(
+            logger,
+            logging.INFO,
+            "reader.task_completed",
+            task_id=str(task.id),
+            urls=urls,
+            page_count=len(pages),
+            pages_summary=[
+                {"url": p.url, "ok": not bool(p.error), "error": p.error, "words": p.word_count}
+                for p in pages
+            ],
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
         pass
@@ -145,6 +158,13 @@ async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageConte
     if not urls:
         return []
 
+    log_event(
+        logger,
+        logging.INFO,
+        "reader.read_urls_start",
+        urls=urls,
+        max_chars=max_chars,
+    )
     prompt = (
         "URLs to read:\n"
         + "\n".join(f"- {url}" for url in urls)
@@ -158,7 +178,22 @@ async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageConte
     raw_pages: list[object] = raw_pages_any if isinstance(raw_pages_any, list) else []
     pages = [PageContent.model_validate(item) for item in raw_pages if isinstance(item, dict)]
     if pages:
+        log_event(
+            logger,
+            logging.INFO,
+            "reader.read_urls_agent_json",
+            url_count=len(urls),
+            page_count=len(pages),
+            via="smolagents_json",
+        )
         return pages
+    log_event(
+        logger,
+        logging.INFO,
+        "reader.read_urls_fallback",
+        url_count=len(urls),
+        via="fetch_many_trafilatura",
+    )
     return await fetch_many(urls, max_chars=max_chars)
 
 

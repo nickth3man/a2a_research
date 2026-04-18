@@ -34,7 +34,7 @@ def build_agent() -> ToolCallingAgent:
         tools=[WebSearchTool()],
         model=build_model(),
         instructions=SEARCHER_PROMPT,
-        max_steps=3,
+        max_steps=settings.searcher_max_steps,
         verbosity_level=0,
     )
 

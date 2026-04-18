@@ -1,5 +1,9 @@
 """LangGraph StateGraph that implements the FactChecker loop.
 
+The coordinator calls the Fact Checker service once; this graph orchestrates
+search → read → verify with shared ``FactCheckState``, invoking Searcher and
+Reader over A2A from the node factories in ``search_reader_nodes``.
+
 Linear first pass, then conditional loop-back based on :func:`route`:
 
     START → ask_searcher → ask_reader → verify →

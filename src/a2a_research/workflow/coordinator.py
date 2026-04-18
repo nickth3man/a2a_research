@@ -140,9 +140,13 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         session.id, AgentRole.PLANNER, ProgressPhase.STEP_COMPLETED, "planner_completed"
     )
 
+    # Searcher/Reader are not top-level coordinator HTTP calls; FactChecker's LangGraph invokes
+    # them. Session + progress events still mark them RUNNING so the UI matches reality.
     _set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
     _set_status(session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…")
     _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.RUNNING, "Verifying claims…")
+    _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_STARTED, "searcher_started")
+    _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_STARTED, "reader_started")
     _emit_role_event(
         session.id,
         AgentRole.FACT_CHECKER,
@@ -185,6 +189,8 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
             ProgressPhase.STEP_FAILED,
             "fact_checker_failed",
         )
+        _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_FAILED, "searcher_failed")
+        _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_FAILED, "reader_failed")
         reason = " | ".join(fc_errors) or "web search produced no evidence (no errors reported)."
         _set_status(
             session,
@@ -233,6 +239,8 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         AgentStatus.COMPLETED,
         f"Converged after {rounds} round(s).",
     )
+    _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_COMPLETED, "searcher_completed")
+    _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_COMPLETED, "reader_completed")
     _emit_role_event(
         session.id,
         AgentRole.FACT_CHECKER,
@@ -322,8 +330,8 @@ def _error_report(query: str, reason: str, errors: list[str]) -> str:
         lines.extend(f"- {err}" for err in errors)
     lines.extend(["", "## How to fix", ""])
     lines.append(
-        "- Set `TAVILY_API_KEY` in `.env` (free tier: https://tavily.com/) "
-        "if the Tavily provider is disabled."
+        "- Set `TAVILY_API_KEY` in `.env` (https://tavily.com/) and `BRAVE_API_KEY` "
+        "(https://api-dashboard.search.brave.com/) if search providers are misconfigured."
     )
     lines.append(
         "- Wait and retry if DuckDuckGo rate-limited the request, or run "

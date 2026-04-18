@@ -1,7 +1,7 @@
 """Mesop application: main page, ``AppState``, and event handlers.
 
-``AppState.session`` is a non-optional :class:`~a2a_research.models.ResearchSession`
-so Mesop registers the Pydantic model for serialization (optional/union session
+``AppState.session`` is always a :class:`~a2a_research.models.ResearchSession`
+so Mesop registers the Pydantic model for serialization (union-typed session
 fields are skipped and break round-trips).
 
 The submit handler is an **async generator**: it yields to show loading, drains
@@ -15,7 +15,7 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Callable
 from contextlib import suppress
-from dataclasses import field
+
 from typing import Any, cast
 
 import mesop as me
@@ -66,20 +66,22 @@ from a2a_research.ui.session_state import get_session_error, has_progress, has_r
 from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
 
 setup_logging()
-logger = get_logger(__name__)
+# Mesop loads this module with a filesystem-derived ``__name__`` on Windows; use a
+# stable logger so events stay under ``a2a_research.ui`` and dedupe in log viewers.
+logger = get_logger("a2a_research.ui.app")
 log_event(logger, logging.INFO, "ui.app.imported")
 
 
 @me.stateclass
 class AppState:
     query_text: str = ""
-    session: ResearchSession = field(default_factory=lambda: ResearchSession())
+    session: ResearchSession = None  # type: ignore[assignment]
     loading: bool = False
     progress_granularity: int = 1
     current_substep: str = ""
     progress_pct: float = 0.0
     progress_step_label: str = ""
-    progress_running_substeps: list[str] = field(default_factory=list)
+    progress_running_substeps: list[str] = None  # type: ignore[assignment]
 
 
 def _state_snapshot(state: AppState) -> dict[str, object]:

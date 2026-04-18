@@ -16,7 +16,9 @@ Rules:
    specific URLs that back the claim (use the 'citations' list per section).
 3. Acknowledge REFUTED and INSUFFICIENT_EVIDENCE claims explicitly — do not
    paper over disagreement or gaps.
-4. Every citation must point at a URL that appears in the inputs. Do not invent URLs.
+4. Every citation URL must be copied exactly from the Sources list or from a claim's
+   sources field. The system will drop any citation whose URL is not from those inputs;
+   do not invent or paraphrase URLs.
 5. Keep the tone factual, not marketing. No filler phrases.
 
 Return a ReportOutput structure. The framework validates it against a schema.

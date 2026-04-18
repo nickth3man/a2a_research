@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 import warnings
 from typing import TYPE_CHECKING, Any
@@ -22,7 +23,7 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.registry import AgentRegistry, get_registry
-from a2a_research.app_logging import get_logger
+from a2a_research.app_logging import get_logger, log_event
 
 if TYPE_CHECKING:
     from a2a_research.models import AgentRole
@@ -165,17 +166,68 @@ class A2AClient:
         if self._registry.has_handler(role):
             handler = self._registry.get_handler(role)
             params = MessageSendParams(message=message)
-            return await handler.on_message_send(params)
+            result_local = await handler.on_message_send(params)
+            task_state: str | None = None
+            task_id_out: str | None = None
+            if isinstance(result_local, Task):
+                st = getattr(getattr(result_local, "status", None), "state", None)
+                task_state = str(st) if st is not None else None
+                task_id_out = str(result_local.id) if getattr(result_local, "id", None) else None
+            log_event(
+                logger,
+                logging.INFO,
+                "a2a.response",
+                role=role.value,
+                url="in_process",
+                result_type=type(result_local).__name__,
+                task_state=task_state,
+                task_id=task_id_out,
+            )
+            return result_local
         try:
             client = await self._get_sdk_client(role)
             response = await client.send_message(request)
         except httpx.ConnectError as exc:
+            log_event(
+                logger,
+                logging.INFO,
+                "a2a.send_failed",
+                role=role.value,
+                url=url,
+                error_type="ConnectError",
+                error=str(exc),
+            )
             msg = f"Agent not reachable for role '{role.value}' at {url}: {exc}"
             raise RuntimeError(msg) from exc
         if isinstance(response.root, JSONRPCErrorResponse):
+            log_event(
+                logger,
+                logging.INFO,
+                "a2a.jsonrpc_error",
+                role=role.value,
+                url=url,
+                message=response.root.error.message,
+            )
             msg = f"Agent '{role.value}' returned an A2A error: {response.root.error.message}"
             raise RuntimeError(msg)
-        return response.root.result
+        result = response.root.result
+        task_state: str | None = None
+        task_id_out: str | None = None
+        if isinstance(result, Task):
+            st = getattr(getattr(result, "status", None), "state", None)
+            task_state = str(st) if st is not None else None
+            task_id_out = str(result.id) if getattr(result, "id", None) else None
+        log_event(
+            logger,
+            logging.INFO,
+            "a2a.response",
+            role=role.value,
+            url=url,
+            result_type=type(result).__name__,
+            task_state=task_state,
+            task_id=task_id_out,
+        )
+        return result
 
     async def aclose(self) -> None:
         if self._httpx_client is not None:

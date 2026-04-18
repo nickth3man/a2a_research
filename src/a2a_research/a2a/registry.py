@@ -1,6 +1,6 @@
 """Role-to-URL registry for HTTP-based A2A services.
 
-Also retains an optional in-process handler seam for executor-level unit tests.
+Also retains an in-process handler seam for executor-level unit tests.
 """
 
 from __future__ import annotations

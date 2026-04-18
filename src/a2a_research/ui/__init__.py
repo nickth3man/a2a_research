@@ -11,7 +11,7 @@ Alternative::
 
     uv run mesop src/a2a_research/ui/app.py
 
-Environment (see ``.env.example``): ``MESOP_PORT``, and optionally ``MESOP_STATE_SESSION_BACKEND`` (``none`` | ``memory`` | ``file``, etc.). The UI
+Environment (see ``.env.example``): ``MESOP_PORT``; for session state ``MESOP_STATE_SESSION_BACKEND`` (``none`` | ``memory`` | ``file``, etc.). The UI
 reads ``ResearchSession`` from ``AppState`` (always present; ``default_factory``)
 so Mesop's Pydantic state cache stays consistent.
 

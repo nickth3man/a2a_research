@@ -1,7 +1,13 @@
-"""LangGraph node factories that dispatch Searcher and Reader peer agents."""
+"""LangGraph nodes that call Searcher and Reader over A2A.
+
+The Fact Checker graph owns verification state; these nodes are thin adapters to
+the Searcher (:10002) and Reader (:10003) services. Progress substeps use those
+roles so the UI reflects search/read work, not only the Fact Checker role.
+"""
 
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
 from a2a_research.agents.langgraph.fact_checker.node_support import (
@@ -9,7 +15,7 @@ from a2a_research.agents.langgraph.fact_checker.node_support import (
     task_failed,
 )
 from a2a_research.agents.langgraph.fact_checker.state import FactCheckState  # noqa: TC001
-from a2a_research.app_logging import get_logger
+from a2a_research.app_logging import get_logger, log_event
 from a2a_research.models import AgentRole, WebSource
 from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import PageContent, WebHit
@@ -38,8 +44,8 @@ def build_ask_searcher_node() -> Any:
         emit(
             session_id,
             ProgressPhase.STEP_SUBSTEP,
-            AgentRole.FACT_CHECKER,
-            3,
+            AgentRole.SEARCHER,
+            1,
             5,
             f"round_{round_number}_search",
             detail=f"queries={len(queries)}",
@@ -70,6 +76,18 @@ def build_ask_searcher_node() -> Any:
             len(errors),
             exhausted,
         )
+        log_event(
+            logger,
+            logging.INFO,
+            "fact_checker.searcher_round",
+            queries=queries,
+            hit_count=len(hits),
+            pending_urls=pending_urls,
+            hit_urls_sample=[h.url for h in hits[:12]],
+            providers_successful=providers_successful,
+            errors=errors,
+            search_exhausted=exhausted,
+        )
         return {
             "hits": hits,
             "pending_urls": pending_urls,
@@ -94,8 +112,8 @@ def build_ask_reader_node() -> Any:
         emit(
             session_id,
             ProgressPhase.STEP_SUBSTEP,
-            AgentRole.FACT_CHECKER,
-            3,
+            AgentRole.READER,
+            2,
             5,
             f"round_{round_number}_read",
             detail=f"urls={len(urls)}",
@@ -137,6 +155,19 @@ def build_ask_reader_node() -> Any:
             len(successful_pages),
             len(fetch_failures),
             len(errors),
+        )
+        log_event(
+            logger,
+            logging.INFO,
+            "fact_checker.reader_round",
+            urls=urls,
+            pages_ok=len(successful_pages),
+            failures=len(fetch_failures),
+            page_results=[
+                {"url": p.url, "ok": not bool(p.error), "error": p.error, "words": p.word_count}
+                for p in pages
+            ],
+            errors=errors,
         )
         return {
             "evidence": successful_pages,

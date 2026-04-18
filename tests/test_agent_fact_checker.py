@@ -72,7 +72,7 @@ async def test_fact_checker_converges_in_first_round(monkeypatch: pytest.MonkeyP
                     {"url": "https://a.example", "title": "A", "snippet": "x", "source": "tavily"}
                 ],
                 "errors": [],
-                "providers_successful": ["tavily", "duckduckgo"],
+                "providers_successful": ["tavily", "brave", "duckduckgo"],
             }
         ],
         read_responses=[
@@ -130,14 +130,14 @@ async def test_fact_checker_loops_on_needs_more(monkeypatch: pytest.MonkeyPatch)
                     {"url": "https://a.example", "title": "A", "snippet": "x", "source": "tavily"}
                 ],
                 "errors": [],
-                "providers_successful": ["tavily", "duckduckgo"],
+                "providers_successful": ["tavily", "brave", "duckduckgo"],
             },
             {
                 "hits": [
                     {"url": "https://b.example", "title": "B", "snippet": "y", "source": "ddg"}
                 ],
                 "errors": [],
-                "providers_successful": ["tavily", "duckduckgo"],
+                "providers_successful": ["tavily", "brave", "duckduckgo"],
             },
         ],
         read_responses=[
@@ -209,7 +209,7 @@ async def test_fact_checker_respects_max_rounds(monkeypatch: pytest.MonkeyPatch)
                     {"url": "https://x.example", "title": "X", "snippet": "", "source": "tavily"}
                 ],
                 "errors": [],
-                "providers_successful": ["tavily", "duckduckgo"],
+                "providers_successful": ["tavily", "brave", "duckduckgo"],
             }
         ],
         read_responses=[

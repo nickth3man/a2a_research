@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -42,7 +43,7 @@ from pydantic import BaseModel, Field
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.searcher.agent import build_agent
 from a2a_research.agents.smolagents.searcher.card import SEARCHER_CARD
-from a2a_research.app_logging import get_logger
+from a2a_research.app_logging import get_logger, log_event
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
@@ -136,6 +137,17 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
         len(hits),
         len(errors),
         sorted(successful_providers),
+    )
+    log_event(
+        logger,
+        logging.INFO,
+        "searcher.batch_completed",
+        input_queries=queries,
+        queries_used=queries_used,
+        merged_hits=len(hits),
+        errors=errors,
+        successful_providers=sorted(successful_providers),
+        top_hit_urls=[h.url for h in hits[:20]],
     )
     return SearcherBatchResult(
         hits=hits,

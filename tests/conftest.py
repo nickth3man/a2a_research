@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import os
+
+# :mod:`a2a_research.settings` loads a singleton on import; credentials must exist first.
+os.environ.setdefault("LLM_API_KEY", "test-llm-key-placeholder")
+os.environ.setdefault("TAVILY_API_KEY", "test-tavily-key-placeholder")
+os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-placeholder")
+
 from unittest.mock import MagicMock, patch
 
 import pytest

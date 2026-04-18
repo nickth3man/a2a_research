@@ -5,8 +5,11 @@ Prefixes (Pydantic ``BaseSettings``):
 - ``LLM_*`` — OpenRouter model id, base URL, API key.
 
 Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``, ``MESOP_PORT``,
-``WORKFLOW_TIMEOUT``, ``TAVILY_API_KEY``, ``SEARCH_MAX_RESULTS``,
-``RESEARCH_MAX_ROUNDS``, ``*_PORT``, ``*_URL``.
+``WORKFLOW_TIMEOUT``, ``TAVILY_API_KEY`` and ``BRAVE_API_KEY`` (required),
+``SEARCH_MAX_RESULTS``,
+``SEARCHER_MAX_STEPS``, ``RESEARCH_MAX_ROUNDS``, ``*_PORT``, ``*_URL``.
+``LLM_PROVIDER`` is accepted in ``.env`` for backward compatibility but is
+ignored (all LLM traffic uses :class:`LLMSettings` / OpenRouter-style vars).
 
 Mesop reads additional ``MESOP_*`` variables (for example
 ``MESOP_STATE_SESSION_BACKEND``) via its own library config.
@@ -47,7 +50,7 @@ class LLMSettings(BaseSettings):
     )
     api_key: str = Field(
         default="",
-        description="OpenRouter API key.",
+        description="OpenRouter API key (required when using AppSettings; env: LLM_API_KEY).",
     )
 
 
@@ -57,11 +60,15 @@ def _expected_prefixed_keys(settings_cls: type[BaseSettings]) -> set[str]:
 
 
 _EXPECTED_DOTENV_KEYS = {
+    # Legacy from older templates; not read by Pydantic (kept to avoid noisy warnings).
+    "LLM_PROVIDER",
     "LOG_LEVEL",
     "MESOP_PORT",
     "WORKFLOW_TIMEOUT",
     "TAVILY_API_KEY",
+    "BRAVE_API_KEY",
     "SEARCH_MAX_RESULTS",
+    "SEARCHER_MAX_STEPS",
     "RESEARCH_MAX_ROUNDS",
     "PLANNER_PORT",
     "SEARCHER_PORT",
@@ -100,8 +107,9 @@ def _validate_dotenv_keys() -> None:
         logging.getLogger(__name__).warning(
             "Unknown keys in .env: %s. "
             "Allowed project keys are LOG_LEVEL, MESOP_PORT, WORKFLOW_TIMEOUT, "
-            "TAVILY_API_KEY, SEARCH_MAX_RESULTS, RESEARCH_MAX_ROUNDS, "
-            "and keys under the LLM_ prefix. "
+            "TAVILY_API_KEY, BRAVE_API_KEY, SEARCH_MAX_RESULTS, SEARCHER_MAX_STEPS, RESEARCH_MAX_ROUNDS, "
+            "LLM_MODEL, LLM_BASE_URL, LLM_API_KEY, LLM_PROVIDER (ignored legacy), "
+            "service *_PORT / *_URL keys. "
             "MESOP_* keys are allowed as passthrough.",
             rendered,
         )
@@ -117,8 +125,11 @@ class AppSettings(BaseSettings):
     )
 
     log_level: str = Field(
-        default="INFO",
-        description="Logging level: DEBUG, INFO, WARNING, or ERROR (env: LOG_LEVEL).",
+        default="DEBUG",
+        description=(
+            "Logging threshold for console and every file under logs/ (env: LOG_LEVEL). "
+            "Standard names: DEBUG, INFO, WARNING, ERROR."
+        ),
     )
     mesop_port: int = Field(
         default=32123,
@@ -130,16 +141,29 @@ class AppSettings(BaseSettings):
     )
     tavily_api_key: str = Field(
         default="",
-        description="Tavily API key for web search; blank = DuckDuckGo-only mode (env: TAVILY_API_KEY).",
+        description="Tavily API key for web search (required; env: TAVILY_API_KEY).",
+    )
+    brave_api_key: str = Field(
+        default="",
+        description="Brave Search API key (required; env: BRAVE_API_KEY).",
     )
     search_max_results: int = Field(
         default=5,
         ge=1,
         le=25,
-        description="Per-provider result cap for the parallel Tavily + DDG search (env: SEARCH_MAX_RESULTS).",
+        description=(
+            "Per-provider fetch cap for parallel Tavily + Brave + DDG; merged list is capped "
+            "separately (env: SEARCH_MAX_RESULTS)."
+        ),
+    )
+    searcher_max_steps: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Max tool-calling steps for the smolagents Searcher agent (env: SEARCHER_MAX_STEPS).",
     )
     research_max_rounds: int = Field(
-        default=3,
+        default=5,
         ge=1,
         le=10,
         description="Maximum number of FactChecker loop rounds (env: RESEARCH_MAX_ROUNDS).",
@@ -166,6 +190,19 @@ class AppSettings(BaseSettings):
     @model_validator(mode="after")
     def validate_dotenv_contract(self) -> AppSettings:
         _validate_dotenv_keys()
+        return self
+
+    @model_validator(mode="after")
+    def require_api_credentials(self) -> AppSettings:
+        if not self.llm.api_key.strip():
+            msg = "LLM_API_KEY is required — set it in .env or the environment."
+            raise ValueError(msg)
+        if not self.tavily_api_key.strip():
+            msg = "TAVILY_API_KEY is required — set it in .env or the environment."
+            raise ValueError(msg)
+        if not self.brave_api_key.strip():
+            msg = "BRAVE_API_KEY is required — set it in .env or the environment."
+            raise ValueError(msg)
         return self
 
 

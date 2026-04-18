@@ -14,6 +14,8 @@ The five agents are:
 4. **FactChecker** — LangGraph verification loop coordinating Searcher + Reader
 5. **Synthesizer** — Pydantic AI structured report generation
 
+**Orchestration (two levels):** The coordinator issues **three** sequential HTTP calls: **Planner → Fact Checker → Synthesizer**. Searcher and Reader are **not** separate coordinator steps; the Fact Checker service runs a LangGraph loop that **invokes** Searcher and Reader over A2A whenever it needs web search or page text. The UI lists all five roles so the timeline can show search/read activity during verification.
+
 ## Architecture
 
 ```text
@@ -69,10 +71,10 @@ cp .env.example .env
 Copy-Item .env.example .env
 ```
 
-Edit `.env` and set at least:
+Edit `.env` and set:
 
 - `LLM_API_KEY`
-- optionally `TAVILY_API_KEY` for better search coverage
+- `TAVILY_API_KEY` and `BRAVE_API_KEY` (required for web search; Tavily, Brave, and DuckDuckGo run in parallel)
 
 ### 3. Start the agent services
 
@@ -141,11 +143,12 @@ make test
 
 | Variable | Meaning | Default |
 |---|---|---|
-| `TAVILY_API_KEY` | Tavily API key; blank keeps DDGS-only fallback | empty |
-| `SEARCH_MAX_RESULTS` | Per-provider search cap | `5` |
-| `RESEARCH_MAX_ROUNDS` | FactChecker max loop rounds | `3` |
+| `TAVILY_API_KEY` | Tavily API key | _(required)_ |
+| `BRAVE_API_KEY` | Brave Search API key ([dashboard](https://api-dashboard.search.brave.com/)) | _(required)_ |
+| `SEARCH_MAX_RESULTS` | Per-provider fetch cap before merge | `5` |
+| `RESEARCH_MAX_ROUNDS` | FactChecker max loop rounds | `5` |
 | `WORKFLOW_TIMEOUT` | Coordinator timeout (seconds) | `180` |
-| `LOG_LEVEL` | Logging level | `INFO` |
+| `LOG_LEVEL` | One threshold for console and `logs/app.log` | `DEBUG` |
 | `MESOP_PORT` | UI port | `32123` |
 
 See `.env.example` for the fully annotated version.
@@ -190,7 +193,7 @@ Then check `GET /.well-known/agent-card.json` for the service URL.
 
 ### Search quality is poor
 
-- set `TAVILY_API_KEY` to enable Tavily in addition to DDGS
+- set `TAVILY_API_KEY` and `BRAVE_API_KEY` for the paid/indexed providers
 - raise `SEARCH_MAX_RESULTS`
 - inspect Searcher logs for provider failures or rate limiting
 

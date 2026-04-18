@@ -117,6 +117,9 @@ dev = [
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-n auto --cov=src/a2a_research --cov-report=term-missing"
+markers = [
+    "integration: calls real network APIs; set TAVILY_LIVE=1 / BRAVE_LIVE=1 for live search tests",
+]
 filterwarnings = [
     "error",
     # Windows ProactorEventLoop and transport __del__ emit ResourceWarning during

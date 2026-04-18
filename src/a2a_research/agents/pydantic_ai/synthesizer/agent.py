@@ -34,7 +34,13 @@ def build_agent() -> Agent[None, ReportOutput]:
     """Return a cached ``Agent`` with :class:`ReportOutput` as structured output."""
     return cast(
         "Agent[None, ReportOutput]",
-        Agent(build_model(), instructions=SYNTHESIZER_PROMPT, output_type=ReportOutput),
+        Agent(
+            build_model(),
+            instructions=SYNTHESIZER_PROMPT,
+            output_type=ReportOutput,
+            # Default retries=1 is tight for schema-shaped JSON; extra attempts reduce flaky failures.
+            output_retries=4,
+        ),
     )
 
 

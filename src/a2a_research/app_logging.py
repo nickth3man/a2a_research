@@ -1,8 +1,18 @@
 """Shared logging setup and logger factory.
 
-``setup_logging`` applies :mod:`logging` ``basicConfig`` once, using
-``AppSettings.log_level``. ``get_logger`` ensures setup has run before returning
-a named logger.
+``setup_logging`` configures the root logger once. The same ``LOG_LEVEL``
+applies everywhere: console and every log file. Records are never dropped by
+level within the app.
+
+Files under ``logs/``:
+
+- ``everything.log`` — full audit trail (all loggers).
+- ``app.log`` — ``a2a_research.*`` only (this package).
+- ``a2a_sdk.log`` — third-party ``a2a`` SDK (``a2a.*``, not ``a2a_research``).
+- ``http_clients.log`` — ``httpx`` / ``httpcore``.
+- ``mesop_server.log`` — Mesop, Flask, Werkzeug, Uvicorn.
+- ``stdio.log`` — captured ``stdout`` / ``stderr`` when using  :func:`redirect_stdio_to_logging`.
+- ``warnings.log`` — Python :mod:`warnings` (``py.warnings``).
 """
 
 from __future__ import annotations
@@ -14,6 +24,7 @@ import logging
 import os
 import sys
 import threading
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TextIO, cast
@@ -25,12 +36,61 @@ if TYPE_CHECKING:
 
 _CONFIGURED = False
 _LOG_DIR = Path.cwd() / "logs"
+_LOG_EVERYTHING = _LOG_DIR / "everything.log"
 _APP_LOG = _LOG_DIR / "app.log"
-_ERROR_LOG = _LOG_DIR / "errors.log"
-_TRACE_LOG = _LOG_DIR / "trace.log"
+_LOG_A2A_SDK = _LOG_DIR / "a2a_sdk.log"
+_LOG_HTTP_CLIENTS = _LOG_DIR / "http_clients.log"
+_LOG_MESOP_SERVER = _LOG_DIR / "mesop_server.log"
+_LOG_STDIO = _LOG_DIR / "stdio.log"
+_LOG_WARNINGS = _LOG_DIR / "warnings.log"
 _ORIGINAL_STDOUT = sys.stdout
 _ORIGINAL_STDERR = sys.stderr
 _EVENT_COUNTER = itertools.count(1)
+
+
+@dataclass(frozen=True)
+class _PrefixFilter:
+    """Pass records whose logger name starts with any of the given prefixes."""
+
+    prefixes: tuple[str, ...]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return any(record.name.startswith(p) for p in self.prefixes)
+
+
+@dataclass(frozen=True)
+class _A2aSdkFilter:
+    """Third-party A2A SDK loggers (exclude our ``a2a_research`` package)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        name = record.name
+        if name.startswith("a2a_research"):
+            return False
+        return name == "a2a" or name.startswith("a2a.")
+
+
+@dataclass(frozen=True)
+class _HttpClientsFilter:
+    def filter(self, record: logging.LogRecord) -> bool:
+        name = record.name
+        if name == "httpcore" or name.startswith("httpcore."):
+            return True
+        return name == "httpx" or name.startswith("httpx.")
+
+
+@dataclass(frozen=True)
+class _MesopServerFilter:
+    _roots: frozenset[str] = frozenset({"mesop", "flask", "werkzeug", "uvicorn"})
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        base = record.name.split(".", 1)[0]
+        return base in self._roots
+
+
+@dataclass(frozen=True)
+class _WarningsFilter:
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.name == "py.warnings"
 
 
 class _StreamToLogger:
@@ -79,7 +139,7 @@ def _normalize_log_value(value: Any) -> Any:
 
 
 def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> None:
-    """Write a granular structured event log line."""
+    """Write a granular structured log line (``event=`` + JSON payload)."""
     payload = {
         "seq": next(_EVENT_COUNTER),
         "ts": datetime.now(UTC).isoformat(),
@@ -168,6 +228,13 @@ def install_asyncio_exception_logging(loop: asyncio.AbstractEventLoop | None = N
     target_loop.set_exception_handler(_handle_async_exception)
 
 
+def _file_handler(path: Path, level: int, formatter: logging.Formatter) -> logging.FileHandler:
+    handler = logging.FileHandler(path, encoding="utf-8")
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+    return handler
+
+
 def setup_logging() -> None:
     global _CONFIGURED
     if _CONFIGURED:
@@ -175,7 +242,7 @@ def setup_logging() -> None:
 
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
     level_name = settings.log_level.upper()
-    level = getattr(logging, level_name, logging.INFO)
+    level = getattr(logging, level_name, logging.DEBUG)
     formatter = _build_formatter()
 
     root = logging.getLogger()
@@ -186,39 +253,50 @@ def setup_logging() -> None:
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
 
-    app_file_handler = logging.FileHandler(_APP_LOG, encoding="utf-8")
-    app_file_handler.setLevel(level)
-    app_file_handler.setFormatter(formatter)
+    everything_handler = _file_handler(_LOG_EVERYTHING, level, formatter)
 
-    error_file_handler = logging.FileHandler(_ERROR_LOG, encoding="utf-8")
-    error_file_handler.setLevel(logging.ERROR)
-    error_file_handler.setFormatter(formatter)
+    app_handler = _file_handler(_APP_LOG, level, formatter)
+    app_handler.addFilter(_PrefixFilter(("a2a_research",)))
 
-    trace_file_handler = logging.FileHandler(_TRACE_LOG, encoding="utf-8")
-    trace_file_handler.setLevel(logging.DEBUG)
-    trace_file_handler.setFormatter(formatter)
+    a2a_sdk_handler = _file_handler(_LOG_A2A_SDK, level, formatter)
+    a2a_sdk_handler.addFilter(_A2aSdkFilter())
+
+    http_handler = _file_handler(_LOG_HTTP_CLIENTS, level, formatter)
+    http_handler.addFilter(_HttpClientsFilter())
+
+    mesop_handler = _file_handler(_LOG_MESOP_SERVER, level, formatter)
+    mesop_handler.addFilter(_MesopServerFilter())
+
+    warnings_handler = _file_handler(_LOG_WARNINGS, level, formatter)
+    warnings_handler.addFilter(_WarningsFilter())
 
     root.addHandler(console_handler)
-    root.addHandler(app_file_handler)
-    root.addHandler(error_file_handler)
-    root.addHandler(trace_file_handler)
+    root.addHandler(everything_handler)
+    root.addHandler(app_handler)
+    root.addHandler(a2a_sdk_handler)
+    root.addHandler(http_handler)
+    root.addHandler(mesop_handler)
+    root.addHandler(warnings_handler)
 
     logging.captureWarnings(True)
     _configure_named_logger("asyncio", level)
     _configure_named_logger("mesop", level)
     _configure_named_logger("werkzeug", level)
     _configure_named_logger("flask", level)
+    # Trafilatura logs ERROR for non-200 HTTP (e.g. 403) and WARNING for empty extraction;
+    # outcomes are summarized in ``a2a_research.tools.fetch`` batch events.
+    logging.getLogger("trafilatura.downloads").setLevel(logging.CRITICAL)
+    logging.getLogger("trafilatura.core").setLevel(logging.ERROR)
     # stdout/stderr loggers: disable propagation to avoid duplicate console output
     # (they write directly to terminal via _StreamToLogger._original_stream)
-    stderr_logger = _configure_named_logger("stderr", logging.ERROR, propagate=False)
+    stderr_logger = _configure_named_logger("stderr", level, propagate=False)
     stdout_logger = _configure_named_logger("stdout", level, propagate=False)
-    # Clear existing handlers to avoid duplication on reconfiguration
     stderr_logger.handlers.clear()
     stdout_logger.handlers.clear()
-    # Attach file handlers directly to prevent log loss when propagation is off
-    for handler in [app_file_handler, error_file_handler, trace_file_handler]:
-        stdout_logger.addHandler(handler)
-        stderr_logger.addHandler(handler)
+    stdio_handler = _file_handler(_LOG_STDIO, level, formatter)
+    for h in (everything_handler, stdio_handler):
+        stdout_logger.addHandler(h)
+        stderr_logger.addHandler(h)
     _install_exception_hooks()
 
     log_event(
@@ -226,17 +304,26 @@ def setup_logging() -> None:
         logging.INFO,
         "logging.configured",
         configured_level=level_name,
-        app_log=_APP_LOG,
-        error_log=_ERROR_LOG,
-        trace_log=_TRACE_LOG,
+        log_files={
+            "everything": str(_LOG_EVERYTHING),
+            "app": str(_APP_LOG),
+            "a2a_sdk": str(_LOG_A2A_SDK),
+            "http_clients": str(_LOG_HTTP_CLIENTS),
+            "mesop_server": str(_LOG_MESOP_SERVER),
+            "stdio": str(_LOG_STDIO),
+            "warnings": str(_LOG_WARNINGS),
+        },
     )
     _CONFIGURED = True
 
 
 def redirect_stdio_to_logging() -> None:
     """Opt-in redirection of sys.stdout/stderr to the logging system."""
-    sys.stdout = _StreamToLogger(logging.getLogger("stdout"), logging.INFO, _ORIGINAL_STDOUT)
-    sys.stderr = _StreamToLogger(logging.getLogger("stderr"), logging.ERROR, _ORIGINAL_STDERR)
+    setup_logging()
+    level_name = settings.log_level.upper()
+    level = getattr(logging, level_name, logging.DEBUG)
+    sys.stdout = _StreamToLogger(logging.getLogger("stdout"), level, _ORIGINAL_STDOUT)
+    sys.stderr = _StreamToLogger(logging.getLogger("stderr"), level, _ORIGINAL_STDERR)
 
 
 __all__ = [

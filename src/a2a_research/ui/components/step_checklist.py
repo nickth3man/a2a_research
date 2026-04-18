@@ -1,4 +1,4 @@
-"""Per-agent checklist with optional sub-step lines for the active step."""
+"""Per-agent checklist with secondary sub-step lines for the active step."""
 
 import mesop as me
 

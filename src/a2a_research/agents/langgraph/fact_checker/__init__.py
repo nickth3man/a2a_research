@@ -1,4 +1,9 @@
-"""FactChecker — bounded langgraph StateGraph loop that coordinates Searcher + Reader."""
+"""FactChecker — bounded LangGraph loop that verifies claims.
+
+Top-level workflow calls this service over HTTP once per run; internally the
+graph dispatches Searcher and Reader via A2A (see ``graph`` and
+``search_reader_nodes`` in this package).
+"""
 
 from __future__ import annotations
 

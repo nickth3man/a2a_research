@@ -87,8 +87,6 @@ class TestSetupLogging:
         with (
             patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
             patch("a2a_research.app_logging._APP_LOG", tmp_path / "logs" / "app.log"),
-            patch("a2a_research.app_logging._ERROR_LOG", tmp_path / "logs" / "errors.log"),
-            patch("a2a_research.app_logging._TRACE_LOG", tmp_path / "logs" / "trace.log"),
             patch("a2a_research.app_logging.logging.FileHandler", side_effect=make_file_handler),
         ):
             import a2a_research.app_logging as logging_mod
@@ -121,8 +119,6 @@ class TestSetupLogging:
         with (
             patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
             patch("a2a_research.app_logging._APP_LOG", tmp_path / "logs" / "app.log"),
-            patch("a2a_research.app_logging._ERROR_LOG", tmp_path / "logs" / "errors.log"),
-            patch("a2a_research.app_logging._TRACE_LOG", tmp_path / "logs" / "trace.log"),
             patch("a2a_research.app_logging.logging.FileHandler", side_effect=make_file_handler),
         ):
             import a2a_research.app_logging as logging_mod
