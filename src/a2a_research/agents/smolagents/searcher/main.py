@@ -46,7 +46,7 @@ from a2a_research.app_logging import get_logger
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import WebHit
+from a2a_research.tools import WebHit, web_search
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -105,7 +105,17 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
         else queries
     )
     if not by_url and not errors:
-        errors.append("Searcher agent returned no usable hits.")
+        fallback_results = await asyncio.gather(
+            *[web_search(query) for query in queries],
+            return_exceptions=False,
+        )
+        for result in fallback_results:
+            for hit in result.hits:
+                by_url.setdefault(hit.url, hit)
+            errors.extend(err for err in result.errors if err not in errors)
+            successful_providers.update(result.providers_successful)
+        if not by_url and not errors:
+            errors.append("Searcher agent returned no usable hits.")
 
     for index, query in enumerate(queries_used, start=1):
         emit(

@@ -1,15 +1,28 @@
-"""Start all five HTTP A2A agent services as subprocesses."""
+"""Start all five HTTP A2A agent services in one process."""
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 import threading
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
+import uvicorn
+
+from a2a_research.agents.langgraph.fact_checker.main import (
+    build_http_app as build_fact_checker_app,
+)
+from a2a_research.agents.pocketflow.planner.main import build_http_app as build_planner_app
+from a2a_research.agents.pydantic_ai.synthesizer.main import (
+    build_http_app as build_synthesizer_app,
+)
+from a2a_research.agents.smolagents.reader.main import build_http_app as build_reader_app
+from a2a_research.agents.smolagents.searcher.main import build_http_app as build_searcher_app
 from a2a_research.app_logging import get_logger
+from a2a_research.settings import settings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 logger = get_logger(__name__)
 
@@ -17,62 +30,55 @@ logger = get_logger(__name__)
 @dataclass(frozen=True)
 class ServiceSpec:
     name: str
-    module: str
+    port: int
+    app_factory: Callable[[], Any]
 
 
 SERVICES = [
-    ServiceSpec("planner", "a2a_research.agents.pocketflow.planner"),
-    ServiceSpec("searcher", "a2a_research.agents.smolagents.searcher"),
-    ServiceSpec("reader", "a2a_research.agents.smolagents.reader"),
-    ServiceSpec("fact-checker", "a2a_research.agents.langgraph.fact_checker"),
-    ServiceSpec("synthesizer", "a2a_research.agents.pydantic_ai.synthesizer"),
+    ServiceSpec("planner", settings.planner_port, build_planner_app),
+    ServiceSpec("searcher", settings.searcher_port, build_searcher_app),
+    ServiceSpec("reader", settings.reader_port, build_reader_app),
+    ServiceSpec("fact-checker", settings.fact_checker_port, build_fact_checker_app),
+    ServiceSpec("synthesizer", settings.synthesizer_port, build_synthesizer_app),
 ]
 
 
-def _stream_logs(name: str, process: subprocess.Popen[str]) -> None:
-    if process.stdout is None:
-        return
-    for line in process.stdout:
-        logger.info("[%s] %s", name, line.rstrip())
+def _run_server(server: uvicorn.Server) -> None:
+    server.run()
 
 
 def main() -> None:
-    env = os.environ.copy()
-    processes: list[subprocess.Popen[str]] = []
     threads: list[threading.Thread] = []
+    servers: list[uvicorn.Server] = []
 
     try:
         for service in SERVICES:
-            process = subprocess.Popen(
-                [sys.executable, "-m", service.module],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=env,
+            config = uvicorn.Config(
+                app=service.app_factory(),
+                host="0.0.0.0",
+                port=service.port,
+                log_level="info",
             )
-            processes.append(process)
-            thread = threading.Thread(
-                target=_stream_logs, args=(service.name, process), daemon=True
-            )
+            server = uvicorn.Server(config)
+            thread = threading.Thread(target=_run_server, args=(server,), daemon=True)
             thread.start()
             threads.append(thread)
+            servers.append(server)
+            logger.info("Started %s on port %s", service.name, service.port)
 
         while True:
-            for process, service in zip(processes, SERVICES, strict=False):
-                code = process.poll()
-                if code is not None:
-                    raise RuntimeError(
-                        f"Service {service.name} exited unexpectedly with code {code}"
-                    )
+            for service, thread in zip(SERVICES, threads, strict=False):
+                if not thread.is_alive():
+                    raise RuntimeError(f"Service {service.name} stopped unexpectedly")
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("Received SIGINT, stopping services")
     finally:
-        for process in processes:
-            if process.poll() is None:
-                process.terminate()
-        for process in processes:
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
+        for server in servers:
+            server.should_exit = True
+        for thread in threads:
+            thread.join(timeout=5)
+
+
+if __name__ == "__main__":
+    main()

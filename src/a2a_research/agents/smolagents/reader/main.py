@@ -35,7 +35,7 @@ from a2a_research.app_logging import get_logger
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import PageContent
+from a2a_research.tools import PageContent, fetch_many
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -156,7 +156,10 @@ async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageConte
     data = parse_json_safely(str(raw_output))
     raw_pages_any = data.get("pages")
     raw_pages: list[object] = raw_pages_any if isinstance(raw_pages_any, list) else []
-    return [PageContent.model_validate(item) for item in raw_pages if isinstance(item, dict)]
+    pages = [PageContent.model_validate(item) for item in raw_pages if isinstance(item, dict)]
+    if pages:
+        return pages
+    return await fetch_many(urls, max_chars=max_chars)
 
 
 def _coerce_str_list(raw: Any) -> list[str]:
