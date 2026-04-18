@@ -25,6 +25,8 @@ from a2a.types import (
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import fetch_many
 
 if TYPE_CHECKING:
@@ -41,8 +43,10 @@ class ReaderExecutor(AgentExecutor):
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
         urls = _coerce_str_list(payload.get("urls") or payload.get("url"))
         max_chars = int(payload.get("max_chars") or 8000)
+        emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.READER, 2, 5, "reader_started")
 
         try:
             pages = await fetch_many(urls, max_chars=max_chars) if urls else []
@@ -53,6 +57,19 @@ class ReaderExecutor(AgentExecutor):
             pages = []
             status = TaskState.failed
             error_text = str(exc)
+
+        for index, page in enumerate(pages, start=1):
+            emit(
+                session_id,
+                ProgressPhase.STEP_SUBSTEP,
+                AgentRole.READER,
+                2,
+                5,
+                f"fetch_url_{index}",
+                substep_index=index,
+                substep_total=max(len(urls), 1),
+                detail=page.error or page.title or page.url,
+            )
 
         artifact = Artifact(
             artifact_id="extracted-pages",
@@ -78,6 +95,17 @@ class ReaderExecutor(AgentExecutor):
                 final=True,
                 metadata={"error": error_text} if error_text else None,
             )
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_COMPLETED
+            if status == TaskState.completed
+            else ProgressPhase.STEP_FAILED,
+            AgentRole.READER,
+            2,
+            5,
+            "reader_completed" if status == TaskState.completed else "reader_failed",
+            detail=f"urls={len(urls)} pages={len(pages)}",
         )
         logger.info("Reader task_id=%s urls=%s pages=%s", task.id, len(urls), len(pages))
 

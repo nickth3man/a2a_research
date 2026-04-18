@@ -28,7 +28,8 @@ from pydantic import ValidationError
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pydantic_ai.synthesizer import agent as _agent
 from a2a_research.app_logging import get_logger
-from a2a_research.models import Claim, ReportOutput, WebSource
+from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
+from a2a_research.progress import ProgressPhase, emit
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -58,10 +59,22 @@ def _build_prompt(query: str, claims: list[Claim], sources: list[WebSource]) -> 
     )
 
 
-async def synthesize(query: str, claims: list[Claim], sources: list[WebSource]) -> ReportOutput:
+async def synthesize(
+    query: str, claims: list[Claim], sources: list[WebSource], *, session_id: str = ""
+) -> ReportOutput:
     """Run the Synthesizer agent and return the :class:`ReportOutput`."""
     agent = _agent.build_agent()
+    emit(
+        session_id,
+        ProgressPhase.STEP_SUBSTEP,
+        AgentRole.SYNTHESIZER,
+        4,
+        5,
+        "building_prompt",
+        detail=f"claims={len(claims)} sources={len(sources)}",
+    )
     prompt = _build_prompt(query, claims, sources)
+    emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.SYNTHESIZER, 4, 5, "llm_call")
     result = await agent.run(prompt)
     return result.output
 
@@ -72,12 +85,21 @@ class SynthesizerExecutor(AgentExecutor):
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
         query = str(payload.get("query") or "")
         claims = _coerce_claims(payload.get("verified_claims") or payload.get("claims") or [])
         sources = _coerce_sources(payload.get("sources") or [])
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.SYNTHESIZER,
+            4,
+            5,
+            "synthesizer_started",
+        )
 
         try:
-            report = await synthesize(query, claims, sources)
+            report = await synthesize(query, claims, sources, session_id=session_id)
             status = TaskState.completed
             error_text: str | None = None
         except Exception as exc:
@@ -89,6 +111,14 @@ class SynthesizerExecutor(AgentExecutor):
             status = TaskState.failed
             error_text = str(exc)
 
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.SYNTHESIZER,
+            4,
+            5,
+            "rendering_markdown",
+        )
         markdown = report.to_markdown()
         data_artifact = Artifact(
             artifact_id="report",
@@ -118,6 +148,17 @@ class SynthesizerExecutor(AgentExecutor):
                 final=True,
                 metadata={"error": error_text} if error_text else None,
             )
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_COMPLETED
+            if status == TaskState.completed
+            else ProgressPhase.STEP_FAILED,
+            AgentRole.SYNTHESIZER,
+            4,
+            5,
+            "synthesizer_completed" if status == TaskState.completed else "synthesizer_failed",
+            detail=f"report_title={report.title}",
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:

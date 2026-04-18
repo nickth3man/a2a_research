@@ -28,20 +28,34 @@ from a2a_research.models import (
     ResearchSession,
     WebSource,
 )
+from a2a_research.progress import Bus, ProgressPhase, ProgressQueue, emit
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
 
 __all__ = ["run_research", "run_research_async", "run_research_sync"]
 
+_TOTAL_STEPS = 5
+_STEP_INDEX = {
+    AgentRole.PLANNER: 0,
+    AgentRole.SEARCHER: 1,
+    AgentRole.READER: 2,
+    AgentRole.FACT_CHECKER: 3,
+    AgentRole.SYNTHESIZER: 4,
+}
 
-async def run_research_async(query: str) -> ResearchSession:
+
+async def run_research_async(
+    query: str, progress_queue: ProgressQueue | None = None
+) -> ResearchSession:
     session = ResearchSession(query=query)
     session.ensure_agent_results()
     started = perf_counter()
     logger.info("workflow start session_id=%s query=%r", session.id, query)
 
     client = A2AClient(get_registry())
+    if progress_queue is not None:
+        Bus.register(session.id, progress_queue)
 
     try:
         await asyncio.wait_for(_drive(session, client, query), timeout=settings.workflow_timeout)
@@ -63,6 +77,9 @@ async def run_research_async(query: str) -> ResearchSession:
         elapsed_ms,
         session.error,
     )
+    if progress_queue is not None:
+        progress_queue.put_nowait(None)
+        Bus.unregister(session.id)
     return session
 
 
@@ -86,8 +103,12 @@ def run_research(query: str) -> ResearchSession:
 
 
 async def _drive(session: ResearchSession, client: A2AClient, query: str) -> None:
+    _emit_role_event(session.id, AgentRole.PLANNER, ProgressPhase.STEP_STARTED, "planner_started")
     _set_status(session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…")
-    plan_task = await client.send(AgentRole.PLANNER, payload={"query": query})
+    plan_task = await client.send(
+        AgentRole.PLANNER,
+        payload={"query": query, "session_id": session.id},
+    )
     plan = _payload(plan_task)
     plan_failed = _task_failed(plan_task)
     claims: list[Claim] = [
@@ -102,6 +123,9 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         ("Failed to decompose query." if plan_failed else f"Extracted {len(claims)} claim(s)."),
     )
     if plan_failed:
+        _emit_role_event(
+            session.id, AgentRole.PLANNER, ProgressPhase.STEP_FAILED, "planner_failed"
+        )
         session.error = "Planner failed to decompose query."
         _set_status(session, AgentRole.SEARCHER, AgentStatus.FAILED, "Skipped: planner failed.")
         _set_status(session, AgentRole.READER, AgentStatus.FAILED, "Skipped: planner failed.")
@@ -112,14 +136,24 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         session.report = None
         session.final_report = _planner_failed_report(query)
         return
+    _emit_role_event(
+        session.id, AgentRole.PLANNER, ProgressPhase.STEP_COMPLETED, "planner_completed"
+    )
 
     _set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
     _set_status(session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…")
     _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.RUNNING, "Verifying claims…")
+    _emit_role_event(
+        session.id,
+        AgentRole.FACT_CHECKER,
+        ProgressPhase.STEP_STARTED,
+        "fact_checker_started",
+    )
 
     fc_task = await client.send(
         AgentRole.FACT_CHECKER,
         payload={
+            "session_id": session.id,
             "query": query,
             "claims": [c.model_dump(mode="json") for c in claims],
             "seed_queries": seed_queries,
@@ -145,6 +179,12 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     session.sources = sources
 
     if fc_failed or fc_search_exhausted:
+        _emit_role_event(
+            session.id,
+            AgentRole.FACT_CHECKER,
+            ProgressPhase.STEP_FAILED,
+            "fact_checker_failed",
+        )
         reason = " | ".join(fc_errors) or "web search produced no evidence (no errors reported)."
         _set_status(
             session,
@@ -193,11 +233,24 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         AgentStatus.COMPLETED,
         f"Converged after {rounds} round(s).",
     )
+    _emit_role_event(
+        session.id,
+        AgentRole.FACT_CHECKER,
+        ProgressPhase.STEP_COMPLETED,
+        "fact_checker_completed",
+    )
 
     _set_status(session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…")
+    _emit_role_event(
+        session.id,
+        AgentRole.SYNTHESIZER,
+        ProgressPhase.STEP_STARTED,
+        "synthesizer_started",
+    )
     syn_task = await client.send(
         AgentRole.SYNTHESIZER,
         payload={
+            "session_id": session.id,
             "query": query,
             "verified_claims": [c.model_dump(mode="json") for c in (verified or claims)],
             "sources": [s.model_dump(mode="json") for s in sources],
@@ -215,7 +268,20 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         "Failed to synthesize report." if syn_failed else "Report synthesized.",
     )
     if syn_failed:
+        _emit_role_event(
+            session.id,
+            AgentRole.SYNTHESIZER,
+            ProgressPhase.STEP_FAILED,
+            "synthesizer_failed",
+        )
         session.error = session.error or "Synthesizer failed to produce a report."
+    else:
+        _emit_role_event(
+            session.id,
+            AgentRole.SYNTHESIZER,
+            ProgressPhase.STEP_COMPLETED,
+            "synthesizer_completed",
+        )
 
 
 def _task_failed(task: Any) -> bool:
@@ -278,6 +344,20 @@ def _set_status(
     session: ResearchSession, role: AgentRole, status: AgentStatus, message: str
 ) -> None:
     session.agent_results[role] = AgentResult(role=role, status=status, message=message)
+
+
+def _emit_role_event(
+    session_id: str, role: AgentRole, phase: ProgressPhase, label: str, detail: str = ""
+) -> None:
+    emit(
+        session_id,
+        phase,
+        role,
+        _STEP_INDEX[role],
+        _TOTAL_STEPS,
+        label,
+        detail=detail,
+    )
 
 
 def _mark_running_failed(session: ResearchSession) -> None:

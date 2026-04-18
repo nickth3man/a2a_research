@@ -42,7 +42,14 @@ from a2a_research.app_logging import (
     log_event,
     setup_logging,
 )
-from a2a_research.models import ResearchSession
+from a2a_research.models import AgentStatus, ResearchSession
+from a2a_research.progress import (
+    ProgressEvent,
+    ProgressGranularity,
+    ProgressPhase,
+    ProgressQueue,
+    drain_progress_while_running,
+)
 from a2a_research.ui.components import (
     BannerError,
     CardLoading,
@@ -234,6 +241,73 @@ def _initialize_progress_state(state: AppState) -> None:
     state.progress_step_label = "Running the 5-agent research pipeline\u2026"
 
 
+def _role_label(role: object) -> str:
+    value = getattr(role, "value", str(role))
+    return str(value).replace("_", " ").title()
+
+
+def _format_progress_text(state: AppState, event: ProgressEvent) -> str:
+    label = event.substep_label.replace("_", " ")
+    if state.progress_granularity >= ProgressGranularity.DETAIL and event.detail:
+        return f"{label} — {event.detail}"
+    return label
+
+
+def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
+    state.session.ensure_agent_results()
+    role_label = _role_label(event.role)
+    display = _format_progress_text(state, event)
+    step_result = state.session.agent_results[event.role]
+
+    if event.phase == ProgressPhase.STEP_STARTED:
+        state.session.agent_results[event.role] = step_result.model_copy(
+            update={"status": AgentStatus.RUNNING, "message": display}
+        )
+        if role_label not in state.progress_running_substeps:
+            state.progress_running_substeps.append(role_label)
+        state.progress_step_label = f"{role_label}…"
+        state.progress_pct = max(state.progress_pct, event.step_index / max(event.total_steps, 1))
+        return
+
+    if event.phase == ProgressPhase.STEP_SUBSTEP:
+        state.session.agent_results[event.role] = step_result.model_copy(
+            update={"status": AgentStatus.RUNNING, "message": display}
+        )
+        if state.progress_granularity >= ProgressGranularity.SUBSTEP:
+            state.current_substep = display
+        state.progress_step_label = f"{role_label}…"
+        substep_fraction = event.substep_index / max(event.substep_total, 1)
+        state.progress_pct = max(
+            state.progress_pct,
+            (event.step_index + substep_fraction) / max(event.total_steps, 1),
+        )
+        return
+
+    if event.phase == ProgressPhase.STEP_COMPLETED:
+        state.session.agent_results[event.role] = step_result.model_copy(
+            update={"status": AgentStatus.COMPLETED, "message": display}
+        )
+        state.progress_running_substeps = [
+            item for item in state.progress_running_substeps if item != role_label
+        ]
+        state.progress_step_label = f"{role_label} completed"
+        state.current_substep = ""
+        state.progress_pct = max(
+            state.progress_pct, (event.step_index + 1) / max(event.total_steps, 1)
+        )
+        return
+
+    if event.phase == ProgressPhase.STEP_FAILED:
+        state.session.agent_results[event.role] = step_result.model_copy(
+            update={"status": AgentStatus.FAILED, "message": display}
+        )
+        state.progress_running_substeps = [
+            item for item in state.progress_running_substeps if item != role_label
+        ]
+        state.progress_step_label = f"{role_label} failed"
+        state.current_substep = display
+
+
 def _render_results(session: ResearchSession) -> None:
     log_event(
         logger,
@@ -340,9 +414,8 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     state.session = ResearchSession(query=query_text)
     state.session.ensure_agent_results()
     state.progress_pct = 0.05
-    state.current_substep = ""
+    _initialize_progress_state(state)
     state.progress_step_label = "Starting pipeline\u2026"
-    state.progress_running_substeps = []
     log_event(
         logger,
         logging.INFO,
@@ -357,12 +430,12 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
 
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:
-        wf_task = asyncio.create_task(run_research_async(query_text))
-        # Coarse-grained progress: yield periodically so the UI stays responsive
-        # while the pipeline runs; granular per-agent events are a future task.
-        while not wf_task.done():
-            await asyncio.sleep(0.5)
-            state.progress_pct = min(0.95, state.progress_pct + 0.02)
+        progress_queue: ProgressQueue = asyncio.Queue()
+        wf_task = asyncio.create_task(
+            run_research_async(query_text, progress_queue=progress_queue)
+        )
+        async for event in drain_progress_while_running(progress_queue, wf_task):
+            _apply_progress_event(state, event)
             yield
 
         state.session = wf_task.result()

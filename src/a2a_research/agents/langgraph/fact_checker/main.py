@@ -26,7 +26,8 @@ from a2a_research.a2a import A2AClient
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.graph import build_fact_check_graph
 from a2a_research.app_logging import get_logger
-from a2a_research.models import Claim, WebSource
+from a2a_research.models import AgentRole, Claim, WebSource
+from a2a_research.progress import ProgressPhase, emit
 from a2a_research.settings import settings
 
 if TYPE_CHECKING:
@@ -43,6 +44,7 @@ async def run_fact_check(
     claims: list[Claim],
     seed_queries: list[str],
     *,
+    session_id: str = "",
     client: A2AClient | None = None,
     max_rounds: int | None = None,
 ) -> FactCheckRunResult:
@@ -50,6 +52,7 @@ async def run_fact_check(
     active_client = client or A2AClient()
     graph = build_fact_check_graph(active_client)
     initial_state: FactCheckState = {
+        "session_id": session_id,
         "query": query,
         "claims": list(claims),
         "evidence": [],
@@ -74,6 +77,15 @@ async def run_fact_check(
         if err not in seen_errors:
             seen_errors.add(err)
             errors.append(err)
+    emit(
+        session_id,
+        ProgressPhase.STEP_SUBSTEP,
+        AgentRole.FACT_CHECKER,
+        3,
+        5,
+        "exhausted" if final_state.get("search_exhausted") else "converged",
+        detail=f"rounds={int(final_state.get('round') or 0)} errors={len(errors)}",
+    )
     return {
         "verified_claims": list(final_state.get("claims") or []),
         "sources": list(unique_sources.values()),
@@ -89,12 +101,26 @@ class FactCheckerExecutor(AgentExecutor):
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
         query = str(payload.get("query") or "")
         claims = _coerce_claims(payload.get("claims") or [])
         seed_queries = _coerce_str_list(payload.get("seed_queries") or [])
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            "fact_checker_started",
+        )
 
         try:
-            result: FactCheckRunResult = await run_fact_check(query, claims, seed_queries)
+            result: FactCheckRunResult = await run_fact_check(
+                query,
+                claims,
+                seed_queries,
+                session_id=session_id,
+            )
             error_text: str | None = None
             exhausted = bool(result["search_exhausted"])
             errors_list = list(result["errors"])
@@ -155,6 +181,17 @@ class FactCheckerExecutor(AgentExecutor):
                 final=True,
                 metadata={"error": error_text} if error_text else None,
             )
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_COMPLETED
+            if status == TaskState.completed
+            else ProgressPhase.STEP_FAILED,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            "fact_checker_completed" if status == TaskState.completed else "fact_checker_failed",
+            detail=f"rounds={result['rounds']} errors={len(result['errors'])}",
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:

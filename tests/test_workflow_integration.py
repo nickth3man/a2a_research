@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -13,7 +14,8 @@ from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
 from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.agents.smolagents.searcher import main as searcher_main
-from a2a_research.models import AgentStatus, ReportOutput
+from a2a_research.models import AgentRole, AgentStatus, ReportOutput
+from a2a_research.progress import ProgressEvent, ProgressPhase, drain_progress_while_running
 from a2a_research.tools.fetch import PageContent
 from a2a_research.tools.search import SearchResult, WebHit
 from a2a_research.workflow import run_research_async
@@ -35,9 +37,7 @@ class _FakePydAgent:
         return SimpleNamespace(output=self._report)
 
 
-@pytest.mark.asyncio
-async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Planner returns 1 claim + seed queries
+def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         planner_nodes,
         "get_llm",
@@ -49,7 +49,6 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
 
-    # Searcher tool: one hit from Tavily, both providers succeeded
     async def fake_search(query: str, max_results: int | None = None) -> SearchResult:
         return SearchResult(
             hits=[
@@ -68,7 +67,6 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(searcher_main, "web_search", fake_search)
 
-    # Reader tool: one page
     async def fake_fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent]:
         return [
             PageContent(
@@ -81,7 +79,6 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(reader_main, "fetch_many", fake_fetch_many)
 
-    # FactChecker LLM: one-round convergence
     monkeypatch.setattr(
         fc_verify,
         "get_llm",
@@ -101,7 +98,6 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
 
-    # Synthesizer: returns a ReportOutput
     synth_agent.reset_agent_cache()
     monkeypatch.setattr(
         synth_agent,
@@ -115,6 +111,11 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
 
+
+@pytest.mark.asyncio
+async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure_success_path(monkeypatch)
+
     session = await run_research_async("When did JWST launch?")
 
     assert session.error is None
@@ -125,6 +126,32 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     assert session.sources[0].url == "https://nasa.example/jwst"
     statuses = {r: ar.status for r, ar in session.agent_results.items()}
     assert all(s == AgentStatus.COMPLETED for s in statuses.values())
+
+
+@pytest.mark.asyncio
+async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    _configure_success_path(monkeypatch)
+
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    workflow_task = asyncio.create_task(
+        run_research_async("When did JWST launch?", progress_queue=queue)
+    )
+    events = [event async for event in drain_progress_while_running(queue, workflow_task)]
+    session = await workflow_task
+
+    assert session.error is None
+    started_roles = {event.role for event in events if event.phase == ProgressPhase.STEP_STARTED}
+    assert started_roles == {
+        AgentRole.PLANNER,
+        AgentRole.SEARCHER,
+        AgentRole.READER,
+        AgentRole.FACT_CHECKER,
+        AgentRole.SYNTHESIZER,
+    }
+    assert any(
+        event.substep_label.startswith("round_") and event.phase == ProgressPhase.STEP_SUBSTEP
+        for event in events
+    )
 
 
 @pytest.mark.asyncio

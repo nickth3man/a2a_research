@@ -26,6 +26,7 @@ class FactCheckRunResult(TypedDict):
 
 
 class FactCheckState(TypedDict, total=False):
+    session_id: str
     query: str
     claims: list[Claim]
     evidence: Annotated[list[PageContent], operator.add]

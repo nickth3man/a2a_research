@@ -11,7 +11,8 @@ from a2a_research.agents.langgraph.fact_checker.node_support import (
 from a2a_research.agents.langgraph.fact_checker.prompt import VERIFY_PROMPT
 from a2a_research.agents.langgraph.fact_checker.state import FactCheckState  # noqa: TC001
 from a2a_research.app_logging import get_logger
-from a2a_research.models import Verdict
+from a2a_research.models import AgentRole, Verdict
+from a2a_research.progress import ProgressPhase, emit
 from a2a_research.providers import ProviderRequestError, get_llm
 
 logger = get_logger(__name__)
@@ -24,7 +25,18 @@ def build_verify_node() -> Any:
         claims = list(state.get("claims") or [])
         evidence = list(state.get("evidence") or [])
         errors = list(state.get("errors") or [])
+        session_id = str(state.get("session_id") or "")
         next_round = int(state.get("round") or 0) + 1
+
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            f"round_{next_round}_verify",
+            detail=f"claims={len(claims)} evidence={len(evidence)}",
+        )
 
         if not evidence:
             reason = (
@@ -46,6 +58,15 @@ def build_verify_node() -> Any:
                 )
                 for c in claims
             ]
+            emit(
+                session_id,
+                ProgressPhase.STEP_SUBSTEP,
+                AgentRole.FACT_CHECKER,
+                3,
+                5,
+                "exhausted",
+                detail=reason,
+            )
             return {
                 "claims": degraded,
                 "round": next_round,

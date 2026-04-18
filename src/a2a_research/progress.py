@@ -7,7 +7,7 @@ from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from a2a_research.app_logging import get_logger, log_event
 
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 __all__ = [
+    "Bus",
     "ProgressEvent",
     "ProgressGranularity",
     "ProgressPhase",
@@ -24,6 +25,7 @@ __all__ = [
     "ProgressReporter",
     "create_progress_reporter",
     "drain_progress_while_running",
+    "emit",
 ]
 
 
@@ -48,6 +50,7 @@ class ProgressPhase(StrEnum):
 class ProgressEvent:
     """Single progress update emitted by the workflow."""
 
+    session_id: str
     phase: ProgressPhase
     role: AgentRole
     step_index: int
@@ -63,6 +66,63 @@ class ProgressEvent:
 
 ProgressQueue = asyncio.Queue[ProgressEvent | None]
 ProgressReporter = Callable[[ProgressEvent | None], None]
+
+
+class Bus:
+    """In-process registry of per-session progress queues."""
+
+    _queues: ClassVar[dict[str, ProgressQueue]] = {}
+
+    @classmethod
+    def register(cls, session_id: str, queue: ProgressQueue) -> None:
+        cls._queues[session_id] = queue
+
+    @classmethod
+    def get(cls, session_id: str) -> ProgressQueue | None:
+        return cls._queues.get(session_id)
+
+    @classmethod
+    def unregister(cls, session_id: str) -> None:
+        cls._queues.pop(session_id, None)
+
+
+def emit(
+    session_id: str,
+    phase: ProgressPhase,
+    role: AgentRole,
+    step_index: int,
+    total_steps: int,
+    substep_label: str,
+    **extra: Any,
+) -> None:
+    """Emit a progress event to the registered queue for ``session_id``."""
+    if not session_id:
+        return
+    queue = Bus.get(session_id)
+    if queue is None:
+        return
+    granularity = extra.get("granularity")
+    if not isinstance(granularity, ProgressGranularity):
+        granularity = (
+            ProgressGranularity.SUBSTEP
+            if phase == ProgressPhase.STEP_SUBSTEP
+            else ProgressGranularity.AGENT
+        )
+    queue.put_nowait(
+        ProgressEvent(
+            session_id=session_id,
+            phase=phase,
+            role=role,
+            step_index=step_index,
+            total_steps=total_steps,
+            substep_label=substep_label,
+            substep_index=int(extra.get("substep_index") or 0),
+            substep_total=int(extra.get("substep_total") or 1),
+            granularity=granularity,
+            detail=str(extra.get("detail") or ""),
+            elapsed_ms=extra.get("elapsed_ms"),
+        )
+    )
 
 
 def create_progress_reporter(
@@ -82,6 +142,7 @@ def create_progress_reporter(
             if event is None
             else {
                 "phase": event.phase,
+                "session_id": event.session_id,
                 "role": event.role,
                 "step_index": event.step_index,
                 "total_steps": event.total_steps,

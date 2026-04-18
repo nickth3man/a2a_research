@@ -24,6 +24,8 @@ from a2a.types import (
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pocketflow.planner.flow import plan
 from a2a_research.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -39,6 +41,10 @@ class PlannerExecutor(AgentExecutor):
         await event_queue.enqueue_event(task)
 
         query = _extract_query(context)
+        payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
+        emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.PLANNER, 0, 5, "planner_started")
+        emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.PLANNER, 0, 5, "decompose")
 
         try:
             claims, seed_queries = await plan(query)
@@ -83,6 +89,17 @@ class PlannerExecutor(AgentExecutor):
                 metadata={"error": error_text} if error_text else None,
             )
         )
+        emit(
+            session_id,
+            ProgressPhase.STEP_COMPLETED
+            if status == TaskState.completed
+            else ProgressPhase.STEP_FAILED,
+            AgentRole.PLANNER,
+            0,
+            5,
+            "planner_completed" if status == TaskState.completed else "planner_failed",
+            detail=f"claims={len(claims)} seeds={len(seed_queries)}",
+        )
         logger.info(
             "Planner task_id=%s claims=%s seeds=%s",
             task.id,
@@ -95,6 +112,10 @@ class PlannerExecutor(AgentExecutor):
 
 
 def _extract_query(context: RequestContext) -> str:
+    payload = _extract_payload(context)
+    query = payload.get("query")
+    if isinstance(query, str) and query.strip():
+        return query.strip()
     if context.message is None:
         return ""
     text_parts: list[str] = []
@@ -114,3 +135,13 @@ def _extract_query(context: RequestContext) -> str:
     if isinstance(data, dict) and isinstance(data.get("query"), str):
         return str(data["query"]).strip()
     return joined
+
+
+def _extract_payload(context: RequestContext) -> dict[str, object]:
+    if context.message is None:
+        return {}
+    for part in context.message.parts:
+        root = getattr(part, "root", part)
+        if isinstance(root, DataPart):
+            return dict(root.data)
+    return {}

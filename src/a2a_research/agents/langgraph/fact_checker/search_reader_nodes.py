@@ -11,6 +11,7 @@ from a2a_research.agents.langgraph.fact_checker.node_support import (
 from a2a_research.agents.langgraph.fact_checker.state import FactCheckState  # noqa: TC001
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole, WebSource
+from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import PageContent, WebHit
 
 if TYPE_CHECKING:
@@ -24,6 +25,8 @@ __all__ = ["build_ask_reader_node", "build_ask_searcher_node"]
 def build_ask_searcher_node(client: A2AClient) -> Any:
     async def ask_searcher(state: FactCheckState) -> dict[str, Any]:
         queries = list(state.get("pending_queries") or [])
+        session_id = str(state.get("session_id") or "")
+        round_number = int(state.get("round") or 0) + 1
         if not queries:
             return {
                 "hits": [],
@@ -34,7 +37,19 @@ def build_ask_searcher_node(client: A2AClient) -> Any:
             }
         from a2a_research.a2a import extract_data_payloads
 
-        task = await client.send(AgentRole.SEARCHER, payload={"queries": queries})
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            f"round_{round_number}_search",
+            detail=f"queries={len(queries)}",
+        )
+        task = await client.send(
+            AgentRole.SEARCHER,
+            payload={"queries": queries, "session_id": session_id},
+        )
         payloads = extract_data_payloads(task)
         data = payloads[0] if payloads else {}
         raw_hits = data.get("hits") or []
@@ -72,11 +87,25 @@ def build_ask_searcher_node(client: A2AClient) -> Any:
 def build_ask_reader_node(client: A2AClient) -> Any:
     async def ask_reader(state: FactCheckState) -> dict[str, Any]:
         urls = list(state.get("pending_urls") or [])
+        session_id = str(state.get("session_id") or "")
+        round_number = int(state.get("round") or 0) + 1
         if not urls:
             return {"evidence": [], "sources": [], "errors": [], "pending_urls": []}
         from a2a_research.a2a import extract_data_payloads
 
-        task = await client.send(AgentRole.READER, payload={"urls": urls})
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            f"round_{round_number}_read",
+            detail=f"urls={len(urls)}",
+        )
+        task = await client.send(
+            AgentRole.READER,
+            payload={"urls": urls, "session_id": session_id},
+        )
         payloads = extract_data_payloads(task)
         data = payloads[0] if payloads else {}
         raw_pages = data.get("pages") or []

@@ -36,6 +36,8 @@ from a2a.types import (
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import WebHit, web_search
 
 if TYPE_CHECKING:
@@ -46,7 +48,9 @@ logger = get_logger(__name__)
 __all__ = ["SearcherExecutor", "search_queries"]
 
 
-async def search_queries(queries: list[str]) -> tuple[list[WebHit], list[str], list[str]]:
+async def search_queries(
+    queries: list[str], *, session_id: str = ""
+) -> tuple[list[WebHit], list[str], list[str]]:
     """Run :func:`web_search` across ``queries`` in parallel.
 
     Returns ``(hits, errors, providers_successful)`` where hits are deduped by
@@ -61,7 +65,7 @@ async def search_queries(queries: list[str]) -> tuple[list[WebHit], list[str], l
     errors: list[str] = []
     seen_errors: set[str] = set()
     successful_providers: set[str] = set()
-    for sr in results:
+    for index, (query, sr) in enumerate(zip(queries, results, strict=False), start=1):
         for hit in sr.hits:
             by_url.setdefault(hit.url, hit)
         for err in sr.errors:
@@ -69,6 +73,20 @@ async def search_queries(queries: list[str]) -> tuple[list[WebHit], list[str], l
                 seen_errors.add(err)
                 errors.append(err)
         successful_providers.update(sr.providers_successful)
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.SEARCHER,
+            1,
+            5,
+            f"search_query_{index}",
+            substep_index=index,
+            substep_total=len(queries),
+            detail=(
+                f"query={query[:80]} hits={len(sr.hits)} "
+                f"providers={','.join(sr.providers_successful) or 'none'} errors={len(sr.errors)}"
+            ),
+        )
     hits = sorted(by_url.values(), key=lambda h: (-h.score, h.source, h.url))
     logger.info(
         "Searcher searched queries=%s merged_hits=%s errors=%s successful_providers=%s",
@@ -101,12 +119,16 @@ class SearcherExecutor(AgentExecutor):
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
         queries = _coerce_str_list(payload.get("queries"))
         if not queries and isinstance(payload.get("query"), str):
             queries = [payload["query"]]
+        emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.SEARCHER, 1, 5, "searcher_started")
 
         try:
-            hits, errors, successful_providers = await search_queries(queries)
+            hits, errors, successful_providers = await search_queries(
+                queries, session_id=session_id
+            )
         except Exception as exc:
             logger.exception("Searcher crashed task_id=%s", task.id)
             hits, errors, successful_providers = [], [f"Searcher crashed: {exc}"], []
@@ -146,6 +168,17 @@ class SearcherExecutor(AgentExecutor):
                 final=True,
                 metadata={"error": error_text} if error_text else None,
             )
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_COMPLETED
+            if status == TaskState.completed
+            else ProgressPhase.STEP_FAILED,
+            AgentRole.SEARCHER,
+            1,
+            5,
+            "searcher_completed" if status == TaskState.completed else "searcher_failed",
+            detail=f"hits={len(hits)} errors={len(errors)}",
         )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
