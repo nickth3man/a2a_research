@@ -2,7 +2,7 @@
 
 Prefixes (Pydantic ``BaseSettings``):
 
-- ``LLM_*`` — chat model provider, model id, base URL, API key.
+- ``LLM_*`` — OpenRouter model id, base URL, API key.
 
 Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``, ``MESOP_PORT``,
 ``WORKFLOW_TIMEOUT``, ``TAVILY_API_KEY``, ``SEARCH_MAX_RESULTS``,
@@ -28,7 +28,7 @@ __all__ = ["AppSettings", "LLMSettings", "settings"]
 
 
 class LLMSettings(BaseSettings):
-    """LLM provider configuration — vendor-agnostic."""
+    """OpenRouter configuration used by every LLM integration."""
 
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
@@ -37,21 +37,17 @@ class LLMSettings(BaseSettings):
         extra="ignore",
     )
 
-    provider: str = Field(
-        default="openrouter",
-        description="LLM provider: openrouter | openai | anthropic | google | ollama",
-    )
     model: str = Field(
         default="openrouter/elephant-alpha",
-        description="Model identifier (provider-specific).",
+        description="OpenRouter model identifier.",
     )
     base_url: str = Field(
         default="https://openrouter.ai/api/v1",
-        description="OpenAI-compatible base URL override (blank = provider default).",
+        description="OpenRouter base URL.",
     )
     api_key: str = Field(
         default="",
-        description="API key for the chosen provider.",
+        description="OpenRouter API key.",
     )
 
 
@@ -79,9 +75,6 @@ def _validate_dotenv_keys() -> None:
     unknown_keys: list[str] = []
 
     for key in raw_values:
-        if key is None:
-            continue
-
         normalized = key.upper()
 
         if normalized in _EXPECTED_DOTENV_KEYS:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from a2a.types import Artifact, DataPart, Part, Task, TaskState, TaskStatus
@@ -59,7 +59,7 @@ def _fake_llm(payload: dict[str, Any]) -> Any:
     import json
 
     model = MagicMock()
-    model.invoke.return_value = MagicMock(content=json.dumps(payload))
+    model.ainvoke = AsyncMock(return_value=MagicMock(content=json.dumps(payload)))
     return model
 
 

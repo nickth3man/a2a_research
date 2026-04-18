@@ -10,7 +10,6 @@ Env vars: ``LLM_MODEL``, ``LLM_BASE_URL``, ``LLM_API_KEY`` via :data:`settings.l
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
 
 from smolagents import OpenAIServerModel, ToolCallingAgent
 
@@ -22,12 +21,11 @@ __all__ = ["build_agent", "build_model", "reset_agent_cache"]
 
 
 def build_model() -> OpenAIServerModel:
-    init_kwargs: dict[str, Any] = {"model_id": settings.llm.model}
-    if settings.llm.base_url:
-        init_kwargs["api_base"] = settings.llm.base_url
-    if settings.llm.api_key:
-        init_kwargs["api_key"] = settings.llm.api_key
-    return OpenAIServerModel(**init_kwargs)
+    return OpenAIServerModel(
+        model_id=settings.llm.model,
+        api_base=settings.llm.base_url,
+        api_key=settings.llm.api_key,
+    )
 
 
 @lru_cache(maxsize=1)

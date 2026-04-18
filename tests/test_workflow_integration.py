@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -21,7 +21,7 @@ from a2a_research.workflow import run_research_async
 
 def _llm_stub(payload: dict[str, Any]) -> Any:
     model = MagicMock()
-    model.invoke.return_value = MagicMock(content=json.dumps(payload))
+    model.ainvoke = AsyncMock(return_value=MagicMock(content=json.dumps(payload)))
     return model
 
 

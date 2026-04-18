@@ -22,11 +22,8 @@ dependencies = [
     "rich>=15.0.0",
     # UI
     "mesop>=1.2.7",
-    # LLM providers (direct SDKs)
+    # LLM providers
     "openai>=2.32.0",
-    "anthropic>=0.95.0",
-    "google-genai>=1.73.1",
-    "ollama>=0.6.1",
     "langgraph>=0.3.0",
     "langchain-core>=0.3.0",
     "langchain-openai>=0.2.0",

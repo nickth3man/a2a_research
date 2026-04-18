@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,7 +16,7 @@ from a2a_research.models import AgentRole
 
 def _fake_llm(content: str) -> Any:
     model = MagicMock()
-    model.invoke.return_value = MagicMock(content=content)
+    model.ainvoke = AsyncMock(return_value=MagicMock(content=content))
     return model
 
 

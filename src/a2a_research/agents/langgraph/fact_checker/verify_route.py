@@ -56,7 +56,7 @@ def build_verify_node() -> Any:
         user_content = build_verify_prompt(state.get("query", ""), claims, evidence)
         try:
             model = get_llm()
-            response = model.invoke(
+            response = await model.ainvoke(
                 [
                     {"role": "system", "content": VERIFY_PROMPT},
                     {"role": "user", "content": user_content},

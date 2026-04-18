@@ -1,22 +1,19 @@
-"""Tests for src/a2a_research/providers.py — provider selection, error translation, singleton behavior."""
+"""Tests for src/a2a_research/providers.py — OpenRouter-only async behavior."""
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel
 
+import a2a_research.providers as providers_module
 from a2a_research.providers import (
-    AnthropicProvider,
     ChatResponse,
-    GoogleProvider,
-    OllamaProvider,
-    OpenAIProvider,
+    OpenRouterChatModel,
     ProviderRateLimitError,
     ProviderRequestError,
     get_llm,
-    get_llm_provider,
     parse_structured_response,
     reset_provider_singletons,
 )
@@ -26,277 +23,159 @@ class _FakeSchema(BaseModel):
     value: str
 
 
-class TestProviderSelection:
-    @pytest.mark.parametrize(
-        "provider_name,expected_class",
-        [
-            ("openai", OpenAIProvider),
-            ("openrouter", OpenAIProvider),
-            ("anthropic", AnthropicProvider),
-            ("google", GoogleProvider),
-            ("ollama", OllamaProvider),
-        ],
-    )
-    def test_get_llm_provider_returns_correct_class(
-        self, provider_name: str, expected_class: type
-    ):
-        with patch("a2a_research.providers.settings.llm.provider", provider_name):
-            provider = get_llm_provider()
-            assert isinstance(provider, expected_class)
-
-    def test_get_llm_provider_raises_on_unknown_provider(self):
-        with (
-            patch("a2a_research.providers.settings.llm.provider", "unknown"),
-            pytest.raises(ValueError, match="Unknown LLM provider"),
-        ):
-            get_llm_provider()
+def _response_with(content: str | None) -> MagicMock:
+    response = MagicMock()
+    response.choices = [MagicMock(message=MagicMock(content=content))]
+    return response
 
 
 class TestSingletonBehavior:
-    def test_get_llm_returns_cached_provider(self):
+    def test_get_llm_returns_cached_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         reset_provider_singletons()
-        with patch("a2a_research.providers.get_llm_provider") as mock_get_provider:
-            mock_model = MagicMock()
-            mock_provider = MagicMock()
-            mock_provider.get_model.return_value = mock_model
-            mock_get_provider.return_value = mock_provider
+        created: list[object] = []
 
-            first = get_llm()
-            second = get_llm()
+        class FakeModel:
+            def __init__(self) -> None:
+                created.append(self)
 
-            mock_get_provider.assert_called_once()
-            assert first is second is mock_model
+        monkeypatch.setattr(providers_module, "OpenRouterChatModel", FakeModel)
 
-    def test_reset_provider_singletons_clears_cached_providers(self):
+        first = get_llm()
+        second = get_llm()
+
+        assert first is second
+        assert len(created) == 1
+
+    def test_reset_provider_singletons_clears_cached_model(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         reset_provider_singletons()
-        with patch("a2a_research.providers.get_llm_provider") as mock_get_provider:
-            mock_model = MagicMock()
-            mock_provider = MagicMock()
-            mock_provider.get_model.return_value = mock_model
-            mock_get_provider.return_value = mock_provider
+        created: list[object] = []
 
-            first = get_llm()
-            reset_provider_singletons()
-            second = get_llm()
+        class FakeModel:
+            def __init__(self) -> None:
+                created.append(self)
 
-            assert mock_get_provider.call_count == 2
-            assert first is second is mock_model
+        monkeypatch.setattr(providers_module, "OpenRouterChatModel", FakeModel)
 
+        first = get_llm()
+        reset_provider_singletons()
+        second = get_llm()
 
-class TestErrorTranslation:
-    def test_openai_provider_wraps_exception_into_provider_request_error(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.chat.completions.create.side_effect = Exception("openai failed")
-            mock_openai = MagicMock()
-            mock_openai.return_value = mock_client
-            mock_load_attr.return_value = mock_openai
-
-            provider = OpenAIProvider(model="gpt-4o", api_key="test-key")
-            model = provider.get_model()
-            with pytest.raises(ProviderRequestError, match="openai failed"):
-                model.invoke([{"role": "user", "content": "hello"}])
-
-    def test_anthropic_provider_wraps_exception_into_provider_request_error(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.messages.create.side_effect = Exception("anthropic failed")
-            mock_anthropic = MagicMock()
-            mock_anthropic.return_value = mock_client
-            mock_load_attr.return_value = mock_anthropic
-
-            provider = AnthropicProvider(model="claude-3", api_key="test-key")
-            model = provider.get_model()
-            with pytest.raises(ProviderRequestError, match="anthropic failed"):
-                model.invoke([{"role": "user", "content": "hello"}])
-
-    def test_google_provider_wraps_exception_into_provider_request_error(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.models.generate_content.side_effect = Exception("google failed")
-            mock_genai = MagicMock()
-            mock_genai.return_value = mock_client
-            mock_load_attr.return_value = mock_genai
-
-            provider = GoogleProvider(model="gemini", api_key="test-key")
-            model = provider.get_model()
-            with pytest.raises(ProviderRequestError, match="google failed"):
-                model.invoke([{"role": "user", "content": "hello"}])
-
-    def test_ollama_provider_wraps_exception_into_provider_request_error(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_ollama_chat = MagicMock()
-            mock_ollama_chat.side_effect = Exception("ollama failed")
-            mock_load_attr.return_value = mock_ollama_chat
-
-            provider = OllamaProvider(model="llama3", base_url="http://localhost:11434")
-            model = provider.get_model()
-            with pytest.raises(ProviderRequestError, match="ollama failed"):
-                model.invoke([{"role": "user", "content": "hello"}])
+        assert first is not second
+        assert len(created) == 2
 
 
-class TestRateLimitDetection:
-    def test_429_status_code_raises_provider_rate_limit_error(self):
+class TestOpenRouterChatModel:
+    @pytest.mark.asyncio
+    async def test_ainvoke_returns_chatresponse_with_assistant_content(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=_response_with("hi there"))
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+
+        model = OpenRouterChatModel(
+            model="openrouter/test-model",
+            api_key="test-key",
+            base_url="https://openrouter.example/v1",
+        )
+        result = await model.ainvoke([{"role": "user", "content": "ping"}])
+
+        assert isinstance(result, ChatResponse)
+        assert result.content == "hi there"
+        mock_client.chat.completions.create.assert_awaited_once()
+        assert (
+            mock_client.chat.completions.create.call_args.kwargs["model"]
+            == "openrouter/test-model"
+        )
+
+    @pytest.mark.asyncio
+    async def test_ainvoke_replaces_none_content_with_empty_string(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=_response_with(None))
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+
+        model = OpenRouterChatModel(api_key="test-key")
+        result = await model.ainvoke([{"role": "user", "content": "ping"}])
+
+        assert result.content == ""
+
+    @pytest.mark.asyncio
+    async def test_ainvoke_requires_api_key_on_first_use(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        async_openai = MagicMock()
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", async_openai)
+
+        model = OpenRouterChatModel(api_key="")
+        with pytest.raises(ProviderRequestError, match="LLM_API_KEY"):
+            await model.ainvoke([{"role": "user", "content": "ping"}])
+
+        async_openai.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_openrouter_wraps_exception_into_provider_request_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=Exception("openrouter failed"))
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+
+        model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
+        with pytest.raises(ProviderRequestError, match="openrouter failed"):
+            await model.ainvoke([{"role": "user", "content": "hello"}])
+
+    @pytest.mark.asyncio
+    async def test_429_status_code_raises_provider_rate_limit_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         class FakeError(Exception):
             status_code = 429
 
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.chat.completions.create.side_effect = FakeError("rate limited")
-            mock_openai = MagicMock()
-            mock_openai.return_value = mock_client
-            mock_load_attr.return_value = mock_openai
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=FakeError("rate limited"))
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
 
-            provider = OpenAIProvider(model="gpt-4o", api_key="test-key")
-            model = provider.get_model()
-            with pytest.raises(ProviderRateLimitError):
-                model.invoke([{"role": "user", "content": "hello"}])
+        model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
+        with pytest.raises(ProviderRateLimitError):
+            await model.ainvoke([{"role": "user", "content": "hello"}])
 
-    def test_rate_limit_error_by_name_raises_provider_rate_limit_error(self):
+    @pytest.mark.asyncio
+    async def test_rate_limit_error_by_name_raises_provider_rate_limit_error(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         class RateLimitError(Exception):
             pass
 
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.chat.completions.create.side_effect = RateLimitError("throttled")
-            mock_openai = MagicMock()
-            mock_openai.return_value = mock_client
-            mock_load_attr.return_value = mock_openai
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(side_effect=RateLimitError("throttled"))
+        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
 
-            provider = OpenAIProvider(model="gpt-4o", api_key="test-key")
-            model = provider.get_model()
-            with pytest.raises(ProviderRateLimitError):
-                model.invoke([{"role": "user", "content": "hello"}])
-
-
-class TestBaseURLNormalization:
-    def test_openai_provider_strips_trailing_slash(self):
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com/"
-            response = MagicMock()
-            response.choices = [MagicMock(message=MagicMock(content="hello"))]
-            mock_client.chat.completions.create.return_value = response
-            mock_openai = MagicMock()
-            mock_openai.return_value = mock_client
-            mock_load_attr.return_value = mock_openai
-
-            provider = OpenAIProvider(
-                model="gpt-4o", api_key="test-key", base_url="https://api.example.com/"
-            )
-            model = provider.get_model()
-            result = model.invoke([{"role": "user", "content": "hi"}])
-            assert isinstance(result, ChatResponse)
+        model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
+        with pytest.raises(ProviderRateLimitError):
+            await model.ainvoke([{"role": "user", "content": "hello"}])
 
 
 class TestParseStructuredResponse:
-    def test_parse_structured_response_returns_none_for_invalid_json(self):
+    def test_parse_structured_response_returns_none_for_invalid_json(self) -> None:
         assert parse_structured_response("not json", _FakeSchema) is None
 
-    def test_parse_structured_response_returns_none_for_empty_string(self):
+    def test_parse_structured_response_returns_none_for_empty_string(self) -> None:
         assert parse_structured_response("", _FakeSchema) is None
 
-    def test_parse_structured_response_returns_none_for_json_that_fails_schema(self):
-        """Valid JSON that does not match the schema must return None, not raise."""
-
+    def test_parse_structured_response_returns_none_for_json_that_fails_schema(self) -> None:
         class StrictSchema(BaseModel):
             value: int
 
         assert parse_structured_response('{"value": "not-an-int"}', StrictSchema) is None
 
-    def test_parse_structured_response_uses_model_validate(self):
+    def test_parse_structured_response_uses_model_validate(self) -> None:
         class SimpleSchema(BaseModel):
             value: int
 
         result = parse_structured_response('{"value": 42}', SimpleSchema)
         assert result is not None
         assert result.value == 42
-
-
-class TestOpenAIChatSuccessPath:
-    def test_invoke_returns_chatresponse_with_assistant_content(self):
-        """Success path must unwrap the OpenAI response into a plain ``ChatResponse``
-        carrying ``choices[0].message.content``."""
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com"
-            response = MagicMock()
-            response.choices = [MagicMock(message=MagicMock(content="hi there"))]
-            mock_client.chat.completions.create.return_value = response
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            provider = OpenAIProvider(model="gpt-4o", api_key="k", base_url="https://e.com")
-            result = provider.get_model().invoke([{"role": "user", "content": "ping"}])
-
-        assert isinstance(result, ChatResponse)
-        assert result.content == "hi there"
-        mock_client.chat.completions.create.assert_called_once()
-        assert mock_client.chat.completions.create.call_args.kwargs["model"] == "gpt-4o"
-
-    def test_invoke_replaces_none_content_with_empty_string(self):
-        """Some OpenAI-compatible backends return ``content=None``; the wrapper must
-        coerce that to ``""`` so downstream JSON parsing does not crash."""
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            mock_client.base_url = "https://api.example.com"
-            response = MagicMock()
-            response.choices = [MagicMock(message=MagicMock(content=None))]
-            mock_client.chat.completions.create.return_value = response
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            provider = OpenAIProvider(model="m", api_key="k")
-            result = provider.get_model().invoke([{"role": "user", "content": "ping"}])
-
-        assert result.content == ""
-
-
-class TestAnthropicChatMessageShaping:
-    def test_system_message_is_extracted_and_chat_messages_are_user_only(self):
-        """Anthropic's API takes ``system`` as a kwarg; the adapter must peel the system
-        message out of the messages array and pass the remainder as-is."""
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            response = MagicMock()
-            response.content = [MagicMock(text="answer")]
-            mock_client.messages.create.return_value = response
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            provider = AnthropicProvider(model="claude-3", api_key="k")
-            result = provider.get_model().invoke(
-                [
-                    {"role": "system", "content": "You are a helper."},
-                    {"role": "user", "content": "ping"},
-                ]
-            )
-
-        kwargs = mock_client.messages.create.call_args.kwargs
-        assert kwargs["system"] == "You are a helper."
-        assert kwargs["messages"] == [{"role": "user", "content": "ping"}]
-        assert result.content == "answer"
-
-    def test_empty_content_array_returns_empty_string(self):
-        """If Anthropic returns an empty ``content`` array the wrapper must return
-        an empty ``ChatResponse`` instead of raising IndexError."""
-        with patch("a2a_research.providers._load_attr") as mock_load_attr:
-            mock_client = MagicMock()
-            response = MagicMock()
-            response.content = []
-            mock_client.messages.create.return_value = response
-            mock_load_attr.return_value = MagicMock(return_value=mock_client)
-
-            provider = AnthropicProvider(model="claude-3", api_key="k")
-            result = provider.get_model().invoke([{"role": "user", "content": "ping"}])
-
-        assert result.content == ""
-
-
-class TestLoadAttrErrorMessages:
-    def test_missing_module_raises_import_error_with_install_hint(self):
-        from a2a_research.providers import _load_attr
-
-        with pytest.raises(ImportError, match="pip install totally_fake"):
-            _load_attr(
-                "a2a_research_totally_fake_module_xyz",
-                "X",
-                "pip install totally_fake",
-            )

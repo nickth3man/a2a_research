@@ -53,7 +53,7 @@ class DecomposeNode(AsyncNode):
         logger.info("Planner decomposing query=%r", query)
         try:
             model = get_llm()
-            response = model.invoke(
+            response = await model.ainvoke(
                 [
                     {"role": "system", "content": PLANNER_PROMPT},
                     {"role": "user", "content": query},

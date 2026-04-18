@@ -36,7 +36,6 @@ class TestValidateDotenvKeys:
             "LOG_LEVEL=INFO\n"
             "MESOP_PORT=32123\n"
             "WORKFLOW_TIMEOUT=120\n"
-            "LLM_PROVIDER=openrouter\n"
             "LLM_MODEL=m\n"
             "LLM_BASE_URL=https://example.com\n"
             "LLM_API_KEY=k\n"
@@ -80,10 +79,20 @@ class TestAppSettings:
             patch.dict("os.environ", {}, clear=True),
         ):
             llm = LLMSettings()
-        assert llm.provider == "openrouter"
         assert llm.model == "openrouter/elephant-alpha"
         assert llm.base_url == "https://openrouter.ai/api/v1"
         assert isinstance(llm.api_key, str)
+
+    def test_llm_provider_is_no_longer_an_expected_env_key(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        env_file = tmp_path / ".env"
+        env_file.write_text("LLM_PROVIDER=openrouter\nLLM_API_KEY=secret\n")
+
+        with patch("a2a_research.settings._ENV_FILE", env_file):
+            settings_module._validate_dotenv_keys()
+
+        assert "Unknown keys in .env: LLM_PROVIDER" in caplog.text
 
     def test_new_research_fields(self, tmp_path: Path) -> None:
         empty_env = tmp_path / ".env"
