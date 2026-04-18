@@ -1,4 +1,4 @@
-"""Tests for the in-process A2AClient + AgentRegistry."""
+"""HTTP tests for the A2AClient wrapper."""
 
 from __future__ import annotations
 
@@ -6,11 +6,18 @@ from typing import Any
 
 import pytest
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.apps import A2AStarletteApplication
 from a2a.server.events import EventQueue
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
     Artifact,
     DataPart,
     Part,
+    Task,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
@@ -18,28 +25,26 @@ from a2a.types import (
 )
 from a2a.utils import new_task
 
-from a2a_research.a2a import A2AClient, AgentRegistry, build_message, extract_data_payloads
+from a2a_research.a2a.client import A2AClient, build_message, extract_data_payloads
+from a2a_research.a2a.registry import AgentRegistry
 from a2a_research.models import AgentRole
 
 
 class EchoExecutor(AgentExecutor):
-    """Emit one Task with a DataArtifact echoing the input payload."""
-
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         task = context.current_task or new_task(context.message)  # type: ignore[arg-type]
         await event_queue.enqueue_event(task)
 
-        payloads = []
+        payloads: list[dict[str, Any]] = []
         for part in context.message.parts if context.message else []:
             root = getattr(part, "root", part)
             if isinstance(root, DataPart):
-                payloads.append(dict(root.data))
+                payloads.append(dict[str, Any](root.data))
 
-        combined: dict[str, Any] = {"echoed": payloads}
         artifact = Artifact(
             artifact_id="echo-out",
             name="echo",
-            parts=[Part(root=DataPart(data=combined))],
+            parts=[Part(root=DataPart(data={"echoed": payloads}))],
         )
         await event_queue.enqueue_event(
             TaskArtifactUpdateEvent(
@@ -63,30 +68,58 @@ class EchoExecutor(AgentExecutor):
         pass
 
 
-@pytest.mark.asyncio
-async def test_client_send_returns_task_with_artifact() -> None:
-    registry = AgentRegistry()
-    registry.register_factory(AgentRole.SEARCHER, EchoExecutor)
-    client = A2AClient(registry)
+def _echo_app() -> Any:
+    card = AgentCard(
+        name="Echo",
+        description="Echo test agent",
+        version="1.0.0",
+        protocol_version="0.3.0",
+        url="http://echo.test",
+        preferred_transport="JSONRPC",
+        default_input_modes=["application/json"],
+        default_output_modes=["application/json"],
+        capabilities=AgentCapabilities(streaming=True),
+        skills=[
+            AgentSkill(
+                id="echo",
+                name="Echo",
+                description="Echo test skill",
+                tags=["test"],
+                input_modes=["application/json"],
+                output_modes=["application/json"],
+            )
+        ],
+    )
+    handler = DefaultRequestHandler(agent_executor=EchoExecutor(), task_store=InMemoryTaskStore())
+    return A2AStarletteApplication(agent_card=card, http_handler=handler).build()
 
+
+@pytest.mark.asyncio
+async def test_client_send_returns_task_with_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
+    import httpx
+
+    from a2a_research.a2a import client as client_module
+
+    shared_client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=_echo_app()), base_url="http://echo.test"
+    )
+
+    def _client_factory(*args: object, **kwargs: object) -> httpx.AsyncClient:
+        return shared_client
+
+    monkeypatch.setattr(client_module.httpx, "AsyncClient", _client_factory)
+
+    registry = AgentRegistry(searcher_url="http://echo.test")
+    client = A2AClient(registry)
     result = await client.send(AgentRole.SEARCHER, payload={"hello": "world"})
 
-    assert result.__class__.__name__ == "Task"
-    payloads = extract_data_payloads(result)
-    assert payloads, "expected at least one DataPart in artifacts"
-    assert payloads[0] == {"echoed": [{"hello": "world"}]}
-
-
-@pytest.mark.asyncio
-async def test_missing_role_raises_keyerror() -> None:
-    registry = AgentRegistry()
-    client = A2AClient(registry)
-    with pytest.raises(KeyError, match="planner"):
-        await client.send(AgentRole.PLANNER, payload={})
+    assert isinstance(result, Task)
+    assert extract_data_payloads(result)[0] == {"echoed": [{"hello": "world"}]}
+    await shared_client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_build_message_includes_text_and_data() -> None:
     msg = build_message(text="hello", data={"k": 1})
-    kinds = [getattr(p.root, "kind", None) for p in msg.parts]
+    kinds = [getattr(part.root, "kind", None) for part in msg.parts]
     assert "text" in kinds and "data" in kinds

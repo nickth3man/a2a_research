@@ -1,4 +1,4 @@
-"""AgentCard re-export for the Synthesizer role."""
+"""Static AgentCard for the Synthesizer HTTP service."""
 
 from __future__ import annotations
 

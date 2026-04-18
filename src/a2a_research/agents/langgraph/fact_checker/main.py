@@ -10,6 +10,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
     DataPart,
@@ -24,6 +27,7 @@ from pydantic import ValidationError
 
 from a2a_research.a2a import A2AClient
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.langgraph.fact_checker.card import FACT_CHECKER_CARD
 from a2a_research.agents.langgraph.fact_checker.graph import build_fact_check_graph
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, WebSource
@@ -36,7 +40,7 @@ if TYPE_CHECKING:
     from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult, FactCheckState
 
 logger = get_logger(__name__)
-__all__ = ["FactCheckerExecutor", "run_fact_check"]
+__all__ = ["FactCheckerExecutor", "build_http_app", "run_fact_check"]
 
 
 async def run_fact_check(
@@ -235,3 +239,10 @@ def _coerce_str_list(raw: Any) -> list[str]:
     if isinstance(raw, list):
         return [str(item).strip() for item in raw if str(item).strip()]
     return []
+
+
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=FactCheckerExecutor(), task_store=InMemoryTaskStore()
+    )
+    return A2AStarletteApplication(agent_card=FACT_CHECKER_CARD, http_handler=handler).build()

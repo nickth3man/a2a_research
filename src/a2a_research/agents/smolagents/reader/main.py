@@ -13,6 +13,9 @@ import json
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
     DataPart,
@@ -26,6 +29,7 @@ from a2a.types import (
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.reader.agent import build_agent
+from a2a_research.agents.smolagents.reader.card import READER_CARD
 from a2a_research.app_logging import get_logger
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
@@ -37,7 +41,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["ReaderExecutor"]
+__all__ = ["ReaderExecutor", "build_http_app", "read_urls"]
 
 
 class ReaderExecutor(AgentExecutor):
@@ -158,3 +162,10 @@ def _coerce_str_list(raw: Any) -> list[str]:
     if isinstance(raw, list):
         return [str(item).strip() for item in raw if str(item).strip()]
     return []
+
+
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=ReaderExecutor(), task_store=InMemoryTaskStore()
+    )
+    return A2AStarletteApplication(agent_card=READER_CARD, http_handler=handler).build()

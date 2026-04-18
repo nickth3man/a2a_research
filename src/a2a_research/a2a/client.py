@@ -1,23 +1,22 @@
-"""In-process A2A client.
-
-Builds a :class:`Message` (text + optional data payload), delegates to the
-appropriate :class:`DefaultRequestHandler`'s ``on_message_send``, and returns
-either the final :class:`Task` (with artifacts) or a direct response
-:class:`Message`. The wire protocol is never touched — this keeps everything
-in one Python process.
-"""
+"""HTTP A2A client wrapper over the official SDK client."""
 
 from __future__ import annotations
 
 import uuid
+import warnings
 from typing import TYPE_CHECKING, Any
 
+import httpx
+from a2a.client import A2AClient as SDKClient
 from a2a.types import (
+    AgentCard,
     DataPart,
+    JSONRPCErrorResponse,
     Message,
     MessageSendParams,
     Part,
     Role,
+    SendMessageRequest,
     Task,
     TextPart,
 )
@@ -41,7 +40,6 @@ def build_message(
     task_id: str | None = None,
     context_id: str | None = None,
 ) -> Message:
-    """Construct a :class:`Message` with an optional text part and data part."""
     parts: list[Part] = []
     if text:
         parts.append(Part(root=TextPart(text=text)))
@@ -59,7 +57,6 @@ def build_message(
 
 
 def extract_data_payloads(task_or_message: Task | Message) -> list[dict[str, Any]]:
-    """Pull :class:`DataPart` payloads out of a Task's artifacts or a Message's parts."""
     payloads: list[dict[str, Any]] = []
     if isinstance(task_or_message, Task):
         for artifact in task_or_message.artifacts or []:
@@ -76,7 +73,6 @@ def extract_data_payloads(task_or_message: Task | Message) -> list[dict[str, Any
 
 
 def extract_text(task_or_message: Task | Message) -> str:
-    """Concatenate :class:`TextPart` contents into a single string."""
     chunks: list[str] = []
     if isinstance(task_or_message, Task):
         for artifact in task_or_message.artifacts or []:
@@ -89,14 +85,39 @@ def extract_text(task_or_message: Task | Message) -> str:
             root = getattr(part, "root", part)
             if isinstance(root, TextPart):
                 chunks.append(root.text)
-    return "\n".join(c for c in chunks if c)
+    return "\n".join(chunk for chunk in chunks if chunk)
 
 
 class A2AClient:
-    """Thin async client that dispatches A2A messages to in-process handlers."""
+    """Thin async client that dispatches to HTTP-backed A2A services."""
 
-    def __init__(self, registry: AgentRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: AgentRegistry | None = None,
+        httpx_client: httpx.AsyncClient | None = None,
+    ) -> None:
         self._registry = registry or get_registry()
+        self._httpx_client = httpx_client
+        self._sdk_clients: dict[str, SDKClient] = {}
+        self._cards: dict[str, AgentCard] = {}
+
+    async def _get_httpx_client(self) -> httpx.AsyncClient:
+        if self._httpx_client is None:
+            self._httpx_client = httpx.AsyncClient(timeout=30.0)
+        return self._httpx_client
+
+    async def _get_sdk_client(self, role: AgentRole) -> SDKClient:
+        key = role.value
+        if key in self._sdk_clients:
+            return self._sdk_clients[key]
+        http_client = await self._get_httpx_client()
+        url = self._registry.get_url(role)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            sdk_client = SDKClient(httpx_client=http_client, url=url)
+        self._cards[key] = await sdk_client.get_card()
+        self._sdk_clients[key] = sdk_client
+        return sdk_client
 
     async def send(
         self,
@@ -107,14 +128,34 @@ class A2AClient:
         task_id: str | None = None,
         context_id: str | None = None,
     ) -> Task | Message:
-        """Send a message to ``role`` and await the final Task or Message response."""
-        handler = self._registry.get_handler(role)
         message = build_message(text=text, data=payload, task_id=task_id, context_id=context_id)
-        params = MessageSendParams(message=message)
+        request = SendMessageRequest(
+            id=str(uuid.uuid4()),
+            params=MessageSendParams(message=message),
+        )
+        url = self._registry.get_url(role)
         logger.info(
-            "A2A.send role=%s task_id=%s payload_keys=%s",
+            "A2A.send role=%s url=%s task_id=%s payload_keys=%s",
             role.value,
+            url,
             task_id,
             sorted(payload or {}),
         )
-        return await handler.on_message_send(params)
+        if self._registry.has_handler(role):
+            handler = self._registry.get_handler(role)
+            params = MessageSendParams(message=message)
+            return await handler.on_message_send(params)
+        try:
+            client = await self._get_sdk_client(role)
+            response = await client.send_message(request)
+        except httpx.ConnectError as exc:
+            msg = f"Agent not reachable for role '{role.value}' at {url}: {exc}"
+            raise RuntimeError(msg) from exc
+        if isinstance(response.root, JSONRPCErrorResponse):
+            msg = f"Agent '{role.value}' returned an A2A error: {response.root.error.message}"
+            raise RuntimeError(msg)
+        return response.root.result
+
+    async def aclose(self) -> None:
+        if self._httpx_client is not None:
+            await self._httpx_client.aclose()

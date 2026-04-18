@@ -13,6 +13,9 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
     DataPart,
@@ -27,6 +30,7 @@ from pydantic import ValidationError
 
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pydantic_ai.synthesizer import agent as _agent
+from a2a_research.agents.pydantic_ai.synthesizer.card import SYNTHESIZER_CARD
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
 from a2a_research.progress import ProgressPhase, emit
@@ -36,7 +40,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["SynthesizerExecutor", "synthesize"]
+__all__ = ["SynthesizerExecutor", "build_http_app", "synthesize"]
 
 
 def _build_prompt(query: str, claims: list[Claim], sources: list[WebSource]) -> str:
@@ -208,3 +212,10 @@ def _coerce_sources(raw: Any) -> list[WebSource]:
             except ValidationError:
                 continue
     return sources
+
+
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=SynthesizerExecutor(), task_store=InMemoryTaskStore()
+    )
+    return A2AStarletteApplication(agent_card=SYNTHESIZER_CARD, http_handler=handler).build()

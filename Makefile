@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov
+.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -44,6 +44,24 @@ clean: ## Remove build artifacts and cache directories
 
 mesop: ## Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
 	export MESOP_STATE_SESSION_BACKEND=memory && uv run mesop src/a2a_research/ui/app.py
+
+serve-all: ## Start all agent HTTP services
+	uv run python -m a2a_research.launcher
+
+serve-planner: ## Start Planner HTTP service
+	uv run python -m a2a_research.agents.pocketflow.planner
+
+serve-searcher: ## Start Searcher HTTP service
+	uv run python -m a2a_research.agents.smolagents.searcher
+
+serve-reader: ## Start Reader HTTP service
+	uv run python -m a2a_research.agents.smolagents.reader
+
+serve-fact-checker: ## Start FactChecker HTTP service
+	uv run python -m a2a_research.agents.langgraph.fact_checker
+
+serve-synthesizer: ## Start Synthesizer HTTP service
+	uv run python -m a2a_research.agents.pydantic_ai.synthesizer
 
 htmlcov: ## Generate HTML coverage report
 	uv run pytest --cov=src/a2a_research --cov-report=html

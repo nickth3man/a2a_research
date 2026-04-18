@@ -7,9 +7,12 @@ of ``{claims, seed_queries}`` — the handoff shape the FactChecker expects.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.apps import A2AStarletteApplication
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
     DataPart,
@@ -22,6 +25,7 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
 from a2a_research.agents.pocketflow.planner.flow import plan
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
@@ -32,7 +36,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["PlannerExecutor"]
+__all__ = ["PlannerExecutor", "build_http_app"]
 
 
 class PlannerExecutor(AgentExecutor):
@@ -145,3 +149,10 @@ def _extract_payload(context: RequestContext) -> dict[str, object]:
         if isinstance(root, DataPart):
             return dict(root.data)
     return {}
+
+
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=PlannerExecutor(), task_store=InMemoryTaskStore()
+    )
+    return A2AStarletteApplication(agent_card=PLANNER_CARD, http_handler=handler).build()

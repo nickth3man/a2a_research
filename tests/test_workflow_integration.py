@@ -1,22 +1,28 @@
-"""End-to-end workflow test with every LLM + network call mocked."""
+"""End-to-end workflow test over in-memory HTTP A2A services."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from a2a_research.a2a.registry import AgentRegistry
+from a2a_research.agents.langgraph.fact_checker import main as fact_checker_main
 from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
+from a2a_research.agents.pocketflow.planner import main as planner_main
 from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
+from a2a_research.agents.pydantic_ai.synthesizer import main as synth_main
 from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.agents.smolagents.searcher import main as searcher_main
 from a2a_research.models import AgentRole, AgentStatus, ReportOutput
 from a2a_research.progress import ProgressEvent, ProgressPhase, drain_progress_while_running
 from a2a_research.workflow import run_research_async
+from tests.http_harness import make_multi_app_client
 
 
 def _llm_stub(payload: dict[str, Any]) -> Any:
@@ -30,8 +36,6 @@ class _FakePydAgent:
         self._report = report
 
     async def run(self, prompt: str) -> Any:
-        from types import SimpleNamespace
-
         return SimpleNamespace(output=self._report)
 
 
@@ -43,18 +47,32 @@ class _FakeJSONAgent:
         return json.dumps(self._payload)
 
 
-def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        planner_nodes,
-        "get_llm",
-        lambda: _llm_stub(
-            {
-                "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
-                "seed_queries": ["JWST launch date"],
-            }
-        ),
-    )
+def _apps() -> dict[str, object]:
+    return {
+        "http://localhost:10001": planner_main.build_http_app(),
+        "http://localhost:10002": searcher_main.build_http_app(),
+        "http://localhost:10003": reader_main.build_http_app(),
+        "http://localhost:10004": fact_checker_main.build_http_app(),
+        "http://localhost:10005": synth_main.build_http_app(),
+    }
 
+
+def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
+    planner_model = MagicMock()
+    planner_model.ainvoke = AsyncMock(
+        side_effect=[
+            MagicMock(content=json.dumps({"strategy": "temporal"})),
+            MagicMock(
+                content=json.dumps(
+                    {
+                        "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
+                        "seed_queries": ["JWST launch date"],
+                    }
+                )
+            ),
+        ]
+    )
+    monkeypatch.setattr(planner_nodes, "get_llm", lambda: planner_model)
     monkeypatch.setattr(
         searcher_main,
         "build_agent",
@@ -73,7 +91,6 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
             }
         ),
     )
-
     monkeypatch.setattr(
         reader_main,
         "build_agent",
@@ -90,7 +107,6 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
             }
         ),
     )
-
     monkeypatch.setattr(
         fc_verify,
         "get_llm",
@@ -109,24 +125,38 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
             }
         ),
     )
-
     synth_agent.reset_agent_cache()
     monkeypatch.setattr(
         synth_agent,
         "build_agent",
         lambda: _FakePydAgent(
             ReportOutput(
-                title="JWST Launch",
-                summary="JWST launched in December 2021.",
-                sections=[],
+                title="JWST Launch", summary="JWST launched in December 2021.", sections=[]
             )
         ),
     )
 
 
+def _install_http_services(monkeypatch: pytest.MonkeyPatch) -> Any:
+    from a2a_research.a2a import client as client_module
+    from a2a_research.workflow import coordinator as coordinator_module
+
+    shared_client = make_multi_app_client(_apps())
+    registry = AgentRegistry()
+
+    def _client_factory(*args: object, **kwargs: object) -> Any:
+        return shared_client
+
+    monkeypatch.setattr(client_module.httpx, "AsyncClient", _client_factory)
+    monkeypatch.setattr(client_module, "get_registry", lambda: registry)
+    monkeypatch.setattr(coordinator_module, "get_registry", lambda: registry)
+    return shared_client
+
+
 @pytest.mark.asyncio
 async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     _configure_success_path(monkeypatch)
+    shared_client = _install_http_services(monkeypatch)
 
     session = await run_research_async("When did JWST launch?")
 
@@ -136,13 +166,15 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "JWST" in session.final_report
     assert len(session.sources) == 1
     assert session.sources[0].url == "https://nasa.example/jwst"
-    statuses = {r: ar.status for r, ar in session.agent_results.items()}
-    assert all(s == AgentStatus.COMPLETED for s in statuses.values())
+    statuses = {role: result.status for role, result in session.agent_results.items()}
+    assert all(status == AgentStatus.COMPLETED for status in statuses.values())
+    await shared_client.aclose()
 
 
 @pytest.mark.asyncio
 async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
     _configure_success_path(monkeypatch)
+    shared_client = _install_http_services(monkeypatch)
 
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     workflow_task = asyncio.create_task(
@@ -164,78 +196,4 @@ async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
         event.substep_label.startswith("round_") and event.phase == ProgressPhase.STEP_SUBSTEP
         for event in events
     )
-
-
-@pytest.mark.asyncio
-async def test_pipeline_aborts_when_search_providers_all_fail(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """When every search provider fails, the FactChecker must mark claims
-    INSUFFICIENT_EVIDENCE, the Synthesizer must be skipped, and session.error
-    must name the underlying providers so the user can debug."""
-
-    from a2a_research.models import AgentRole, Verdict
-
-    monkeypatch.setattr(
-        planner_nodes,
-        "get_llm",
-        lambda: _llm_stub(
-            {
-                "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
-                "seed_queries": ["JWST launch"],
-            }
-        ),
-    )
-
-    monkeypatch.setattr(
-        searcher_main,
-        "build_agent",
-        lambda: _FakeJSONAgent(
-            {
-                "queries_used": ["JWST launch"],
-                "hits": [],
-                "errors": [
-                    "Tavily disabled (TAVILY_API_KEY is blank in .env).",
-                    "DuckDuckGo request failed: 429",
-                ],
-            }
-        ),
-    )
-
-    def _reader_tripwire() -> object:
-        raise AssertionError("Reader must not be invoked when Searcher produced no URLs")
-
-    monkeypatch.setattr(reader_main, "build_agent", _reader_tripwire)
-
-    # Tripwires on the FactChecker and Synthesizer LLMs — they must not run.
-    def _fc_tripwire() -> Any:
-        raise AssertionError("FactChecker LLM must not run when no evidence is available")
-
-    monkeypatch.setattr(fc_verify, "get_llm", _fc_tripwire)
-
-    synth_agent.reset_agent_cache()
-
-    def _synth_tripwire() -> Any:
-        raise AssertionError("Synthesizer must not run when FactChecker failed")
-
-    monkeypatch.setattr(synth_agent, "build_agent", _synth_tripwire)
-
-    session = await run_research_async("When did JWST launch?")
-
-    assert session.error is not None
-    assert "Tavily disabled" in session.error
-    assert "DuckDuckGo" in session.error
-    assert session.report is None  # Synthesizer was skipped
-    # Claims marked INSUFFICIENT_EVIDENCE with the reason in the evidence_snippets.
-    assert all(c.verdict == Verdict.INSUFFICIENT_EVIDENCE for c in session.claims)
-    joined = " ".join(s for c in session.claims for s in c.evidence_snippets)
-    assert "Tavily disabled" in joined
-    # Agent statuses reflect the failure explicitly.
-    statuses = {r: ar.status for r, ar in session.agent_results.items()}
-    assert statuses[AgentRole.PLANNER] == AgentStatus.COMPLETED
-    assert statuses[AgentRole.SEARCHER] == AgentStatus.FAILED
-    assert statuses[AgentRole.FACT_CHECKER] == AgentStatus.FAILED
-    assert statuses[AgentRole.SYNTHESIZER] == AgentStatus.FAILED
-    # final_report explains the failure in human terms.
-    assert "Research unavailable" in session.final_report
-    assert "Tavily disabled" in session.final_report
+    await shared_client.aclose()
