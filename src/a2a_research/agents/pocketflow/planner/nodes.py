@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any, Literal
 
 from pocketflow import AsyncNode
@@ -14,8 +15,10 @@ from a2a_research.agents.pocketflow.planner.prompt import (
 )
 from a2a_research.app_logging import get_logger
 from a2a_research.json_utils import parse_json_safely
-from a2a_research.models import Claim
+from a2a_research.models import AgentRole, Claim
+from a2a_research.progress import emit_llm_response, emit_prompt
 from a2a_research.providers import ProviderRequestError, get_llm
+from a2a_research.settings import settings
 
 logger = get_logger(__name__)
 
@@ -52,6 +55,14 @@ class ClassifyNode(AsyncNode):
 
     async def exec_async(self, prep_res: str) -> dict[str, str]:
         query = prep_res
+        emit_prompt(
+            AgentRole.PLANNER,
+            "classify",
+            query,
+            system_text=CLASSIFIER_PROMPT,
+            model=settings.llm.model,
+        )
+        started = perf_counter()
         try:
             model = get_llm()
             response = await model.ainvoke(
@@ -63,6 +74,13 @@ class ClassifyNode(AsyncNode):
             raw = getattr(response, "content", None) or str(response)
         except ProviderRequestError:
             return {"strategy": _heuristic_strategy(query)}
+        emit_llm_response(
+            AgentRole.PLANNER,
+            "classify",
+            raw,
+            elapsed_ms=(perf_counter() - started) * 1000,
+            model=settings.llm.model,
+        )
 
         data = parse_json_safely(raw)
         strategy = str((data or {}).get("strategy") or "").strip().lower()
@@ -87,6 +105,15 @@ class _BaseDecomposeNode(AsyncNode):
     async def exec_async(self, prep_res: str) -> dict[str, Any]:
         query = prep_res
         logger.info("Planner decomposing strategy=%s query=%r", self.__class__.__name__, query)
+        label = f"decompose_{self.__class__.__name__.replace('DecomposeNode', '').lower()}"
+        emit_prompt(
+            AgentRole.PLANNER,
+            label,
+            query,
+            system_text=self.prompt,
+            model=settings.llm.model,
+        )
+        started = perf_counter()
         try:
             model = get_llm()
             response = await model.ainvoke(
@@ -99,6 +126,13 @@ class _BaseDecomposeNode(AsyncNode):
         except ProviderRequestError as exc:
             logger.warning("Planner LLM failed in %s: %s", self.__class__.__name__, exc)
             return {"raw": "", "error": str(exc)}
+        emit_llm_response(
+            AgentRole.PLANNER,
+            label,
+            raw,
+            elapsed_ms=(perf_counter() - started) * 1000,
+            model=settings.llm.model,
+        )
         return {"raw": raw, "error": None}
 
     async def post_async(

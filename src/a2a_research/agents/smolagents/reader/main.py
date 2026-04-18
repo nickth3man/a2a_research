@@ -59,7 +59,7 @@ class ReaderExecutor(AgentExecutor):
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.READER, 2, 5, "reader_started")
 
         try:
-            pages = await read_urls(urls, max_chars=max_chars)
+            pages = await read_urls(urls, max_chars=max_chars, session_id=session_id)
             status = TaskState.completed
             error_text: str | None = None
         except Exception as exc:
@@ -154,7 +154,9 @@ def _extract_payload(context: RequestContext) -> dict[str, object]:
     return {}
 
 
-async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageContent]:
+async def read_urls(
+    urls: list[str], *, max_chars: int = 8000, session_id: str = ""
+) -> list[PageContent]:
     if not urls:
         return []
 
@@ -170,9 +172,30 @@ async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageConte
         + "\n".join(f"- {url}" for url in urls)
         + f"\n\nmax_chars={max_chars}. Return JSON only with a pages array."
     )
+    from a2a_research.progress import emit_llm_response, emit_prompt, using_session
+    from a2a_research.settings import settings as _app_settings
+    from time import perf_counter
+
+    emit_prompt(
+        AgentRole.READER,
+        "react_loop",
+        prompt,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
     agent = build_agent()
     runner = cast("Any", agent.run)
-    raw_output = await asyncio.to_thread(runner, prompt)
+    started = perf_counter()
+    with using_session(session_id):
+        raw_output = await asyncio.to_thread(runner, prompt)
+    emit_llm_response(
+        AgentRole.READER,
+        "react_loop",
+        str(raw_output),
+        elapsed_ms=(perf_counter() - started) * 1000,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
     data = parse_json_safely(str(raw_output))
     raw_pages_any = data.get("pages")
     raw_pages: list[object] = raw_pages_any if isinstance(raw_pages_any, list) else []

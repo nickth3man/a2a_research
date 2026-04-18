@@ -35,7 +35,8 @@ from a2a_research.agents.pydantic_ai.synthesizer.card import SYNTHESIZER_CARD
 from a2a_research.app_logging import get_logger
 from a2a_research.citation_sanitize import sanitize_report_output
 from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
-from a2a_research.progress import ProgressPhase, emit
+from a2a_research.progress import ProgressPhase, emit, emit_llm_response, emit_prompt
+from a2a_research.settings import settings as _app_settings
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -80,9 +81,32 @@ async def synthesize(
         detail=f"claims={len(claims)} sources={len(sources)}",
     )
     prompt = _build_prompt(query, claims, sources)
+    emit_prompt(
+        AgentRole.SYNTHESIZER,
+        "synthesize",
+        prompt,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
     emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.SYNTHESIZER, 4, 5, "llm_call")
+    from time import perf_counter
+
+    started = perf_counter()
     result = await agent.run(prompt)
-    return sanitize_report_output(result.output, sources, claims)
+    report = sanitize_report_output(result.output, sources, claims)
+    try:
+        preview = result.output.model_dump_json() if hasattr(result.output, "model_dump_json") else str(result.output)
+    except Exception:  # noqa: BLE001
+        preview = str(result.output)
+    emit_llm_response(
+        AgentRole.SYNTHESIZER,
+        "synthesize",
+        preview,
+        elapsed_ms=(perf_counter() - started) * 1000,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
+    return report
 
 
 class SynthesizerExecutor(AgentExecutor):

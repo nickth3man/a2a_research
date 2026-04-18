@@ -35,7 +35,7 @@ def PageHeader() -> None:  # noqa: N802
                 style=me.Style(display="inline-block", white_space="nowrap"),
             )
             me.text(
-                "4 agents",
+                "5 agents",
                 style=me.Style(
                     font_size=FONT_SIZE_TINY,
                     color=HEADER_ACCENT_COLOR,
@@ -52,7 +52,7 @@ def PageHeader() -> None:  # noqa: N802
                 ),
             )
         me.text(
-            "Researcher \u2192 Analyst \u2192 Verifier \u2192 Presenter",
+            "Planner \u2192 Searcher \u2192 Reader \u2192 FactChecker \u2192 Synthesizer",
             style=me.Style(
                 font_size=FONT_SIZE_BODY,
                 color=HEADER_SUBTITLE_COLOR,

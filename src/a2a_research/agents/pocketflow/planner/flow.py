@@ -15,6 +15,7 @@ from a2a_research.agents.pocketflow.planner.nodes import (
     TemporalDecomposeNode,
     TerminalNode,
 )
+from a2a_research.progress import using_session
 
 if TYPE_CHECKING:
     from a2a_research.models import Claim
@@ -48,8 +49,14 @@ def build_planner_flow() -> AsyncFlow[Any, Any]:
     return AsyncFlow(start=classify)
 
 
-async def plan(query: str) -> tuple[list[Claim], list[str]]:
+async def plan(query: str, *, session_id: str = "") -> tuple[list[Claim], list[str]]:
     """Run the Planner flow and return (claims, seed_queries)."""
-    shared: dict[str, Any] = {"query": query, "claims": [], "seed_queries": []}
-    await build_planner_flow().run_async(shared)
+    shared: dict[str, Any] = {
+        "query": query,
+        "claims": [],
+        "seed_queries": [],
+        "session_id": session_id,
+    }
+    with using_session(session_id):
+        await build_planner_flow().run_async(shared)
     return list(shared.get("claims") or []), list(shared.get("seed_queries") or [])

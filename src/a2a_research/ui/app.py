@@ -10,6 +10,7 @@ yields so the completed UI renders.
 """
 
 import asyncio
+import dataclasses
 import logging
 import os
 import sys
@@ -45,7 +46,6 @@ from a2a_research.app_logging import (
 from a2a_research.models import AgentStatus, ResearchSession
 from a2a_research.progress import (
     ProgressEvent,
-    ProgressGranularity,
     ProgressPhase,
     ProgressQueue,
     drain_progress_while_running,
@@ -75,24 +75,25 @@ log_event(logger, logging.INFO, "ui.app.imported")
 @me.stateclass
 class AppState:
     query_text: str = ""
-    session: ResearchSession = None  # type: ignore[assignment]
+    session: ResearchSession = dataclasses.field(default_factory=ResearchSession)
     loading: bool = False
-    progress_granularity: int = 1
     current_substep: str = ""
-    progress_pct: float = 0.0
     progress_step_label: str = ""
-    progress_running_substeps: list[str] = None  # type: ignore[assignment]
+    progress_running_substeps: list[str] = dataclasses.field(default_factory=list)
+    # Per-role activity feed: role label → list of "HH:MM:SS  text" lines, appended
+    # on every progress event. Drives the live per-agent activity panel that
+    # replaced the coarse percentage bar.
+    activity_by_role: dict[str, list[str]] = dataclasses.field(default_factory=dict)
 
 
 def _state_snapshot(state: AppState) -> dict[str, object]:
     return {
         "query_text": state.query_text,
         "loading": state.loading,
-        "progress_granularity": state.progress_granularity,
-        "progress_pct": round(state.progress_pct, 3),
         "progress_step_label": state.progress_step_label,
         "current_substep": state.current_substep,
         "running_substeps": list(state.progress_running_substeps),
+        "activity_counts": {role: len(lines) for role, lines in state.activity_by_role.items()},
         "session": {
             "id": state.session.id,
             "query": state.session.query,
@@ -138,17 +139,17 @@ def main_page() -> None:
                     logger,
                     logging.INFO,
                     "ui.loading.render",
-                    progress_pct=state.progress_pct,
                     progress_step_label=state.progress_step_label,
                     progress_substep_label=state.current_substep,
+                    activity_counts={
+                        role: len(lines) for role, lines in state.activity_by_role.items()
+                    },
                 )
                 CardLoading(
-                    progress_pct=state.progress_pct,
                     progress_step_label=state.progress_step_label,
-                    progress_substep_label=state.current_substep,
                     session=state.session,
-                    granularity=state.progress_granularity,
                     running_substeps=state.progress_running_substeps,
+                    activity_by_role=state.activity_by_role,
                 )
             else:
                 if has_results(state.session):
@@ -183,7 +184,6 @@ def main_page() -> None:
                 props={
                     "query_text": state.query_text,
                     "submit_disabled": state.loading,
-                    "progress_granularity": state.progress_granularity,
                     "has_example_handlers": True,
                 },
             )
@@ -192,10 +192,6 @@ def main_page() -> None:
                 on_query_input=_on_query_input,
                 query_text=state.query_text,
                 submit_disabled=state.loading,
-                progress_granularity=state.progress_granularity,
-                on_granularity_agent=_on_granularity_agent,
-                on_granularity_substep=_on_granularity_substep,
-                on_granularity_detail=_on_granularity_detail,
                 on_example_a=_on_example_a,
                 on_example_b=_on_example_b,
                 on_example_c=_on_example_c,
@@ -236,11 +232,29 @@ def _render_error_banner(error: str) -> None:
     BannerError(error, on_retry=_on_retry)
 
 
+_ACTIVITY_MAX_LINES_PER_ROLE = 80
+
+
 def _initialize_progress_state(state: AppState) -> None:
     """Reset progress-related UI state for a fresh run."""
     state.progress_running_substeps = []
     state.current_substep = ""
     state.progress_step_label = "Running the 5-agent research pipeline\u2026"
+    state.activity_by_role = {}
+
+
+def _append_activity(state: AppState, role_label: str, icon: str, text: str) -> None:
+    from datetime import datetime
+
+    ts = datetime.now().strftime("%H:%M:%S")
+    line = f"{ts}  {icon}  {text}"
+    lines = state.activity_by_role.get(role_label)
+    if lines is None:
+        lines = []
+        state.activity_by_role[role_label] = lines
+    lines.append(line)
+    if len(lines) > _ACTIVITY_MAX_LINES_PER_ROLE:
+        del lines[: len(lines) - _ACTIVITY_MAX_LINES_PER_ROLE]
 
 
 def _role_label(role: object) -> str:
@@ -248,17 +262,22 @@ def _role_label(role: object) -> str:
     return str(value).replace("_", " ").title()
 
 
-def _format_progress_text(state: AppState, event: ProgressEvent) -> str:
+def _format_progress_text(event: ProgressEvent) -> str:
     label = event.substep_label.replace("_", " ")
-    if state.progress_granularity >= ProgressGranularity.DETAIL and event.detail:
-        return f"{label} — {event.detail}"
-    return label
+    parts = [label]
+    if event.substep_total and event.substep_total > 1:
+        parts.append(f"[{event.substep_index}/{event.substep_total}]")
+    if event.detail:
+        parts.append(f"— {event.detail}")
+    if event.elapsed_ms is not None:
+        parts.append(f"({event.elapsed_ms:.0f}ms)")
+    return " ".join(parts)
 
 
 def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
     state.session.ensure_agent_results()
     role_label = _role_label(event.role)
-    display = _format_progress_text(state, event)
+    display = _format_progress_text(event)
     step_result = state.session.agent_results[event.role]
 
     if event.phase == ProgressPhase.STEP_STARTED:
@@ -268,21 +287,16 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         if role_label not in state.progress_running_substeps:
             state.progress_running_substeps.append(role_label)
         state.progress_step_label = f"{role_label}…"
-        state.progress_pct = max(state.progress_pct, event.step_index / max(event.total_steps, 1))
+        _append_activity(state, role_label, "▶", f"started — {display}")
         return
 
     if event.phase == ProgressPhase.STEP_SUBSTEP:
         state.session.agent_results[event.role] = step_result.model_copy(
             update={"status": AgentStatus.RUNNING, "message": display}
         )
-        if state.progress_granularity >= ProgressGranularity.SUBSTEP:
-            state.current_substep = display
+        state.current_substep = display
         state.progress_step_label = f"{role_label}…"
-        substep_fraction = event.substep_index / max(event.substep_total, 1)
-        state.progress_pct = max(
-            state.progress_pct,
-            (event.step_index + substep_fraction) / max(event.total_steps, 1),
-        )
+        _append_activity(state, role_label, "·", display)
         return
 
     if event.phase == ProgressPhase.STEP_COMPLETED:
@@ -294,9 +308,7 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         ]
         state.progress_step_label = f"{role_label} completed"
         state.current_substep = ""
-        state.progress_pct = max(
-            state.progress_pct, (event.step_index + 1) / max(event.total_steps, 1)
-        )
+        _append_activity(state, role_label, "✓", f"completed — {display}")
         return
 
     if event.phase == ProgressPhase.STEP_FAILED:
@@ -308,6 +320,7 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         ]
         state.progress_step_label = f"{role_label} failed"
         state.current_substep = display
+        _append_activity(state, role_label, "✗", f"failed — {display}")
 
 
 def _render_results(session: ResearchSession) -> None:
@@ -363,21 +376,6 @@ def _on_example_c(_e: me.ClickEvent) -> None:
     _set_example_query(EXAMPLE_QUERIES[2])
 
 
-def _on_granularity_agent(_e: me.ClickEvent) -> None:
-    log_event(logger, logging.INFO, "ui.granularity.changed", granularity="agent")
-    me.state(AppState).progress_granularity = 1
-
-
-def _on_granularity_substep(_e: me.ClickEvent) -> None:
-    log_event(logger, logging.INFO, "ui.granularity.changed", granularity="substep")
-    me.state(AppState).progress_granularity = 2
-
-
-def _on_granularity_detail(_e: me.ClickEvent) -> None:
-    log_event(logger, logging.INFO, "ui.granularity.changed", granularity="detail")
-    me.state(AppState).progress_granularity = 3
-
-
 async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     """Run research on click using Mesop's async-generator loading pattern."""
     install_asyncio_exception_logging()
@@ -415,7 +413,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     state.loading = True
     state.session = ResearchSession(query=query_text)
     state.session.ensure_agent_results()
-    state.progress_pct = 0.05
     _initialize_progress_state(state)
     state.progress_step_label = "Starting pipeline\u2026"
     log_event(
@@ -424,7 +421,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
         "ui.submit.started",
         query=query_text,
         session_id=state.session.id,
-        granularity=state.progress_granularity,
     )
     yield
 
@@ -442,7 +438,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
 
         state.session = wf_task.result()
         if state.session.error:
-            state.progress_pct = 0.0
             log_event(
                 logger,
                 logging.WARNING,
@@ -452,7 +447,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
                 final_report_chars=len(state.session.final_report),
             )
         else:
-            state.progress_pct = 1.0
             log_event(
                 logger,
                 logging.INFO,
@@ -466,7 +460,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             )
     except asyncio.CancelledError:
         state.session.error = "Live update stream was interrupted. Please retry."
-        state.progress_pct = 0.0
         log_event(
             logger,
             logging.WARNING,
@@ -477,7 +470,6 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
         )
     except Exception as exc:
         state.session.error = str(exc)
-        state.progress_pct = 0.0
         log_event(
             logger,
             logging.ERROR,

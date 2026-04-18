@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from time import perf_counter
 from typing import Any, Literal
 
 from a2a_research.agents.langgraph.fact_checker.node_support import (
@@ -12,8 +13,15 @@ from a2a_research.agents.langgraph.fact_checker.prompt import VERIFY_PROMPT
 from a2a_research.agents.langgraph.fact_checker.state import FactCheckState  # noqa: TC001
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole, Verdict
-from a2a_research.progress import ProgressPhase, emit
+from a2a_research.progress import (
+    ProgressPhase,
+    emit,
+    emit_claim_verdict,
+    emit_llm_response,
+    emit_prompt,
+)
 from a2a_research.providers import ProviderRequestError, get_llm
+from a2a_research.settings import settings
 
 logger = get_logger(__name__)
 
@@ -75,6 +83,15 @@ def build_verify_node() -> Any:
             }
 
         user_content = build_verify_prompt(state.get("query", ""), claims, evidence)
+        emit_prompt(
+            AgentRole.FACT_CHECKER,
+            f"verify_round_{next_round}",
+            user_content,
+            system_text=VERIFY_PROMPT,
+            model=settings.llm.model,
+            session_id=session_id,
+        )
+        started = perf_counter()
         try:
             model = get_llm()
             response = await model.ainvoke(
@@ -87,7 +104,31 @@ def build_verify_node() -> Any:
         except ProviderRequestError as exc:
             logger.warning("FactChecker LLM failed: %s", exc)
             raw = ""
+        emit_llm_response(
+            AgentRole.FACT_CHECKER,
+            f"verify_round_{next_round}",
+            raw,
+            elapsed_ms=(perf_counter() - started) * 1000,
+            model=settings.llm.model,
+            session_id=session_id,
+        )
         new_claims, follow_ups = parse_verifier(raw, fallback=claims)
+        old_by_id = {c.id: c for c in claims}
+        for claim in new_claims:
+            prior = old_by_id.get(claim.id)
+            old_verdict = prior.verdict.value if prior else "∅"
+            new_verdict = claim.verdict.value
+            if not prior or old_verdict != new_verdict or (prior and prior.confidence != claim.confidence):
+                emit_claim_verdict(
+                    AgentRole.FACT_CHECKER,
+                    claim.id,
+                    claim.text,
+                    old_verdict,
+                    new_verdict,
+                    confidence=claim.confidence,
+                    source_count=len(claim.sources or []),
+                    session_id=session_id,
+                )
         logger.info(
             "FactChecker verify round=%s claims=%s follow_ups=%s",
             next_round,

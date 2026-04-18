@@ -74,9 +74,30 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
         + "\n\nReturn JSON only with keys queries_used and hits."
     )
 
+    from a2a_research.progress import emit_llm_response, emit_prompt, using_session
+    from a2a_research.settings import settings as _app_settings
+    from time import perf_counter
+
+    emit_prompt(
+        AgentRole.SEARCHER,
+        "react_loop",
+        prompt,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
     agent = build_agent()
     runner = cast("Any", agent.run)
-    raw_output = await asyncio.to_thread(runner, prompt)
+    started = perf_counter()
+    with using_session(session_id):
+        raw_output = await asyncio.to_thread(runner, prompt)
+    emit_llm_response(
+        AgentRole.SEARCHER,
+        "react_loop",
+        str(raw_output),
+        elapsed_ms=(perf_counter() - started) * 1000,
+        model=_app_settings.llm.model,
+        session_id=session_id,
+    )
     data = parse_json_safely(str(raw_output))
     by_url: dict[str, WebHit] = {}
     errors: list[str] = []

@@ -38,6 +38,33 @@ _DDG_PROVIDER = "duckduckgo"
 _BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 _SNIPPET_MERGE_SEP = "\n---\n"
 
+# Brave Free plan enforces 1 req/sec. Serialize calls behind a lock and keep a
+# minimum gap between them; on 429 retry with exponential backoff honoring
+# ``Retry-After`` when present.
+_BRAVE_MIN_INTERVAL_SEC = 1.1
+_BRAVE_MAX_RETRIES = 3
+_brave_lock = asyncio.Lock()
+_brave_last_call_ts = 0.0
+
+
+async def _brave_throttle() -> None:
+    global _brave_last_call_ts
+    now = asyncio.get_event_loop().time()
+    gap = now - _brave_last_call_ts
+    if gap < _BRAVE_MIN_INTERVAL_SEC:
+        await asyncio.sleep(_BRAVE_MIN_INTERVAL_SEC - gap)
+    _brave_last_call_ts = asyncio.get_event_loop().time()
+
+
+def _parse_retry_after(headers: httpx.Headers, attempt: int) -> float:
+    raw = headers.get("retry-after")
+    if raw:
+        try:
+            return max(0.0, float(raw))
+        except ValueError:
+            pass
+    return min(2.0 ** attempt, 8.0)
+
 
 class WebHit(BaseModel):
     url: str
@@ -133,18 +160,34 @@ async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str
         query=query,
         max_results=max_results,
     )
+    response: httpx.Response | None = None
+    text = ""
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(
-                _BRAVE_SEARCH_URL,
-                params={"q": query, "count": count},
-                headers={
-                    "Accept": "application/json",
-                    "X-Subscription-Token": api_key,
-                },
-                timeout=30.0,
-            )
-            text = response.text
+            for attempt in range(_BRAVE_MAX_RETRIES + 1):
+                async with _brave_lock:
+                    await _brave_throttle()
+                    response = await client.get(
+                        _BRAVE_SEARCH_URL,
+                        params={"q": query, "count": count},
+                        headers={
+                            "Accept": "application/json",
+                            "X-Subscription-Token": api_key,
+                        },
+                        timeout=30.0,
+                    )
+                text = response.text
+                if response.status_code != 429 or attempt == _BRAVE_MAX_RETRIES:
+                    break
+                delay = _parse_retry_after(response.headers, attempt)
+                logger.info(
+                    "Brave 429 query=%r attempt=%s retry_in=%.2fs",
+                    query,
+                    attempt + 1,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+            assert response is not None
             if response.status_code != 200:
                 log_fn = logger.info if response.status_code == 429 else logger.warning
                 log_fn(

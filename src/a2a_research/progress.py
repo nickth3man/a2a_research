@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable
+import contextvars
+from collections.abc import AsyncGenerator, Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from time import perf_counter
@@ -18,15 +20,57 @@ logger = get_logger(__name__)
 
 __all__ = [
     "Bus",
+    "PROMPT_DETAIL_MAX_CHARS",
     "ProgressEvent",
     "ProgressGranularity",
     "ProgressPhase",
     "ProgressQueue",
     "ProgressReporter",
     "create_progress_reporter",
+    "current_session_id",
     "drain_progress_while_running",
     "emit",
+    "emit_claim_verdict",
+    "emit_handoff",
+    "emit_llm_response",
+    "emit_prompt",
+    "emit_rate_limit",
+    "emit_tool_call",
+    "truncate_text",
+    "using_session",
 ]
+
+_session_var: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "a2a_research_session_id", default=""
+)
+
+PROMPT_DETAIL_MAX_CHARS = 1200
+
+
+def current_session_id() -> str:
+    """Return the session id set on the current async/thread context (empty if unset)."""
+    return _session_var.get()
+
+
+@contextmanager
+def using_session(session_id: str) -> Iterator[None]:
+    """Bind ``session_id`` to the current context for nested ``emit_*`` calls."""
+    token = _session_var.set(session_id or "")
+    try:
+        yield
+    finally:
+        _session_var.reset(token)
+
+
+def truncate_text(text: str, limit: int = PROMPT_DETAIL_MAX_CHARS) -> str:
+    """Trim ``text`` to ``limit`` chars, appending a ``[truncated N chars]`` marker."""
+    if text is None:
+        return ""
+    text = str(text)
+    if len(text) <= limit:
+        return text
+    dropped = len(text) - limit
+    return text[:limit] + f"\n…[truncated {dropped} chars]"
 
 
 class ProgressGranularity(IntEnum):
@@ -72,18 +116,209 @@ class Bus:
     """In-process registry of per-session progress queues."""
 
     _queues: ClassVar[dict[str, ProgressQueue]] = {}
+    _loops: ClassVar[dict[str, asyncio.AbstractEventLoop]] = {}
 
     @classmethod
     def register(cls, session_id: str, queue: ProgressQueue) -> None:
         cls._queues[session_id] = queue
+        try:
+            cls._loops[session_id] = asyncio.get_running_loop()
+        except RuntimeError:
+            pass
 
     @classmethod
     def get(cls, session_id: str) -> ProgressQueue | None:
         return cls._queues.get(session_id)
 
     @classmethod
+    def get_loop(cls, session_id: str) -> asyncio.AbstractEventLoop | None:
+        return cls._loops.get(session_id)
+
+    @classmethod
     def unregister(cls, session_id: str) -> None:
         cls._queues.pop(session_id, None)
+        cls._loops.pop(session_id, None)
+
+
+_STEP_INDEX_BY_ROLE: dict[str, int] = {
+    "planner": 0,
+    "searcher": 1,
+    "reader": 2,
+    "fact_checker": 3,
+    "synthesizer": 4,
+}
+
+
+def _step_index(role: AgentRole) -> int:
+    return _STEP_INDEX_BY_ROLE.get(getattr(role, "value", str(role)), 0)
+
+
+def _session_or_current(session_id: str | None) -> str:
+    if session_id:
+        return session_id
+    return current_session_id()
+
+
+def emit_prompt(
+    role: AgentRole,
+    label: str,
+    prompt_text: str,
+    *,
+    system_text: str = "",
+    session_id: str | None = None,
+    model: str = "",
+) -> None:
+    """Emit a ``prompt_sent`` substep carrying (truncated) rendered prompt text."""
+    sid = _session_or_current(session_id)
+    full = (
+        f"[SYSTEM]\n{system_text}\n\n[USER]\n{prompt_text}" if system_text else str(prompt_text)
+    )
+    summary = f"chars={len(full)}"
+    if model:
+        summary += f" model={model}"
+    detail = f"{summary}\n{truncate_text(full)}"
+    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, f"prompt_sent:{label}", detail=detail)
+
+
+def emit_llm_response(
+    role: AgentRole,
+    label: str,
+    response_text: str,
+    *,
+    elapsed_ms: float | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    finish_reason: str = "",
+    model: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Emit an ``llm_response`` substep with latency, token counts, and (truncated) body."""
+    sid = _session_or_current(session_id)
+    bits: list[str] = [f"chars={len(response_text or '')}"]
+    if model:
+        bits.append(f"model={model}")
+    if prompt_tokens is not None or completion_tokens is not None:
+        bits.append(f"tokens={prompt_tokens or 0}/{completion_tokens or 0}")
+    if finish_reason:
+        bits.append(f"finish={finish_reason}")
+    detail = " ".join(bits) + "\n" + truncate_text(response_text or "")
+    emit(
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        f"llm_response:{label}",
+        detail=detail,
+        elapsed_ms=elapsed_ms,
+    )
+
+
+def emit_handoff(
+    *,
+    direction: str,
+    role: AgentRole,
+    peer_role: AgentRole | str,
+    payload_keys: list[str] | None = None,
+    payload_bytes: int | None = None,
+    payload_preview: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Emit a ``handoff_sent``/``handoff_received`` substep on the ``role`` panel."""
+    sid = _session_or_current(session_id)
+    peer = getattr(peer_role, "value", str(peer_role))
+    bits: list[str] = [f"peer={peer}"]
+    if payload_keys is not None:
+        bits.append(f"keys=[{','.join(payload_keys)}]")
+    if payload_bytes is not None:
+        bits.append(f"bytes={payload_bytes}")
+    detail = " ".join(bits)
+    if payload_preview:
+        detail += "\n" + truncate_text(payload_preview)
+    label = "handoff_sent" if direction == "sent" else "handoff_received"
+    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, label, detail=detail)
+
+
+def emit_claim_verdict(
+    role: AgentRole,
+    claim_id: str,
+    claim_text: str,
+    old_verdict: str,
+    new_verdict: str,
+    *,
+    confidence: float | None = None,
+    source_count: int | None = None,
+    session_id: str | None = None,
+) -> None:
+    """Emit a ``claim_verdict`` substep describing a single claim's transition."""
+    sid = _session_or_current(session_id)
+    bits = [f"id={claim_id}", f"{old_verdict}→{new_verdict}"]
+    if confidence is not None:
+        bits.append(f"conf={confidence:.2f}")
+    if source_count is not None:
+        bits.append(f"sources={source_count}")
+    detail = " ".join(bits) + "\n" + truncate_text(claim_text, 400)
+    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, "claim_verdict", detail=detail)
+
+
+def emit_tool_call(
+    role: AgentRole,
+    tool_name: str,
+    *,
+    args_preview: str = "",
+    result_preview: str = "",
+    status: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Emit a ``tool_call`` substep for smolagents ReAct step visibility."""
+    sid = _session_or_current(session_id)
+    bits = [f"tool={tool_name}"]
+    if status:
+        bits.append(f"status={status}")
+    parts = [" ".join(bits)]
+    if args_preview:
+        parts.append("args: " + truncate_text(args_preview, 300))
+    if result_preview:
+        parts.append("result: " + truncate_text(result_preview, 400))
+    emit(
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        "tool_call",
+        detail="\n".join(parts),
+    )
+
+
+def emit_rate_limit(
+    role: AgentRole,
+    *,
+    provider: str,
+    attempt: int,
+    max_attempts: int,
+    delay_sec: float,
+    reason: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Emit a ``rate_limit`` substep (amber warning) for throttles and retries."""
+    sid = _session_or_current(session_id)
+    bits = [
+        f"provider={provider}",
+        f"attempt={attempt}/{max_attempts}",
+        f"retry_in={delay_sec:.2f}s",
+    ]
+    if reason:
+        bits.append(f"reason={reason}")
+    emit(
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        "rate_limit",
+        detail=" ".join(bits),
+    )
 
 
 def emit(
@@ -108,21 +343,31 @@ def emit(
             if phase == ProgressPhase.STEP_SUBSTEP
             else ProgressGranularity.AGENT
         )
-    queue.put_nowait(
-        ProgressEvent(
-            session_id=session_id,
-            phase=phase,
-            role=role,
-            step_index=step_index,
-            total_steps=total_steps,
-            substep_label=substep_label,
-            substep_index=int(extra.get("substep_index") or 0),
-            substep_total=int(extra.get("substep_total") or 1),
-            granularity=granularity,
-            detail=str(extra.get("detail") or ""),
-            elapsed_ms=extra.get("elapsed_ms"),
-        )
+    event = ProgressEvent(
+        session_id=session_id,
+        phase=phase,
+        role=role,
+        step_index=step_index,
+        total_steps=total_steps,
+        substep_label=substep_label,
+        substep_index=int(extra.get("substep_index") or 0),
+        substep_total=int(extra.get("substep_total") or 1),
+        granularity=granularity,
+        detail=str(extra.get("detail") or ""),
+        elapsed_ms=extra.get("elapsed_ms"),
     )
+    try:
+        running = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
+    target_loop = Bus.get_loop(session_id)
+    if running is None and target_loop is not None:
+        try:
+            target_loop.call_soon_threadsafe(queue.put_nowait, event)
+        except RuntimeError:
+            pass
+        return
+    queue.put_nowait(event)
 
 
 def create_progress_reporter(

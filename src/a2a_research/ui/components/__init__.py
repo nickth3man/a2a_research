@@ -6,7 +6,6 @@ Each submodule addresses one visual concern; this package re-exports all public
 
 from a2a_research.ui.components.banners import BannerError, CardLoading
 from a2a_research.ui.components.claims import PanelClaims
-from a2a_research.ui.components.granularity_toggle import GranularityToggle
 from a2a_research.ui.components.page_sections import (
     PageEmptyState,
     PageHeader,
@@ -24,7 +23,6 @@ __all__ = [
     "CardLoading",
     "CardQueryInput",
     "CardTimeline",
-    "GranularityToggle",
     "PageEmptyState",
     "PageHeader",
     "PageInstructions",

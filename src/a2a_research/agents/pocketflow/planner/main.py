@@ -30,7 +30,7 @@ from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
 from a2a_research.agents.pocketflow.planner.flow import plan
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
-from a2a_research.progress import ProgressPhase, emit
+from a2a_research.progress import ProgressPhase, emit, using_session
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -52,7 +52,8 @@ class PlannerExecutor(AgentExecutor):
         emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.PLANNER, 0, 5, "decompose")
 
         try:
-            claims, seed_queries = await plan(query)
+            with using_session(session_id):
+                claims, seed_queries = await plan(query, session_id=session_id)
             status = TaskState.completed
             error_text: str | None = None
         except Exception as exc:

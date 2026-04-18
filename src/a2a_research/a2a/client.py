@@ -24,6 +24,8 @@ from a2a.types import (
 
 from a2a_research.a2a.registry import AgentRegistry, get_registry
 from a2a_research.app_logging import get_logger, log_event
+from a2a_research.progress import emit_handoff
+from a2a_research.settings import settings
 
 if TYPE_CHECKING:
     from a2a_research.models import AgentRole
@@ -125,7 +127,7 @@ class A2AClient:
 
     async def _get_httpx_client(self) -> httpx.AsyncClient:
         if self._httpx_client is None:
-            self._httpx_client = httpx.AsyncClient(timeout=30.0)
+            self._httpx_client = httpx.AsyncClient(timeout=settings.workflow_timeout)
         return self._httpx_client
 
     async def _get_sdk_client(self, role: AgentRole) -> SDKClient:
