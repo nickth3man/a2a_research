@@ -16,8 +16,6 @@ from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.agents.smolagents.searcher import main as searcher_main
 from a2a_research.models import AgentRole, AgentStatus, ReportOutput
 from a2a_research.progress import ProgressEvent, ProgressPhase, drain_progress_while_running
-from a2a_research.tools.fetch import PageContent
-from a2a_research.tools.search import SearchResult, WebHit
 from a2a_research.workflow import run_research_async
 
 
@@ -37,6 +35,14 @@ class _FakePydAgent:
         return SimpleNamespace(output=self._report)
 
 
+class _FakeJSONAgent:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self._payload = payload
+
+    def run(self, prompt: str) -> str:
+        return json.dumps(self._payload)
+
+
 def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         planner_nodes,
@@ -49,35 +55,41 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
 
-    async def fake_search(query: str, max_results: int | None = None) -> SearchResult:
-        return SearchResult(
-            hits=[
-                WebHit(
-                    url="https://nasa.example/jwst",
-                    title="NASA JWST",
-                    snippet="launched 2021",
-                    source="tavily",
-                    score=0.9,
-                )
-            ],
-            errors=[],
-            providers_attempted=["tavily", "duckduckgo"],
-            providers_successful=["tavily", "duckduckgo"],
-        )
+    monkeypatch.setattr(
+        searcher_main,
+        "build_agent",
+        lambda: _FakeJSONAgent(
+            {
+                "queries_used": ["JWST launch date"],
+                "hits": [
+                    {
+                        "url": "https://nasa.example/jwst",
+                        "title": "NASA JWST",
+                        "snippet": "launched 2021",
+                        "source": "tavily",
+                        "score": 0.9,
+                    }
+                ],
+            }
+        ),
+    )
 
-    monkeypatch.setattr(searcher_main, "web_search", fake_search)
-
-    async def fake_fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent]:
-        return [
-            PageContent(
-                url="https://nasa.example/jwst",
-                title="NASA JWST",
-                markdown="# NASA\n\nJWST launched December 25, 2021.",
-                word_count=6,
-            )
-        ]
-
-    monkeypatch.setattr(reader_main, "fetch_many", fake_fetch_many)
+    monkeypatch.setattr(
+        reader_main,
+        "build_agent",
+        lambda: _FakeJSONAgent(
+            {
+                "pages": [
+                    {
+                        "url": "https://nasa.example/jwst",
+                        "title": "NASA JWST",
+                        "markdown": "# NASA\n\nJWST launched December 25, 2021.",
+                        "word_count": 6,
+                    }
+                ]
+            }
+        ),
+    )
 
     monkeypatch.setattr(
         fc_verify,
@@ -175,25 +187,25 @@ async def test_pipeline_aborts_when_search_providers_all_fail(
         ),
     )
 
-    # Every provider is dead.
-    async def dead_search(query: str, max_results: int | None = None) -> SearchResult:
-        return SearchResult(
-            hits=[],
-            errors=[
-                "Tavily disabled (TAVILY_API_KEY is blank in .env).",
-                "DuckDuckGo request failed: 429",
-            ],
-            providers_attempted=["tavily", "duckduckgo"],
-            providers_successful=[],
-        )
+    monkeypatch.setattr(
+        searcher_main,
+        "build_agent",
+        lambda: _FakeJSONAgent(
+            {
+                "queries_used": ["JWST launch"],
+                "hits": [],
+                "errors": [
+                    "Tavily disabled (TAVILY_API_KEY is blank in .env).",
+                    "DuckDuckGo request failed: 429",
+                ],
+            }
+        ),
+    )
 
-    monkeypatch.setattr(searcher_main, "web_search", dead_search)
-
-    # Reader should never be called with URLs — tripwire in case it is.
-    async def tripwire_fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent]:
+    def _reader_tripwire() -> object:
         raise AssertionError("Reader must not be invoked when Searcher produced no URLs")
 
-    monkeypatch.setattr(reader_main, "fetch_many", tripwire_fetch_many)
+    monkeypatch.setattr(reader_main, "build_agent", _reader_tripwire)
 
     # Tripwires on the FactChecker and Synthesizer LLMs — they must not run.
     def _fc_tripwire() -> Any:

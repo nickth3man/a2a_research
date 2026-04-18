@@ -14,22 +14,37 @@ from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.models import AgentRole
 
 
-def _fake_llm(content: str) -> Any:
+def _router_llm(route_payload: dict[str, Any], decompose_payload: dict[str, Any]) -> Any:
     model = MagicMock()
-    model.ainvoke = AsyncMock(return_value=MagicMock(content=content))
+
+    async def ainvoke(messages: list[dict[str, str]]) -> Any:
+        system_prompt = messages[0]["content"]
+        if "classifier" in system_prompt.lower():
+            content = json.dumps(route_payload)
+        else:
+            content = json.dumps(decompose_payload)
+        return MagicMock(content=content)
+
+    model.ainvoke = AsyncMock(side_effect=ainvoke)
     return model
 
 
 @pytest.mark.asyncio
 async def test_plan_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
-        "claims": [
-            {"id": "c0", "text": "JWST launched in December 2021."},
-            {"id": "c1", "text": "JWST has a 6.5 m primary mirror."},
-        ],
-        "seed_queries": ["JWST launch date", "JWST primary mirror diameter"],
-    }
-    monkeypatch.setattr(planner_nodes, "get_llm", lambda: _fake_llm(json.dumps(payload)))
+    monkeypatch.setattr(
+        planner_nodes,
+        "get_llm",
+        lambda: _router_llm(
+            {"strategy": "factual"},
+            {
+                "claims": [
+                    {"id": "c0", "text": "JWST launched in December 2021."},
+                    {"id": "c1", "text": "JWST has a 6.5 m primary mirror."},
+                ],
+                "seed_queries": ["JWST launch date", "JWST primary mirror diameter"],
+            },
+        ),
+    )
 
     claims, seeds = await plan("When did JWST launch and what is its mirror size?")
     assert [c.text for c in claims] == [
@@ -40,8 +55,33 @@ async def test_plan_parses_json(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_plan_temporal_branch_uses_temporal_strategy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        planner_nodes,
+        "get_llm",
+        lambda: _router_llm(
+            {"strategy": "temporal"},
+            {
+                "claims": [{"id": "c0", "text": "JWST launched on December 25, 2021."}],
+                "seed_queries": ["JWST launch date NASA"],
+            },
+        ),
+    )
+
+    claims, seeds = await plan("When did JWST launch?")
+    assert claims[0].text == "JWST launched on December 25, 2021."
+    assert seeds == ["JWST launch date NASA"]
+
+
+@pytest.mark.asyncio
 async def test_plan_falls_back_on_empty_llm(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(planner_nodes, "get_llm", lambda: _fake_llm(""))
+    monkeypatch.setattr(
+        planner_nodes,
+        "get_llm",
+        lambda: _router_llm({"strategy": "fallback"}, {"claims": [], "seed_queries": []}),
+    )
 
     claims, seeds = await plan("What is the speed of sound?")
     assert len(claims) == 1
@@ -51,11 +91,17 @@ async def test_plan_falls_back_on_empty_llm(monkeypatch: pytest.MonkeyPatch) -> 
 
 @pytest.mark.asyncio
 async def test_executor_returns_plan_artifact(monkeypatch: pytest.MonkeyPatch) -> None:
-    payload = {
-        "claims": [{"id": "c0", "text": "Claim A"}],
-        "seed_queries": ["query A"],
-    }
-    monkeypatch.setattr(planner_nodes, "get_llm", lambda: _fake_llm(json.dumps(payload)))
+    monkeypatch.setattr(
+        planner_nodes,
+        "get_llm",
+        lambda: _router_llm(
+            {"strategy": "factual"},
+            {
+                "claims": [{"id": "c0", "text": "Claim A"}],
+                "seed_queries": ["query A"],
+            },
+        ),
+    )
 
     registry = AgentRegistry()
     registry.register_factory(AgentRole.PLANNER, PlannerExecutor)

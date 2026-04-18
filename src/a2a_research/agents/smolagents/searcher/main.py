@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.types import (
@@ -35,10 +35,12 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.smolagents.searcher.agent import build_agent
 from a2a_research.app_logging import get_logger
+from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import WebHit, web_search
+from a2a_research.tools import WebHit
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -51,28 +53,51 @@ __all__ = ["SearcherExecutor", "search_queries"]
 async def search_queries(
     queries: list[str], *, session_id: str = ""
 ) -> tuple[list[WebHit], list[str], list[str]]:
-    """Run :func:`web_search` across ``queries`` in parallel.
-
-    Returns ``(hits, errors, providers_successful)`` where hits are deduped by
-    URL, errors is the deduplicated union of per-provider failure reasons, and
-    providers_successful is the union of providers that ran without error for
-    at least one query.
-    """
+    """Run the smolagents Searcher tool-calling loop for ``queries``."""
     if not queries:
         return [], [], []
-    results = await asyncio.gather(*[web_search(q) for q in queries], return_exceptions=False)
+
+    prompt = (
+        "Queries to search:\n"
+        + "\n".join(f"- {query}" for query in queries)
+        + "\n\nReturn JSON only with keys queries_used and hits."
+    )
+
+    agent = build_agent()
+    runner = cast("Any", agent.run)
+    raw_output = await asyncio.to_thread(runner, prompt)
+    data = parse_json_safely(str(raw_output))
     by_url: dict[str, WebHit] = {}
     errors: list[str] = []
     seen_errors: set[str] = set()
     successful_providers: set[str] = set()
-    for index, (query, sr) in enumerate(zip(queries, results, strict=False), start=1):
-        for hit in sr.hits:
-            by_url.setdefault(hit.url, hit)
-        for err in sr.errors:
-            if err not in seen_errors:
-                seen_errors.add(err)
-                errors.append(err)
-        successful_providers.update(sr.providers_successful)
+
+    raw_hits_any = data.get("hits")
+    raw_hits: list[object] = raw_hits_any if isinstance(raw_hits_any, list) else []
+    for raw_hit in raw_hits:
+        if not isinstance(raw_hit, dict):
+            continue
+        hit = WebHit.model_validate(raw_hit)
+        by_url.setdefault(hit.url, hit)
+        successful_providers.add(hit.source)
+
+    raw_errors_any = data.get("errors")
+    raw_errors: list[object] = raw_errors_any if isinstance(raw_errors_any, list) else []
+    for err in raw_errors:
+        if isinstance(err, str) and err not in seen_errors:
+            seen_errors.add(err)
+            errors.append(err)
+
+    queries_used_raw = data.get("queries_used") or queries
+    queries_used = (
+        [item.strip() for item in queries_used_raw if isinstance(item, str) and item.strip()]
+        if isinstance(queries_used_raw, list)
+        else queries
+    )
+    if not by_url and not errors:
+        errors.append("Searcher agent returned no usable hits.")
+
+    for index, query in enumerate(queries_used, start=1):
         emit(
             session_id,
             ProgressPhase.STEP_SUBSTEP,
@@ -81,11 +106,8 @@ async def search_queries(
             5,
             f"search_query_{index}",
             substep_index=index,
-            substep_total=len(queries),
-            detail=(
-                f"query={query[:80]} hits={len(sr.hits)} "
-                f"providers={','.join(sr.providers_successful) or 'none'} errors={len(sr.errors)}"
-            ),
+            substep_total=max(len(queries_used), 1),
+            detail=f"query={query[:80]} providers={','.join(sorted(successful_providers)) or 'none'}",
         )
     hits = sorted(by_url.values(), key=lambda h: (-h.score, h.source, h.url))
     logger.info(
@@ -121,8 +143,9 @@ class SearcherExecutor(AgentExecutor):
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
         queries = _coerce_str_list(payload.get("queries"))
-        if not queries and isinstance(payload.get("query"), str):
-            queries = [payload["query"]]
+        query_raw = payload.get("query")
+        if not queries and isinstance(query_raw, str):
+            queries = [query_raw]
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.SEARCHER, 1, 5, "searcher_started")
 
         try:
@@ -185,7 +208,7 @@ class SearcherExecutor(AgentExecutor):
         pass
 
 
-def _extract_payload(context: RequestContext) -> dict[str, Any]:
+def _extract_payload(context: RequestContext) -> dict[str, object]:
     if context.message is None:
         return {}
     for part in context.message.parts:
@@ -198,7 +221,7 @@ def _extract_payload(context: RequestContext) -> dict[str, Any]:
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
-                return data
+                return dict(data)
     return {}
 
 

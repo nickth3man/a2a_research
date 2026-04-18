@@ -1,9 +1,4 @@
-"""PocketFlow AsyncFlow wiring for the Planner.
-
-``DecomposeNode`` emits either ``default`` (LLM succeeded, claims extracted)
-or ``fallback`` (degrade to a single claim containing the raw query) so the
-downstream pipeline always sees at least one claim.
-"""
+"""PocketFlow AsyncFlow wiring for the Planner."""
 
 from __future__ import annotations
 
@@ -12,8 +7,12 @@ from typing import TYPE_CHECKING, Any
 from pocketflow import AsyncFlow
 
 from a2a_research.agents.pocketflow.planner.nodes import (
-    DecomposeNode,
+    ClassifyNode,
+    ComparativeDecomposeNode,
+    FactualDecomposeNode,
     FallbackNode,
+    SeedQueryNode,
+    TemporalDecomposeNode,
     TerminalNode,
 )
 
@@ -24,13 +23,29 @@ __all__ = ["build_planner_flow", "plan"]
 
 
 def build_planner_flow() -> AsyncFlow[Any, Any]:
-    decompose = DecomposeNode()
+    classify = ClassifyNode()
+    factual = FactualDecomposeNode()
+    comparative = ComparativeDecomposeNode()
+    temporal = TemporalDecomposeNode()
+    seed = SeedQueryNode()
     fallback = FallbackNode()
     terminal = TerminalNode()
-    _ = decompose - "default" >> terminal
-    _ = decompose - "fallback" >> fallback
-    flow: AsyncFlow[Any, Any] = AsyncFlow(start=decompose)
-    return flow
+
+    _ = classify - "factual" >> factual
+    _ = classify - "comparative" >> comparative
+    _ = classify - "temporal" >> temporal
+    _ = classify - "fallback" >> fallback
+
+    _ = factual - "default" >> seed
+    _ = factual - "fallback" >> fallback
+    _ = comparative - "default" >> seed
+    _ = comparative - "fallback" >> fallback
+    _ = temporal - "default" >> seed
+    _ = temporal - "fallback" >> fallback
+    _ = seed - "default" >> terminal
+    _ = fallback - "default" >> terminal
+
+    return AsyncFlow(start=classify)
 
 
 async def plan(query: str) -> tuple[list[Claim], list[str]]:

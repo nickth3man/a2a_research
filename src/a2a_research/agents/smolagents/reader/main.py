@@ -8,8 +8,9 @@ Consumes ``{urls: list[str]}`` and returns a Task with a DataArtifact of
 
 from __future__ import annotations
 
+import asyncio
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.types import (
@@ -24,10 +25,12 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.smolagents.reader.agent import build_agent
 from a2a_research.app_logging import get_logger
+from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import fetch_many
+from a2a_research.tools import PageContent
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -45,11 +48,12 @@ class ReaderExecutor(AgentExecutor):
         payload = _extract_payload(context)
         session_id = str(payload.get("session_id") or "")
         urls = _coerce_str_list(payload.get("urls") or payload.get("url"))
-        max_chars = int(payload.get("max_chars") or 8000)
+        max_chars_raw = payload.get("max_chars")
+        max_chars = int(max_chars_raw) if isinstance(max_chars_raw, (int, str)) else 8000
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.READER, 2, 5, "reader_started")
 
         try:
-            pages = await fetch_many(urls, max_chars=max_chars) if urls else []
+            pages = await read_urls(urls, max_chars=max_chars)
             status = TaskState.completed
             error_text: str | None = None
         except Exception as exc:
@@ -113,7 +117,7 @@ class ReaderExecutor(AgentExecutor):
         pass
 
 
-def _extract_payload(context: RequestContext) -> dict[str, Any]:
+def _extract_payload(context: RequestContext) -> dict[str, object]:
     if context.message is None:
         return {}
     for part in context.message.parts:
@@ -126,8 +130,26 @@ def _extract_payload(context: RequestContext) -> dict[str, Any]:
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
-                return data
+                return dict(data)
     return {}
+
+
+async def read_urls(urls: list[str], *, max_chars: int = 8000) -> list[PageContent]:
+    if not urls:
+        return []
+
+    prompt = (
+        "URLs to read:\n"
+        + "\n".join(f"- {url}" for url in urls)
+        + f"\n\nmax_chars={max_chars}. Return JSON only with a pages array."
+    )
+    agent = build_agent()
+    runner = cast("Any", agent.run)
+    raw_output = await asyncio.to_thread(runner, prompt)
+    data = parse_json_safely(str(raw_output))
+    raw_pages_any = data.get("pages")
+    raw_pages: list[object] = raw_pages_any if isinstance(raw_pages_any, list) else []
+    return [PageContent.model_validate(item) for item in raw_pages if isinstance(item, dict)]
 
 
 def _coerce_str_list(raw: Any) -> list[str]:

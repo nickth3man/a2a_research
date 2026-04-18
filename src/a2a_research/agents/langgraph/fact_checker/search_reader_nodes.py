@@ -104,7 +104,11 @@ def build_ask_reader_node(client: A2AClient) -> Any:
         )
         task = await client.send(
             AgentRole.READER,
-            payload={"urls": urls, "session_id": session_id},
+            payload={
+                "urls": urls,
+                "session_id": session_id,
+                "claims": [claim.model_dump(mode="json") for claim in (state.get("claims") or [])],
+            },
         )
         payloads = extract_data_payloads(task)
         data = payloads[0] if payloads else {}
