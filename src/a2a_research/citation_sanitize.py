@@ -11,11 +11,21 @@ import re
 from urllib.parse import urlparse, urlunparse
 
 from a2a_research.app_logging import get_logger
-from a2a_research.models import Citation, Claim, ReportOutput, ReportSection, WebSource
+from a2a_research.models import (
+    Citation,
+    Claim,
+    ReportOutput,
+    ReportSection,
+    WebSource,
+)
 
 logger = get_logger(__name__)
 
-__all__ = ["allowed_urls_from_evidence", "normalize_url", "sanitize_report_output"]
+__all__ = [
+    "allowed_urls_from_evidence",
+    "normalize_url",
+    "sanitize_report_output",
+]
 
 _MD_LINK = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 
@@ -35,7 +45,9 @@ def normalize_url(url: str) -> str:
     return urlunparse((parsed.scheme.lower(), host, path, "", "", ""))
 
 
-def allowed_urls_from_evidence(sources: list[WebSource], claims: list[Claim]) -> frozenset[str]:
+def allowed_urls_from_evidence(
+    sources: list[WebSource], claims: list[Claim]
+) -> frozenset[str]:
     """URLs that may appear in the final report."""
     out: set[str] = set()
     for s in sources:
@@ -68,7 +80,9 @@ def _url_allowed(candidate: str, allowed: frozenset[str]) -> bool:
     return bool(n) and n in allowed
 
 
-def _filter_citations(citations: list[Citation], allowed: frozenset[str]) -> list[Citation]:
+def _filter_citations(
+    citations: list[Citation], allowed: frozenset[str]
+) -> list[Citation]:
     kept: list[Citation] = []
     for cit in citations:
         if _url_allowed(cit.url, allowed):
@@ -96,7 +110,9 @@ def sanitize_report_output(
     """Drop hallucinated citations and strip bad markdown links from prose."""
     allowed = allowed_urls_from_evidence(sources, claims)
     if not allowed:
-        logger.warning("citation_sanitize: empty allowlist; dropping all structured citations")
+        logger.warning(
+            "citation_sanitize: empty allowlist; dropping all structured citations"
+        )
         empty: frozenset[str] = frozenset()
         return report.model_copy(
             update={
@@ -109,7 +125,9 @@ def sanitize_report_output(
                     )
                     for s in report.sections
                 ],
-                "summary": _strip_untrusted_markdown_links(report.summary, empty),
+                "summary": _strip_untrusted_markdown_links(
+                    report.summary, empty
+                ),
             }
         )
 

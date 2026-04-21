@@ -76,7 +76,9 @@ def _log_request_start(kind: str, model: str, endpoint: str) -> float:
     return perf_counter()
 
 
-def _log_request_success(started_at: float, kind: str, model: str, endpoint: str) -> None:
+def _log_request_success(
+    started_at: float, kind: str, model: str, endpoint: str
+) -> None:
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.info(
         "Provider request completed kind=%s provider=%s model=%s endpoint=%s elapsed_ms=%.1f",
@@ -88,7 +90,9 @@ def _log_request_success(started_at: float, kind: str, model: str, endpoint: str
     )
 
 
-def _log_request_failure(started_at: float, kind: str, model: str, endpoint: str) -> None:
+def _log_request_failure(
+    started_at: float, kind: str, model: str, endpoint: str
+) -> None:
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.exception(
         "Provider request failed kind=%s provider=%s model=%s endpoint=%s elapsed_ms=%.1f",
@@ -110,7 +114,9 @@ def _get_exception_status_code(exc: Exception) -> int | None:
     return response_status if isinstance(response_status, int) else None
 
 
-def _raise_provider_error(exc: Exception, *, model: str, endpoint: str) -> None:
+def _raise_provider_error(
+    exc: Exception, *, model: str, endpoint: str
+) -> None:
     status_code = _get_exception_status_code(exc)
     exc_name = exc.__class__.__name__
     message = str(exc)
@@ -136,7 +142,9 @@ class OpenRouterChatModel:
     ) -> None:
         self._model = model or settings.llm.model
         self._api_key = settings.llm.api_key if api_key is None else api_key
-        self._base_url = settings.llm.base_url if base_url is None else base_url
+        self._base_url = (
+            settings.llm.base_url if base_url is None else base_url
+        )
         self._client: AsyncOpenAI | None = None
 
     def _get_client(self) -> AsyncOpenAI:
@@ -144,7 +152,9 @@ class OpenRouterChatModel:
             msg = "LLM_API_KEY is required for OpenRouter requests."
             raise ProviderRequestError(msg)
         if self._client is None:
-            self._client = AsyncOpenAI(api_key=self._api_key, base_url=self._base_url)
+            self._client = AsyncOpenAI(
+                api_key=self._api_key, base_url=self._base_url
+            )
         return self._client
 
     async def ainvoke(self, messages: list[dict[str, str]]) -> ChatResponse:
@@ -166,10 +176,16 @@ class OpenRouterChatModel:
         assert response is not None
         content = response.choices[0].message.content or ""
         usage = getattr(response, "usage", None)
-        prompt_tokens = getattr(usage, "prompt_tokens", None) if usage else None
-        completion_tokens = getattr(usage, "completion_tokens", None) if usage else None
+        prompt_tokens = (
+            getattr(usage, "prompt_tokens", None) if usage else None
+        )
+        completion_tokens = (
+            getattr(usage, "completion_tokens", None) if usage else None
+        )
         finish_reason = (
-            getattr(response.choices[0], "finish_reason", "") if response.choices else ""
+            getattr(response.choices[0], "finish_reason", "")
+            if response.choices
+            else ""
         )
         return ChatResponse(
             content=content,

@@ -81,7 +81,9 @@ async def fetch_and_extract(url: str, max_chars: int = 8000) -> PageContent:
     return page
 
 
-async def fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent]:
+async def fetch_many(
+    urls: list[str], max_chars: int = 8000
+) -> list[PageContent]:
     """Fetch several URLs in parallel via ``asyncio.gather``."""
     log_event(
         logger,
@@ -101,6 +103,9 @@ async def fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent
         url_count=len(urls),
         ok_count=sum(1 for p in pages if not p.error),
         failed_count=sum(1 for p in pages if p.error),
-        results=[{"url": p.url, "ok": not bool(p.error), "error": p.error} for p in pages],
+        results=[
+            {"url": p.url, "ok": not bool(p.error), "error": p.error}
+            for p in pages
+        ],
     )
     return pages

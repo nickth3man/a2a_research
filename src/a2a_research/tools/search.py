@@ -105,7 +105,9 @@ class SearchResult(BaseModel):
         return bool(self.providers_successful)
 
 
-async def _search_tavily(query: str, max_results: int) -> tuple[list[WebHit], str | None]:
+async def _search_tavily(
+    query: str, max_results: int
+) -> tuple[list[WebHit], str | None]:
     api_key = settings.tavily_api_key
     log_event(
         logger,
@@ -160,7 +162,9 @@ async def _search_tavily(query: str, max_results: int) -> tuple[list[WebHit], st
     return hits, None
 
 
-async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str | None]:
+async def _search_brave(
+    query: str, max_results: int
+) -> tuple[list[WebHit], str | None]:
     api_key = settings.brave_api_key
     count = min(max_results, 20)
     log_event(
@@ -189,7 +193,10 @@ async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str
                         timeout=30.0,
                     )
                 text = response.text
-                if response.status_code != 429 or attempt == _BRAVE_MAX_RETRIES:
+                if (
+                    response.status_code != 429
+                    or attempt == _BRAVE_MAX_RETRIES
+                ):
                     break
                 delay = _parse_retry_after(response.headers, attempt)
                 logger.info(
@@ -210,7 +217,11 @@ async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str
                 await asyncio.sleep(delay)
             assert response is not None
             if response.status_code != 200:
-                log_fn = logger.info if response.status_code == 429 else logger.warning
+                log_fn = (
+                    logger.info
+                    if response.status_code == 429
+                    else logger.warning
+                )
                 log_fn(
                     "Brave search HTTP error query=%r status=%s body=%s",
                     query,
@@ -226,7 +237,10 @@ async def _search_brave(query: str, max_results: int) -> tuple[list[WebHit], str
                     hit_count=0,
                     error=f"HTTP {response.status_code}",
                 )
-                return [], f"Brave request failed: HTTP {response.status_code} {text[:200]}"
+                return (
+                    [],
+                    f"Brave request failed: HTTP {response.status_code} {text[:200]}",
+                )
             data: dict[str, Any] = response.json()
     except Exception as exc:
         logger.warning("Brave search failed query=%r error=%s", query, exc)
@@ -287,7 +301,9 @@ def _search_ddg_sync(query: str, max_results: int) -> list[WebHit]:
     return hits
 
 
-async def _search_ddg(query: str, max_results: int) -> tuple[list[WebHit], str | None]:
+async def _search_ddg(
+    query: str, max_results: int
+) -> tuple[list[WebHit], str | None]:
     log_event(
         logger,
         logging.INFO,
@@ -300,7 +316,9 @@ async def _search_ddg(query: str, max_results: int) -> tuple[list[WebHit], str |
     try:
         hits = await asyncio.to_thread(_search_ddg_sync, query, max_results)
     except Exception as exc:
-        logger.warning("DuckDuckGo search failed query=%r error=%s", query, exc)
+        logger.warning(
+            "DuckDuckGo search failed query=%r error=%s", query, exc
+        )
         log_event(
             logger,
             logging.INFO,
@@ -351,11 +369,21 @@ def _merge_hits_by_url(*lists: list[WebHit]) -> list[WebHit]:
         score = max((h.score for h in hits), default=0.0)
         snippet = _SNIPPET_MERGE_SEP.join(snippets)
         source = ",".join(sorted(sources))
-        merged.append(WebHit(url=url, title=title, snippet=snippet, source=source, score=score))
+        merged.append(
+            WebHit(
+                url=url,
+                title=title,
+                snippet=snippet,
+                source=source,
+                score=score,
+            )
+        )
     return sorted(merged, key=lambda h: (-h.score, h.url))
 
 
-async def web_search(query: str, max_results: int | None = None) -> SearchResult:
+async def web_search(
+    query: str, max_results: int | None = None
+) -> SearchResult:
     """Run Tavily + Brave + DuckDuckGo in parallel and return a :class:`SearchResult`.
 
     Never raises. Provider failures are recorded in ``SearchResult.errors`` so
@@ -363,8 +391,14 @@ async def web_search(query: str, max_results: int | None = None) -> SearchResult
     (no hits, no errors) from "we literally could not reach any search backend"
     (no hits, every provider errored).
     """
-    cap = max_results if max_results is not None else settings.search_max_results
-    (tav_hits, tav_err), (brave_hits, brave_err), (ddg_hits, ddg_err) = await asyncio.gather(
+    cap = (
+        max_results if max_results is not None else settings.search_max_results
+    )
+    (
+        (tav_hits, tav_err),
+        (brave_hits, brave_err),
+        (ddg_hits, ddg_err),
+    ) = await asyncio.gather(
         _search_tavily(query, cap),
         _search_brave(query, cap),
         _search_ddg(query, cap),
@@ -393,7 +427,12 @@ async def web_search(query: str, max_results: int | None = None) -> SearchResult
         errors,
     )
     top_hits = [
-        {"url": h.url, "title": (h.title or "")[:120], "source": h.source, "score": h.score}
+        {
+            "url": h.url,
+            "title": (h.title or "")[:120],
+            "source": h.source,
+            "score": h.score,
+        }
         for h in merged[:30]
     ]
     log_event(

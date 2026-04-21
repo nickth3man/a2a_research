@@ -80,7 +80,9 @@ class _HttpClientsFilter:
 
 @dataclass(frozen=True)
 class _MesopServerFilter:
-    _roots: frozenset[str] = frozenset({"mesop", "flask", "werkzeug", "uvicorn"})
+    _roots: frozenset[str] = frozenset(
+        {"mesop", "flask", "werkzeug", "uvicorn"}
+    )
 
     def filter(self, record: logging.LogRecord) -> bool:
         base = record.name.split(".", 1)[0]
@@ -96,7 +98,9 @@ class _WarningsFilter:
 class _StreamToLogger:
     """Mirror writes into the logging system while preserving terminal output."""
 
-    def __init__(self, logger: logging.Logger, level: int, original_stream: TextIO) -> None:
+    def __init__(
+        self, logger: logging.Logger, level: int, original_stream: TextIO
+    ) -> None:
         self._logger = logger
         self._level = level
         self._original_stream = original_stream
@@ -126,7 +130,9 @@ def _normalize_log_value(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, dict):
-        return {str(key): _normalize_log_value(val) for key, val in value.items()}
+        return {
+            str(key): _normalize_log_value(val) for key, val in value.items()
+        }
     if isinstance(value, (list, tuple, set)):
         return [_normalize_log_value(item) for item in value]
     if hasattr(value, "value"):
@@ -138,7 +144,9 @@ def _normalize_log_value(value: Any) -> Any:
     return repr(value)
 
 
-def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> None:
+def log_event(
+    logger: logging.Logger, level: int, event: str, **fields: Any
+) -> None:
     """Write a granular structured log line (``event=`` + JSON payload)."""
     payload = {
         "seq": next(_EVENT_COUNTER),
@@ -148,10 +156,17 @@ def log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> 
         "thread": threading.current_thread().name,
         **{key: _normalize_log_value(value) for key, value in fields.items()},
     }
-    logger.log(level, "event=%s payload=%s", event, json.dumps(payload, sort_keys=True))
+    logger.log(
+        level,
+        "event=%s payload=%s",
+        event,
+        json.dumps(payload, sort_keys=True),
+    )
 
 
-def _configure_named_logger(name: str, level: int, propagate: bool = True) -> logging.Logger:
+def _configure_named_logger(
+    name: str, level: int, propagate: bool = True
+) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.propagate = propagate
@@ -201,7 +216,9 @@ def _install_exception_hooks() -> None:
     threading.excepthook = _log_thread_exception
 
 
-def install_asyncio_exception_logging(loop: asyncio.AbstractEventLoop | None = None) -> None:
+def install_asyncio_exception_logging(
+    loop: asyncio.AbstractEventLoop | None = None,
+) -> None:
     """Attach an exception handler that records background task failures."""
     setup_logging()
     target_loop = loop
@@ -215,7 +232,9 @@ def install_asyncio_exception_logging(loop: asyncio.AbstractEventLoop | None = N
         loop: asyncio.AbstractEventLoop, context: dict[str, object]
     ) -> None:
         exc_raw = context.get("exception")
-        exc_info: BaseException | None = exc_raw if isinstance(exc_raw, BaseException) else None
+        exc_info: BaseException | None = (
+            exc_raw if isinstance(exc_raw, BaseException) else None
+        )
         logging.getLogger("a2a_research.asyncio").error(
             "Asyncio exception: %s",
             context.get("message", "no message"),
@@ -228,7 +247,9 @@ def install_asyncio_exception_logging(loop: asyncio.AbstractEventLoop | None = N
     target_loop.set_exception_handler(_handle_async_exception)
 
 
-def _file_handler(path: Path, level: int, formatter: logging.Formatter) -> logging.FileHandler:
+def _file_handler(
+    path: Path, level: int, formatter: logging.Formatter
+) -> logging.FileHandler:
     handler = logging.FileHandler(path, encoding="utf-8")
     handler.setLevel(level)
     handler.setFormatter(formatter)
@@ -322,8 +343,12 @@ def redirect_stdio_to_logging() -> None:
     setup_logging()
     level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.DEBUG)
-    sys.stdout = _StreamToLogger(logging.getLogger("stdout"), level, _ORIGINAL_STDOUT)
-    sys.stderr = _StreamToLogger(logging.getLogger("stderr"), level, _ORIGINAL_STDERR)
+    sys.stdout = _StreamToLogger(
+        logging.getLogger("stdout"), level, _ORIGINAL_STDOUT
+    )
+    sys.stderr = _StreamToLogger(
+        logging.getLogger("stderr"), level, _ORIGINAL_STDERR
+    )
 
 
 __all__ = [

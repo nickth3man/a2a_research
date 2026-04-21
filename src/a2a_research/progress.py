@@ -62,7 +62,9 @@ def using_session(session_id: str) -> Iterator[None]:
         _session_var.reset(token)
 
 
-def truncate_text(text: str | None, limit: int = PROMPT_DETAIL_MAX_CHARS) -> str:
+def truncate_text(
+    text: str | None, limit: int = PROMPT_DETAIL_MAX_CHARS
+) -> str:
     """Trim ``text`` to ``limit`` chars per line, appending truncation markers."""
     if text is None:
         return ""
@@ -173,7 +175,11 @@ def emit_prompt(
 ) -> None:
     """Emit a ``prompt_sent`` substep carrying (truncated) rendered prompt text."""
     sid = _session_or_current(session_id)
-    full = f"[SYSTEM]\n{system_text}\n\n[USER]\n{prompt_text}" if system_text else str(prompt_text)
+    full = (
+        f"[SYSTEM]\n{system_text}\n\n[USER]\n{prompt_text}"
+        if system_text
+        else str(prompt_text)
+    )
     summary = f"chars={len(full)}"
     if model:
         summary += f" model={model}"
@@ -245,7 +251,15 @@ def emit_handoff(
     if payload_preview:
         detail += "\n" + truncate_text(payload_preview)
     label = "handoff_sent" if direction == "sent" else "handoff_received"
-    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, label, detail=detail)
+    emit(
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        label,
+        detail=detail,
+    )
 
 
 def emit_claim_verdict(
@@ -268,7 +282,13 @@ def emit_claim_verdict(
         bits.append(f"sources={source_count}")
     detail = " ".join(bits) + "\n" + truncate_text(claim_text, 400)
     emit(
-        sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, "claim_verdict", detail=detail
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        "claim_verdict",
+        detail=detail,
     )
 
 
@@ -384,7 +404,13 @@ def create_progress_reporter(
     queue: ProgressQueue,
 ) -> ProgressReporter:
     """Create a thread-safe reporter for worker-thread agent execution."""
-    log_event(logger, 20, "progress.reporter.created", loop_id=id(loop), queue_id=id(queue))
+    log_event(
+        logger,
+        20,
+        "progress.reporter.created",
+        loop_id=id(loop),
+        queue_id=id(queue),
+    )
 
     def report(event: ProgressEvent | None) -> None:
         log_event(
@@ -439,7 +465,12 @@ async def drain_progress_while_running(
         if queue_task in done:
             event = queue_task.result()
             if event is None:
-                log_event(logger, 20, "progress.drain.stop.sentinel", queue_id=id(queue))
+                log_event(
+                    logger,
+                    20,
+                    "progress.drain.stop.sentinel",
+                    queue_id=id(queue),
+                )
                 break
             log_event(
                 logger,
@@ -476,11 +507,19 @@ async def drain_progress_while_running(
                 try:
                     event = queue.get_nowait()
                 except asyncio.QueueEmpty:
-                    log_event(logger, 20, "progress.drain.queue_empty", queue_id=id(queue))
+                    log_event(
+                        logger,
+                        20,
+                        "progress.drain.queue_empty",
+                        queue_id=id(queue),
+                    )
                     break
                 if event is None:
                     log_event(
-                        logger, 20, "progress.drain.stop.trailing_sentinel", queue_id=id(queue)
+                        logger,
+                        20,
+                        "progress.drain.stop.trailing_sentinel",
+                        queue_id=id(queue),
                     )
                     return
                 log_event(

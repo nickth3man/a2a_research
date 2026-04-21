@@ -12,12 +12,18 @@ import uvicorn
 from a2a_research.agents.langgraph.fact_checker.main import (
     build_http_app as build_fact_checker_app,
 )
-from a2a_research.agents.pocketflow.planner.main import build_http_app as build_planner_app
+from a2a_research.agents.pocketflow.planner.main import (
+    build_http_app as build_planner_app,
+)
 from a2a_research.agents.pydantic_ai.synthesizer.main import (
     build_http_app as build_synthesizer_app,
 )
-from a2a_research.agents.smolagents.reader.main import build_http_app as build_reader_app
-from a2a_research.agents.smolagents.searcher.main import build_http_app as build_searcher_app
+from a2a_research.agents.smolagents.reader.main import (
+    build_http_app as build_reader_app,
+)
+from a2a_research.agents.smolagents.searcher.main import (
+    build_http_app as build_searcher_app,
+)
 from a2a_research.app_logging import get_logger
 from a2a_research.settings import settings
 
@@ -38,8 +44,12 @@ SERVICES = [
     ServiceSpec("planner", settings.planner_port, build_planner_app),
     ServiceSpec("searcher", settings.searcher_port, build_searcher_app),
     ServiceSpec("reader", settings.reader_port, build_reader_app),
-    ServiceSpec("fact-checker", settings.fact_checker_port, build_fact_checker_app),
-    ServiceSpec("synthesizer", settings.synthesizer_port, build_synthesizer_app),
+    ServiceSpec(
+        "fact-checker", settings.fact_checker_port, build_fact_checker_app
+    ),
+    ServiceSpec(
+        "synthesizer", settings.synthesizer_port, build_synthesizer_app
+    ),
 ]
 
 
@@ -60,7 +70,9 @@ def main() -> None:
                 log_level="info",
             )
             server = uvicorn.Server(config)
-            thread = threading.Thread(target=_run_server, args=(server,), daemon=True)
+            thread = threading.Thread(
+                target=_run_server, args=(server,), daemon=True
+            )
             thread.start()
             threads.append(thread)
             servers.append(server)
@@ -69,7 +81,9 @@ def main() -> None:
         while True:
             for service, thread in zip(SERVICES, threads, strict=False):
                 if not thread.is_alive():
-                    raise RuntimeError(f"Service {service.name} stopped unexpectedly")
+                    raise RuntimeError(
+                        f"Service {service.name} stopped unexpectedly"
+                    )
             time.sleep(1)
     except KeyboardInterrupt:
         logger.info("Received SIGINT, stopping services")
