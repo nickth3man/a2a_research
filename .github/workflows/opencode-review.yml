@@ -30,7 +30,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: openrouter/openrouter/elephant-alpha
+          model: openrouter/mistralai/mistral-small-2603
           use_github_token: true
           share: false
           prompt: |
