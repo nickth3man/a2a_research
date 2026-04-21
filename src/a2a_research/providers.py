@@ -49,7 +49,8 @@ class ChatResponse:
 def parse_structured_response(
     content: str, schema: type[StructuredOutputT]
 ) -> StructuredOutputT | None:
-    """Parse provider output into a Pydantic schema when valid JSON is available."""
+    """Parse provider output into a Pydantic schema when valid JSON is"""
+    """available."""
     from a2a_research.json_utils import parse_json_safely
 
     data = parse_json_safely(content)
@@ -81,7 +82,8 @@ def _log_request_success(
 ) -> None:
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.info(
-        "Provider request completed kind=%s provider=%s model=%s endpoint=%s elapsed_ms=%.1f",
+        "Provider request completed kind=%s provider=%s"
+        " model=%s endpoint=%s elapsed_ms=%.1f",
         kind,
         "openrouter",
         model,
@@ -95,7 +97,8 @@ def _log_request_failure(
 ) -> None:
     elapsed_ms = (perf_counter() - started_at) * 1000
     logger.exception(
-        "Provider request failed kind=%s provider=%s model=%s endpoint=%s elapsed_ms=%.1f",
+        "Provider request failed kind=%s provider=%s"
+        " model=%s endpoint=%s elapsed_ms=%.1f",
         kind,
         "openrouter",
         model,
@@ -127,7 +130,10 @@ def _raise_provider_error(
         )
         raise ProviderRateLimitError(msg) from exc
 
-    msg = f"OpenRouter request failed for model '{model}' at {endpoint}: {message}"
+    msg = (
+        f"OpenRouter request failed for model '{model}' at "
+        f"{endpoint}: {message}"
+    )
     raise ProviderRequestError(msg) from exc
 
 

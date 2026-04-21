@@ -31,7 +31,8 @@ _MD_LINK = re.compile(r"\[([^\]]*)\]\(([^)]+)\)")
 
 
 def normalize_url(url: str) -> str:
-    """Normalize URL for comparison (scheme/host/path, no trailing slash on path)."""
+    """Normalize URL for comparison (scheme/host/path, no trailing slash on"""
+    """path)."""
     raw = url.strip()
     if not raw:
         return ""
@@ -91,7 +92,8 @@ def _filter_citations(
 
 
 def _strip_untrusted_markdown_links(text: str, allowed: frozenset[str]) -> str:
-    """Replace ``[label](url)`` with ``label`` when ``url`` is not in the allowlist."""
+    """Replace ``[label](url)`` with ``label`` when ``url`` is not in the"""
+    """allowlist."""
 
     def repl(m: re.Match[str]) -> str:
         label, url = m.group(1), m.group(2).strip()
@@ -111,7 +113,8 @@ def sanitize_report_output(
     allowed = allowed_urls_from_evidence(sources, claims)
     if not allowed:
         logger.warning(
-            "citation_sanitize: empty allowlist; dropping all structured citations"
+            "citation_sanitize: empty allowlist; dropping all"
+            " structured citations"
         )
         empty: frozenset[str] = frozenset()
         return report.model_copy(
@@ -152,7 +155,8 @@ def sanitize_report_output(
     dropped_top = before_top - len(new_top)
     if dropped_top or dropped_sec:
         logger.info(
-            "citation_sanitize: dropped %s top-level and %s section citations (allowlist size=%s)",
+            "citation_sanitize: dropped %s top-level and %s section"
+            " citations (allowlist size=%s)",
             dropped_top,
             dropped_sec,
             len(allowed),

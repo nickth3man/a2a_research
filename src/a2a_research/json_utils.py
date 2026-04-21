@@ -12,7 +12,8 @@ from typing import Any
 
 
 def parse_json_safely(content: str) -> dict[str, Any]:
-    """Extract and parse a JSON object from *content*, returning ``{}`` on failure.
+    """Extract and parse a JSON object from *content*, returning ``{}`` on
+    failure.
 
     Handles fenced code blocks (````json ... ````), bare JSON objects, and
     strings that contain a JSON object embedded in surrounding prose.
