@@ -10,6 +10,7 @@ from a2a_research.models import (
     AgentRole,
     AgentStatus,
     ResearchSession,
+    default_roles,
 )
 from a2a_research.ui.session_state import (
     get_session_error,
@@ -81,7 +82,7 @@ class TestHasResults:
         assert has_results(s) is False
 
     def test_has_progress_tracks_seeded_pipeline_state(self) -> None:
-        s = ResearchSession(query="q")
+        s = ResearchSession(query="q", roles=default_roles())
         s.ensure_agent_results()
         assert has_progress(s) is True
 
