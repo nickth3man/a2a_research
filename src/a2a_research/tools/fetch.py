@@ -72,7 +72,8 @@ def _fetch_sync(url: str, max_chars: int) -> PageContent:
 
 
 async def fetch_and_extract(url: str, max_chars: int = 8000) -> PageContent:
-    """Fetch ``url`` and return extracted markdown, or a PageContent with error set."""
+    """Fetch ``url`` and return extracted markdown, or a PageContent with"""
+    """error set."""
     page = await asyncio.to_thread(_fetch_sync, url, max_chars)
     if page.error:
         logger.debug("fetch_and_extract url=%s error=%s", url, page.error)
