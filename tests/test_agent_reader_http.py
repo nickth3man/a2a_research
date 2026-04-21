@@ -44,7 +44,7 @@ async def test_reader_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
         transport=httpx.ASGITransport(app=reader_main.build_http_app()),
         base_url="http://localhost:10003",
     ) as http_client:
-        client = build_sdk_client(http_client, "http://localhost:10003")
+        client = await build_sdk_client(http_client, "http://localhost:10003")
         result = await send_and_get_result(
             client, payload={"urls": ["https://a.example"]}
         )

@@ -46,7 +46,7 @@ async def test_searcher_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
         transport=httpx.ASGITransport(app=searcher_main.build_http_app()),
         base_url="http://localhost:10002",
     ) as http_client:
-        client = build_sdk_client(http_client, "http://localhost:10002")
+        client = await build_sdk_client(http_client, "http://localhost:10002")
         result = await send_and_get_result(
             client, payload={"queries": ["jwst launch"]}
         )
