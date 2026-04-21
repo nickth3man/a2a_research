@@ -6,8 +6,8 @@ from time import perf_counter
 from typing import Any
 
 from a2a_research.agents.pydantic_ai.synthesizer import agent as _agent
-from a2a_research.app_logging import get_logger
-from a2a_research.citation_sanitize import sanitize_report_output
+from a2a_research.logging.app_logging import get_logger
+from a2a_research.utils.citation_sanitize import sanitize_report_output
 from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
 from a2a_research.progress import (
     ProgressPhase,

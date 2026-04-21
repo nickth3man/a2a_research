@@ -5,8 +5,8 @@ This module re-exports from split sub-modules for backward compatibility.
 
 from __future__ import annotations
 
-from a2a_research.progress_bus import Bus
-from a2a_research.progress_emit import (
+from .progress_bus import Bus
+from .progress_emit import (
     emit,
     emit_claim_verdict,
     emit_handoff,
@@ -15,7 +15,7 @@ from a2a_research.progress_emit import (
     emit_rate_limit,
     emit_tool_call,
 )
-from a2a_research.progress_types import (
+from .progress_types import (
     PROMPT_DETAIL_MAX_CHARS,
     ProgressEvent,
     ProgressGranularity,
@@ -26,7 +26,7 @@ from a2a_research.progress_types import (
     truncate_text,
     using_session,
 )
-from a2a_research.progress_utils import (
+from .progress_utils import (
     create_progress_reporter,
     drain_progress_while_running,
 )

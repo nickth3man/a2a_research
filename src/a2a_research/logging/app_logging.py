@@ -25,7 +25,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from a2a_research.logging_formatters import (
+from .logging_formatters import (
     A2aSdkFilter,
     HttpClientsFilter,
     MesopServerFilter,
@@ -34,7 +34,7 @@ from a2a_research.logging_formatters import (
     build_formatter,
     log_event,
 )
-from a2a_research.logging_streams import StreamToLogger
+from .logging_streams import StreamToLogger
 from a2a_research.settings import settings
 
 _CONFIGURED = False

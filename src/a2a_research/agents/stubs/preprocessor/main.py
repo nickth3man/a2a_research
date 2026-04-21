@@ -20,7 +20,7 @@ from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
 from a2a_research.a2a.proto import get_data_part, get_text_part, make_data_part
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.stubs.preprocessor.card import PREPROCESSOR_CARD
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 

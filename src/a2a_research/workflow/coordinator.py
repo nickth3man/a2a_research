@@ -16,7 +16,7 @@ import asyncio
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import ResearchSession
 from a2a_research.progress import Bus
 from a2a_research.settings import settings

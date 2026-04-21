@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.logging.app_logging import get_logger, log_event
 
 logger = get_logger(__name__)
 

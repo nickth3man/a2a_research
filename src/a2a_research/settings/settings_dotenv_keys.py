@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from a2a_research.settings_llm import LLMSettings
-from a2a_research.settings_validation import _expected_prefixed_keys
-from a2a_research.settings_workflow import WorkflowConfig
+from .settings_llm import LLMSettings
+from .settings_validation import _expected_prefixed_keys
+from .settings_workflow import WorkflowConfig
 
 _EXPECTED_DOTENV_KEYS = {
     "LLM_PROVIDER",

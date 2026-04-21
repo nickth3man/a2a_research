@@ -13,10 +13,10 @@ from a2a_research.agents.pocketflow.planner.nodes_base import (
     TEMPORAL_PROMPT,
     _BaseDecomposeNode,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, ClaimDAG, ClaimDependency
 from a2a_research.progress import emit_llm_response, emit_prompt
-from a2a_research.providers import ProviderRequestError, get_llm
+from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
@@ -89,7 +89,7 @@ class ClassifyNode(AsyncNode):
             finish_reason=getattr(response, "finish_reason", ""),
         )
 
-        from a2a_research.json_utils import parse_json_safely
+        from a2a_research.utils.json_utils import parse_json_safely
 
         data = parse_json_safely(raw)
         strategy = str((data or {}).get("strategy") or "").strip().lower()

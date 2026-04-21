@@ -23,7 +23,7 @@ from a2a_research.agents.smolagents.reader.payload import (
     _coerce_str_list,
     _extract_payload,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 

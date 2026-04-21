@@ -22,7 +22,7 @@ from a2a_research.agents.pydantic_ai.synthesizer.payload import (
     _coerce_sources,
     _extract_payload,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, ReportOutput
 from a2a_research.progress import ProgressPhase, emit
 

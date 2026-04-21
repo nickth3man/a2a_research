@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlparse, urlunparse
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import (
     Citation,
     Claim,

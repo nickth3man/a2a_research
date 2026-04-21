@@ -18,11 +18,11 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from a2a_research.settings_core import AppSettings
-from a2a_research.settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
-from a2a_research.settings_llm import LLMSettings
-from a2a_research.settings_validation import _validate_dotenv_keys as _vd
-from a2a_research.settings_workflow import WorkflowConfig
+from .settings_core import AppSettings
+from .settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
+from .settings_llm import LLMSettings
+from .settings_validation import _validate_dotenv_keys as _vd
+from .settings_workflow import WorkflowConfig
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[1]
 _ENV_FILE = _PROJECT_ROOT / ".env"

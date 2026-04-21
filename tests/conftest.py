@@ -54,7 +54,7 @@ def stub_mesop_box_runtime(stub_mesop_component_runtime: None) -> None:
 def _reset_global_singletons():
     """Reset module-level singletons between tests to prevent state leakage."""
     from a2a_research.a2a import reset_registry
-    from a2a_research.providers import reset_provider_singletons
+    from a2a_research.llm.providers import reset_provider_singletons
 
     reset_provider_singletons()
     reset_registry()

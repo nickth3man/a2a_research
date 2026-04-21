@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from a2a_research.json_utils import parse_json_safely
+from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.tools import WebHit, web_search
 
 

@@ -7,11 +7,11 @@ from typing import Any
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from a2a_research.settings_core_agents import AgentEndpointsMixin
-from a2a_research.settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
-from a2a_research.settings_llm import LLMSettings
-from a2a_research.settings_validation import _validate_dotenv_keys
-from a2a_research.settings_workflow import WorkflowConfig
+from .settings_core_agents import AgentEndpointsMixin
+from .settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
+from .settings_llm import LLMSettings
+from .settings_validation import _validate_dotenv_keys
+from .settings_workflow import WorkflowConfig
 
 __all__ = ["AppSettings"]
 

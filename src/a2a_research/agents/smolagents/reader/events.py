@@ -14,7 +14,7 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.proto import make_data_part, new_agent_text_message
-from a2a_research.app_logging import log_event
+from a2a_research.logging.app_logging import log_event
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 

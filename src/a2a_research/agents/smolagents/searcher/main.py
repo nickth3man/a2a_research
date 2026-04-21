@@ -23,7 +23,7 @@ from a2a_research.agents.smolagents.searcher.payload import (
 from a2a_research.agents.smolagents.searcher.result import (
     enqueue_search_result,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 

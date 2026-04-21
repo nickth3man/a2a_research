@@ -9,7 +9,7 @@ from typing import Any, TypeVar, cast
 from openai import AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ def parse_structured_response(
 ) -> StructuredOutputT | None:
     """Parse provider output into a Pydantic schema when valid JSON is"""
     """available."""
-    from a2a_research.json_utils import parse_json_safely
+    from a2a_research.utils.json_utils import parse_json_safely
 
     data = parse_json_safely(content)
     if not data:

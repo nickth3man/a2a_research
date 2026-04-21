@@ -5,7 +5,7 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from a2a_research.settings_workflow_ext_defaults import (
+from .settings_workflow_ext_defaults import (
     DEFAULT_AB_TESTING_WEIGHTS,
     DEFAULT_CHECKPOINT_STAGES,
     DEFAULT_COST_ATTRIBUTION_TAGS,

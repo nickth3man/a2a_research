@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import mesop as me
 
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.ui.components import (
     CardLoading,
     CardQueryInput,

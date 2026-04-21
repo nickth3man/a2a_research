@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-import a2a_research.providers as providers_module
-from a2a_research.providers import (
+import a2a_research.llm.providers as providers_module
+from a2a_research.llm.providers import (
     get_llm,
     reset_provider_singletons,
 )

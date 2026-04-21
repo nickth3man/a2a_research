@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a_research.progress_types import (
+from .progress_types import (
     ProgressPhase,
     current_session_id,
     truncate_text,
@@ -112,7 +112,7 @@ def _emit(
     **extra,
 ) -> None:
     """Forward to the central emit function to avoid circular imports."""
-    from a2a_research.progress_emit_core import emit
+    from .progress_emit_core import emit
 
     emit(
         session_id,

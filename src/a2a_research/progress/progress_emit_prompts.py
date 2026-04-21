@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a_research.progress_bus import Bus
-from a2a_research.progress_types import (
+from .progress_bus import Bus
+from .progress_types import (
     ProgressGranularity,
     ProgressPhase,
     current_session_id,
@@ -116,7 +116,7 @@ def _emit(
     **extra,
 ) -> None:
     """Forward to the central emit function to avoid circular imports."""
-    from a2a_research.progress_emit_core import emit
+    from .progress_emit_core import emit
 
     emit(
         session_id,

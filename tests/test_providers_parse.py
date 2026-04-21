@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from a2a_research.providers import parse_structured_response
+from a2a_research.llm.providers import parse_structured_response
 
 
 class _FakeSchema(BaseModel):

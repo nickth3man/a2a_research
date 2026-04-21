@@ -7,7 +7,7 @@ from contextlib import suppress
 
 import mesop as me
 
-from a2a_research.app_logging import (
+from a2a_research.logging.app_logging import (
     get_logger,
     install_asyncio_exception_logging,
     log_event,

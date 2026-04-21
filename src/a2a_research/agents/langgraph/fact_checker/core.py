@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from a2a_research.agents.langgraph.fact_checker.verify_route import (
     verify_claims,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, Verdict, WebSource
 from a2a_research.progress import ProgressPhase, emit
 from a2a_research.tools import PageContent

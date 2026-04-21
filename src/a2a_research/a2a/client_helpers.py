@@ -13,7 +13,7 @@ from a2a_research.a2a.proto import (
     get_text_part,
     make_message,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 
 logger = get_logger(__name__)
 

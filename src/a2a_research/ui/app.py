@@ -11,7 +11,7 @@ import logging
 
 import mesop as me
 
-from a2a_research.app_logging import (
+from a2a_research.logging.app_logging import (
     get_logger,
     log_event,
     setup_logging,

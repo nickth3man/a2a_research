@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from a2a_research.progress_emit_core import (
+from .progress_emit_core import (
     emit,
     emit_rate_limit,
     emit_tool_call,
 )
-from a2a_research.progress_emit_events import (
+from .progress_emit_events import (
     emit_claim_verdict,
     emit_handoff,
 )
-from a2a_research.progress_emit_prompts import (
+from .progress_emit_prompts import (
     emit_llm_response,
     emit_prompt,
 )

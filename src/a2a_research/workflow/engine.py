@@ -5,7 +5,7 @@ from __future__ import annotations
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.progress import ProgressPhase
 from a2a_research.workflow.status import emit_v2
 

@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from a2a_research.app_logging import get_logger, log_event
-from a2a_research.progress_bus import Bus
+from a2a_research.logging.app_logging import get_logger, log_event
+from .progress_bus import Bus
 
 if TYPE_CHECKING:
-    from a2a_research.progress_types import (
+    from .progress_types import (
         AsyncGenerator,
         ProgressEvent,
         ProgressQueue,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.settings import settings
 from a2a_research.tools.search_models import WebHit
 

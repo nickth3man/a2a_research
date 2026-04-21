@@ -8,7 +8,7 @@ from a2a.types import TaskState
 from pydantic import ValidationError
 
 from a2a_research.a2a import extract_data_payload_or_warn
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import (
     Claim,
     ClaimDAG,

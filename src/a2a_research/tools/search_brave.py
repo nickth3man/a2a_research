@@ -8,7 +8,7 @@ from typing import Any
 
 import httpx
 
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.models import AgentRole
 from a2a_research.progress import current_session_id, emit_rate_limit
 from a2a_research.settings import settings

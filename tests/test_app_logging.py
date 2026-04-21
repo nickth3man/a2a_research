@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import a2a_research.app_logging as logging_module
-import a2a_research.logging_formatters as _lf
-from a2a_research.app_logging import get_logger, log_event, setup_logging
+import a2a_research.logging.app_logging as logging_module
+import a2a_research.logging.logging_formatters as _lf
+from a2a_research.logging.app_logging import get_logger, log_event, setup_logging
 from a2a_research.models import AgentRole, AgentStatus
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ class TestSetupLogging:
                 side_effect=make_file_handler,
             ),
         ):
-            import a2a_research.app_logging as logging_mod
+            import a2a_research.logging.app_logging as logging_mod
 
             original = logging_mod._CONFIGURED
             try:
@@ -138,7 +138,7 @@ class TestSetupLogging:
                 side_effect=make_file_handler,
             ),
         ):
-            import a2a_research.app_logging as logging_mod
+            import a2a_research.logging.app_logging as logging_mod
 
             original = logging_mod._CONFIGURED
             try:

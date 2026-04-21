@@ -24,7 +24,7 @@ from a2a_research.agents.pocketflow.planner.extract import (
     extract_query,
 )
 from a2a_research.agents.pocketflow.planner.flow import plan
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit, using_session
 

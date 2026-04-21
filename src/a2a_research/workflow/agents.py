@@ -6,7 +6,7 @@ import asyncio
 from typing import Any
 
 from a2a_research.a2a import A2AClient
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, AgentStatus, ResearchSession
 from a2a_research.workflow.coerce import payload, task_failed
 from a2a_research.workflow.definitions import AGENT_DEFINITIONS, stage_timeout

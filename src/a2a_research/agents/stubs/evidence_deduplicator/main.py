@@ -25,7 +25,7 @@ from a2a_research.agents.stubs.evidence_deduplicator.normalize import (
 from a2a_research.agents.stubs.evidence_deduplicator.payload import (
     _extract_payload,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 

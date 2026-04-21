@@ -6,8 +6,8 @@ import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
-from a2a_research.progress_bus import Bus
-from a2a_research.progress_types import (
+from .progress_bus import Bus
+from .progress_types import (
     ProgressEvent,
     ProgressGranularity,
     ProgressPhase,
@@ -152,8 +152,8 @@ def emit(
 
 def _truncate_text(text: str | None, limit: int) -> str:
     """Trim text to limit chars, appending truncation markers."""
-    from a2a_research.progress_types import PROMPT_DETAIL_MAX_CHARS
-    from a2a_research.progress_types import truncate_text as _tt
+    from .progress_types import PROMPT_DETAIL_MAX_CHARS
+    from .progress_types import truncate_text as _tt
 
     if limit <= PROMPT_DETAIL_MAX_CHARS:
         if text is None:

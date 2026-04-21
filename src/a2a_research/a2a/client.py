@@ -21,7 +21,7 @@ from a2a_research.a2a.client_helpers import (
     extract_text,
 )
 from a2a_research.a2a.registry import AgentRegistry, get_registry
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.progress import emit_handoff
 from a2a_research.settings import settings
 

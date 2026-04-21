@@ -24,7 +24,7 @@ from a2a_research.agents.smolagents.reader.main import (
 from a2a_research.agents.smolagents.searcher.main import (
     build_http_app as build_searcher_app,
 )
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.settings import settings
 
 if TYPE_CHECKING:

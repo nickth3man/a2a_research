@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, Verdict
 from a2a_research.workflow.agents import run_agent as _run_agent
 from a2a_research.workflow.coerce import (

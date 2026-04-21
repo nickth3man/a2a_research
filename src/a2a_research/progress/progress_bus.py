@@ -7,7 +7,7 @@ from contextlib import suppress
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
-    from a2a_research.progress_types import ProgressEvent, ProgressQueue
+    from .progress_types import ProgressEvent, ProgressQueue
 
 __all__ = ["Bus"]
 
