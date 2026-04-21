@@ -114,11 +114,14 @@ def CardQueryInput(  # noqa: N802
                 padding=SUBMIT_BUTTON_PADDING,
             )
         ):
-            # Mesop's current button disabled code path still expects an int-backed
-            # CodeValue during serialization, even though the public API is typed as bool.
+            # Mesop's current button disabled code path still expects
+            # an int-backed CodeValue during serialization, even though
+            # the public API is typed as bool.
             button_style = (
                 me.Style(
-                    background="linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                    background=(
+                        "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)"
+                    ),
                     color="#fff",
                 )
                 if not submit_disabled

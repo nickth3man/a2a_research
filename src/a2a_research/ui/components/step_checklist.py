@@ -24,7 +24,8 @@ def StepChecklist(  # noqa: N802
     granularity: int,
     running_substeps: list[str],
 ) -> None:
-    """Icons and status for each agent; indented sub-steps when granularity \u2265 2."""
+    """Icons and status for each agent; indented sub-steps when
+    granularity \u2265 2."""
     for role in get_all_roles(session):
         result = session.get_agent(role)
         _render_checklist_row(role, result, granularity, running_substeps)

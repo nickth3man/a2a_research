@@ -1,6 +1,6 @@
 """Data access layer for UI components.
 
-Decouples Mesop components from the new 5-agent pipeline shape.
+Decouples Mesop components from the v2 pipeline shape.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from a2a_research.models import (
     AgentRole,
     Claim,
     ResearchSession,
-    default_roles,
+    workflow_v2_roles,
 )
 
 
@@ -33,8 +33,11 @@ def get_agent_label(role: AgentRole) -> str:
     return card.name if card else role.value
 
 
-def get_all_roles(session: ResearchSession | None = None) -> list[AgentRole]:
-    """Return roles in pipeline order (session override falls back to defaults)."""
+def get_all_roles(
+    session: ResearchSession | None = None,
+) -> list[AgentRole]:
+    """Return roles in pipeline order (session override falls back to
+    defaults)."""
     if session and session.roles:
         return session.roles
-    return default_roles()
+    return workflow_v2_roles()

@@ -1,4 +1,6 @@
-"""Shared Mesop layout primitives (card shells, badges) built from design tokens."""
+"""Shared Mesop layout primitives (card shells, badges) built from design
+tokens.
+"""
 
 from __future__ import annotations
 
@@ -43,7 +45,8 @@ def card_box(
 
 
 def get_query_input_card_style() -> me.Style:
-    """Single-box card used for the query form (margin included on same node)."""
+    """Single-box card used for the query form (margin included on same
+    node)."""
     from a2a_research.ui.tokens import (
         CARD_PADDING_LARGE,
         QUERY_CARD_MARGIN_BOTTOM,

@@ -2,21 +2,23 @@
 
 import mesop as me
 
+from a2a_research.ui.style_presets import (
+    EMPTY_STATE_STYLE,
+    HEADER_STYLE,
+    INSTRUCTIONS_STYLE,
+)
 from a2a_research.ui.tokens import (
     CARD_BACKGROUND,
     EMPTY_STATE_ICON_BG,
     EMPTY_STATE_ICON_SIZE,
-    EMPTY_STATE_STYLE,
     FONT_SIZE_BODY,
     FONT_SIZE_SMALL,
     FONT_SIZE_SUBTITLE,
     FONT_SIZE_TINY,
     HEADER_ACCENT_COLOR,
-    HEADER_STYLE,
     HEADER_SUBTITLE_COLOR,
     INSTRUCTIONS_BG,
     INSTRUCTIONS_BORDER,
-    INSTRUCTIONS_STYLE,
     STEP_CARD_BORDER,
     TEXT_MUTED,
 )
@@ -61,7 +63,10 @@ def PageHeader() -> None:  # noqa: N802
                 ),
             )
         me.text(
-            "Planner \u2192 Searcher \u2192 Reader \u2192 FactChecker \u2192 Synthesizer",
+            (
+                "Planner \u2192 Searcher \u2192 Reader"
+                " \u2192 FactChecker \u2192 Synthesizer"
+            ),
             style=me.Style(
                 font_size=FONT_SIZE_BODY,
                 color=HEADER_SUBTITLE_COLOR,
@@ -131,7 +136,11 @@ def PageEmptyState() -> None:  # noqa: N802
             ),
         )
         me.text(
-            "Ask about topics in the local corpus. The pipeline retrieves relevant sources, verifies claims, and writes a structured report.",
+            (
+                "Ask about topics in the local corpus. The pipeline"
+                " retrieves relevant sources, verifies claims, and writes a"
+                " structured report."
+            ),
             style=me.Style(
                 color=TEXT_MUTED,
                 font_size=FONT_SIZE_SUBTITLE,

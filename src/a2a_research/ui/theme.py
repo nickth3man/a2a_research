@@ -1,7 +1,8 @@
-"""UI color tokens (no Mesop dependency) for agent status and claim verdict styling.
+"""UI color tokens (no Mesop dependency) for agent status and claim
+verdict styling.
 
-Centralises hex values so :mod:`a2a_research.ui.components` stays readable and tests
-can import colours without pulling in Mesop.
+Centralises hex values so :mod:`a2a_research.ui.components` stays
+readable and tests can import colours without pulling in Mesop.
 """
 
 from __future__ import annotations
