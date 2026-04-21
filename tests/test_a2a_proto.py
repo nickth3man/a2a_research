@@ -1,0 +1,238 @@
+"""Tests for a2a_research.a2a.proto."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime
+
+import pytest
+from a2a.types import Message, Part, Role, Task, TaskState
+
+from a2a_research.a2a.proto import (
+    ROLE_AGENT,
+    ROLE_USER,
+    _serialize_for_proto,
+    get_data_part,
+    get_text_part,
+    make_data_part,
+    make_message,
+    make_text_message,
+    make_text_part,
+    new_agent_text_message,
+    new_task,
+)
+
+
+class TestRoleConstants:
+    def test_role_user_is_role_user(self) -> None:
+        assert ROLE_USER == Role.ROLE_USER
+
+    def test_role_agent_is_role_agent(self) -> None:
+        assert ROLE_AGENT == Role.ROLE_AGENT
+
+
+class TestSerializeForProto:
+    def test_datetime_to_isoformat(self) -> None:
+        dt = datetime(2024, 1, 15, 12, 30, 0)
+        result = _serialize_for_proto(dt)
+        assert result == "2024-01-15T12:30:00"
+
+    def test_date_to_isoformat(self) -> None:
+        d = date(2024, 6, 1)
+        result = _serialize_for_proto(d)
+        assert result == "2024-06-01"
+
+    def test_dict_recursion(self) -> None:
+        dt = datetime(2024, 1, 1, 0, 0, 0)
+        result = _serialize_for_proto({"ts": dt, "val": 42})
+        assert result == {"ts": "2024-01-01T00:00:00", "val": 42}
+
+    def test_list_recursion(self) -> None:
+        d = date(2025, 3, 10)
+        result = _serialize_for_proto([d, "plain", 1])
+        assert result == ["2025-03-10", "plain", 1]
+
+    def test_passthrough_string(self) -> None:
+        assert _serialize_for_proto("hello") == "hello"
+
+    def test_passthrough_int(self) -> None:
+        assert _serialize_for_proto(99) == 99
+
+    def test_passthrough_none(self) -> None:
+        assert _serialize_for_proto(None) is None
+
+    def test_nested_dict_in_list(self) -> None:
+        dt = datetime(2024, 7, 4, 8, 0, 0)
+        result = _serialize_for_proto([{"ts": dt}])
+        assert result == [{"ts": "2024-07-04T08:00:00"}]
+
+
+class TestMakeTextPart:
+    def test_returns_part(self) -> None:
+        part = make_text_part("hello")
+        assert isinstance(part, Part)
+
+    def test_text_field_set(self) -> None:
+        part = make_text_part("world")
+        assert part.text == "world"
+
+    def test_empty_text(self) -> None:
+        part = make_text_part("")
+        assert part.text == ""
+
+
+class TestMakeDataPart:
+    def test_returns_part(self) -> None:
+        part = make_data_part({"key": "value"})
+        assert isinstance(part, Part)
+
+    def test_has_data_field(self) -> None:
+        part = make_data_part({"x": 1})
+        assert part.HasField("data")
+
+    def test_does_not_have_text_field(self) -> None:
+        part = make_data_part({"x": 1})
+        assert not part.text
+
+
+class TestGetTextPart:
+    def test_returns_text_for_text_part(self) -> None:
+        part = make_text_part("hello")
+        assert get_text_part(part) == "hello"
+
+    def test_returns_none_for_data_part(self) -> None:
+        part = make_data_part({"x": 1})
+        assert get_text_part(part) is None
+
+    def test_returns_none_for_empty_text_part(self) -> None:
+        part = make_text_part("")
+        assert get_text_part(part) is None
+
+
+class TestGetDataPart:
+    def test_returns_dict_for_data_part(self) -> None:
+        part = make_data_part({"foo": "bar"})
+        result = get_data_part(part)
+        assert isinstance(result, dict)
+        assert result == {"foo": "bar"}
+
+    def test_returns_none_for_text_part(self) -> None:
+        part = make_text_part("text")
+        assert get_data_part(part) is None
+
+    def test_nested_data(self) -> None:
+        part = make_data_part({"a": {"b": 1}})
+        result = get_data_part(part)
+        assert result == {"a": {"b": 1}}
+
+
+class TestMakeMessage:
+    def test_returns_message(self) -> None:
+        msg = make_message()
+        assert isinstance(msg, Message)
+
+    def test_message_id_is_uuid(self) -> None:
+        msg = make_message()
+        # Should not raise
+        parsed = uuid.UUID(msg.message_id)
+        assert str(parsed) == msg.message_id
+
+    def test_default_role_is_user(self) -> None:
+        msg = make_message()
+        assert msg.role == ROLE_USER
+
+    def test_text_creates_text_part(self) -> None:
+        msg = make_message(text="hello world")
+        texts = [p.text for p in msg.parts if p.text]
+        assert "hello world" in texts
+
+    def test_data_creates_data_part(self) -> None:
+        msg = make_message(data={"k": "v"})
+        data_parts = [p for p in msg.parts if p.HasField("data")]
+        assert len(data_parts) == 1
+        assert get_data_part(data_parts[0]) == {"k": "v"}
+
+    def test_no_text_no_data_creates_empty_text_part(self) -> None:
+        msg = make_message()
+        assert len(msg.parts) == 1
+        assert msg.parts[0].text == ""
+
+    def test_task_id_empty_when_not_provided(self) -> None:
+        msg = make_message()
+        assert msg.task_id == ""
+
+    def test_task_id_set(self) -> None:
+        msg = make_message(task_id="task-123")
+        assert msg.task_id == "task-123"
+
+    def test_context_id_empty_when_not_provided(self) -> None:
+        msg = make_message()
+        assert msg.context_id == ""
+
+    def test_context_id_set(self) -> None:
+        msg = make_message(context_id="ctx-abc")
+        assert msg.context_id == "ctx-abc"
+
+    def test_custom_role(self) -> None:
+        msg = make_message(role=ROLE_AGENT)
+        assert msg.role == ROLE_AGENT
+
+    def test_text_and_data_both_present(self) -> None:
+        msg = make_message(text="hi", data={"x": 1})
+        assert len(msg.parts) == 2
+        text_parts = [p for p in msg.parts if p.text]
+        data_parts = [p for p in msg.parts if p.HasField("data")]
+        assert len(text_parts) == 1
+        assert len(data_parts) == 1
+
+
+class TestMakeTextMessage:
+    def test_returns_message_with_text(self) -> None:
+        msg = make_text_message("test text")
+        texts = [p.text for p in msg.parts if p.text]
+        assert "test text" in texts
+
+    def test_default_role_is_agent(self) -> None:
+        msg = make_text_message("hi")
+        assert msg.role == ROLE_AGENT
+
+    def test_custom_role(self) -> None:
+        msg = make_text_message("hi", role=ROLE_USER)
+        assert msg.role == ROLE_USER
+
+
+class TestNewAgentTextMessage:
+    def test_shortcut_for_make_text_message(self) -> None:
+        msg = new_agent_text_message("agent says hello")
+        texts = [p.text for p in msg.parts if p.text]
+        assert "agent says hello" in texts
+        assert msg.role == ROLE_AGENT
+
+
+class TestNewTask:
+    def test_returns_task(self) -> None:
+        msg = make_message(task_id="t1", context_id="c1")
+        task = new_task(msg)
+        assert isinstance(task, Task)
+
+    def test_uses_message_task_id(self) -> None:
+        msg = make_message(task_id="my-task-id")
+        task = new_task(msg)
+        assert task.id == "my-task-id"
+
+    def test_uses_message_context_id(self) -> None:
+        msg = make_message(context_id="my-context")
+        task = new_task(msg)
+        assert task.context_id == "my-context"
+
+    def test_generates_task_id_when_message_has_none(self) -> None:
+        msg = make_message()
+        task = new_task(msg)
+        assert task.id != ""
+        # Should be a valid UUID
+        uuid.UUID(task.id)
+
+    def test_initial_state_is_submitted(self) -> None:
+        msg = make_message(task_id="t99")
+        task = new_task(msg)
+        assert task.status.state == TaskState.TASK_STATE_SUBMITTED
