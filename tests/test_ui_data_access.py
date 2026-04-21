@@ -8,7 +8,7 @@ from a2a_research.models import (
     ResearchSession,
     Verdict,
     WebSource,
-    default_roles,
+    workflow_v2_roles,
 )
 from a2a_research.ui.data_access import (
     get_agent_label,
@@ -70,11 +70,11 @@ class TestGetAllRoles:
         assert get_all_roles(session) == [AgentRole.SEARCHER]
 
     def test_fallback_when_session_none(self) -> None:
-        assert get_all_roles(None) == default_roles()
+        assert get_all_roles(None) == workflow_v2_roles()
 
     def test_fallback_when_session_empty_roles(self) -> None:
         session = ResearchSession(query="q", roles=[])
-        assert get_all_roles(session) == default_roles()
+        assert get_all_roles(session) == workflow_v2_roles()
 
 
 class TestFormatSourceDisplay:

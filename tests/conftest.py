@@ -9,11 +9,13 @@ from dotenv import load_dotenv
 
 # Load repo ``.env`` first so real keys win over the placeholders below. Pytest
 # imports this module before ``a2a_research.settings``; without this,
-# ``setdefault`` would pin test placeholders and override ``.env`` for Pydantic.
+# ``setdefault`` would pin test placeholders and override ``.env`` for
+# Pydantic.
 _ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(_ENV_FILE)
 
-# :mod:`a2a_research.settings` loads a singleton on import; credentials must exist first.
+# :mod:`a2a_research.settings` loads a singleton on import; credentials must
+# exist first.
 os.environ.setdefault("LLM_API_KEY", "test-llm-key-placeholder")
 os.environ.setdefault("TAVILY_API_KEY", "test-tavily-key-placeholder")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-placeholder")
@@ -26,7 +28,8 @@ from mesop.component_helpers import helper
 
 @pytest.fixture
 def stub_mesop_component_runtime() -> None:
-    """Stub ``helper.runtime()`` for ``@me.component`` and page layout trees."""
+    """Stub ``helper.runtime()`` for ``@me.component`` and page layout"""
+    """trees."""
     node = MagicMock()
     child = MagicMock()
     child.MergeFrom = MagicMock()

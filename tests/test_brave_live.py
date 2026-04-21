@@ -17,9 +17,13 @@ import pytest
 from a2a_research.tools import search as search_module
 from a2a_research.tools.search import WebHit
 
-# One xdist worker for this module: Brave free tier is ~1 req/s; parallel workers
-# cause 429s under ``pytest -n auto``.
 pytestmark = pytest.mark.xdist_group("live_search_providers")
+
+_HAS_KEY = bool(os.environ.get("BRAVE_API_KEY"))
+_SKIP_REASON = (
+    "Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP"
+    " tests."
+)
 
 
 def _hit_text(hit: WebHit) -> str:
@@ -35,8 +39,8 @@ def _any_hit_mentions(hits: list[WebHit], *needles: str) -> bool:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_live_search_returns_hits() -> None:
@@ -50,8 +54,8 @@ async def test_brave_live_search_returns_hits() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_hit_structure() -> None:
@@ -70,8 +74,8 @@ async def test_brave_hit_structure() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_max_results_respected() -> None:
@@ -85,8 +89,8 @@ async def test_brave_max_results_respected() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_multiple_queries_different_results() -> None:
@@ -100,13 +104,15 @@ async def test_brave_multiple_queries_different_results() -> None:
     assert len(hits2) >= 1
     urls1 = {h.url for h in hits1}
     urls2 = {h.url for h in hits2}
-    assert urls1 != urls2, "Different queries should return different URL sets"
+    assert urls1 != urls2, (
+        "Different queries should return different URL sets"
+    )
 
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_unicode_query() -> None:
@@ -119,8 +125,8 @@ async def test_brave_unicode_query() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_special_chars_query() -> None:
@@ -133,8 +139,8 @@ async def test_brave_special_chars_query() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_nonsense_query() -> None:
@@ -146,8 +152,8 @@ async def test_brave_nonsense_query() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_results_have_distinct_urls() -> None:
@@ -162,8 +168,8 @@ async def test_brave_results_have_distinct_urls() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_response_time_reasonable() -> None:
@@ -178,8 +184,8 @@ async def test_brave_response_time_reasonable() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_popular_query_many_results() -> None:
@@ -192,8 +198,8 @@ async def test_brave_popular_query_many_results() -> None:
 
 @pytest.mark.integration
 @pytest.mark.skipif(
-    os.environ.get("BRAVE_LIVE") != "1",
-    reason="Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests.",
+    os.environ.get("BRAVE_LIVE") != "1" and not _HAS_KEY,
+    reason=_SKIP_REASON,
 )
 @pytest.mark.asyncio
 async def test_brave_snippet_quality() -> None:

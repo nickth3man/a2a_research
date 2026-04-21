@@ -10,7 +10,10 @@ import pytest
 from a2a.types import Task
 
 from a2a_research.a2a.client import extract_data_payloads
-from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
+from a2a_research.agents.pocketflow.planner import (
+    nodes as planner_nodes,
+    nodes_base as planner_nodes_base,
+)
 from a2a_research.agents.pocketflow.planner.main import build_http_app
 from tests.http_harness import build_sdk_client, send_and_get_result
 
@@ -32,6 +35,7 @@ async def test_planner_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
         ]
     )
     monkeypatch.setattr(planner_nodes, "get_llm", lambda: model)
+    monkeypatch.setattr(planner_nodes_base, "get_llm", lambda: model)
 
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=build_http_app()),

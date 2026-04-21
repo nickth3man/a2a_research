@@ -1,11 +1,14 @@
 """
-Test Python source constraints: max file size (lines) and max line width (chars).
+Test Python source constraints: max file size (lines)
+and max line width (chars).
 
 Scans ``src/`` and ``tests/`` recursively with no path exclusions.
 
-Non-empty line counts: **soft** target ``SOFT_LIMIT``, **hard** failure ``HARD_LIMIT``.
+Non-empty line counts: **soft** target ``SOFT_LIMIT``,
+**hard** failure ``HARD_LIMIT``.
 
-Physical line width is limited to ``MAX_LINE_CHAR_LIMIT`` characters (aligned with Ruff).
+Physical line width is limited to ``MAX_LINE_CHAR_LIMIT``
+characters (aligned with Ruff).
 """
 
 from pathlib import Path
@@ -24,7 +27,8 @@ SCAN_DIRECTORIES = ["src", "tests"]
 
 
 def _count_lines(file_path: Path) -> int:
-    """Count non-empty lines in a file (more meaningful than raw line count)."""
+    """Count non-empty lines in a file (more meaningful than raw line"""
+    """count)."""
     try:
         with open(file_path, encoding="utf-8") as f:
             # Count lines that have at least one non-whitespace character
@@ -97,7 +101,8 @@ def test_python_files_respect_line_count_limits():
                 "Refactoring suggestions:",
                 "  • Extract classes/functions into dedicated modules",
                 "  • Split large test files by feature or domain",
-                "  • Move configuration/data tables to separate constants files",
+                "  • Move configuration/data tables to separate "
+                "constants files",
                 "  • Consider the 'Composition over Inheritance' principle",
                 f"{'=' * 60}",
             ]
@@ -140,7 +145,8 @@ def _scan_line_width_violations(
 
 
 def test_python_source_line_width_max_79_chars():
-    """No physical line may exceed MAX_LINE_CHAR_LIMIT (kept in sync with Ruff)."""
+    """No physical line may exceed MAX_LINE_CHAR_LIMIT (kept in sync with"""
+    """Ruff)."""
     project_root = Path(__file__).resolve().parent.parent
     violations, scanned = _scan_line_width_violations(
         project_root, MAX_LINE_CHAR_LIMIT
@@ -150,7 +156,8 @@ def test_python_source_line_width_max_79_chars():
         head = [
             f"\n{'=' * 60}",
             "PYTHON LINE WIDTH VIOLATIONS",
-            f"(max {MAX_LINE_CHAR_LIMIT} characters per line; see pyproject.toml [tool.ruff])",
+            f"(max {MAX_LINE_CHAR_LIMIT} chars/line; see "
+            f"pyproject.toml [tool.ruff])",
             f"{'=' * 60}",
             f"Scanned: {scanned} files",
             f"{'-' * 60}",

@@ -9,6 +9,7 @@ import pytest
 from a2a.types import Task
 
 from a2a_research.a2a.client import extract_data_payloads
+from a2a_research.agents.smolagents.reader import core as reader_core
 from a2a_research.agents.smolagents.reader import main as reader_main
 from tests.http_harness import build_sdk_client, send_and_get_result
 
@@ -24,7 +25,7 @@ class _FakeJSONAgent:
 @pytest.mark.asyncio
 async def test_reader_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        reader_main,
+        reader_core,
         "build_agent",
         lambda: _FakeJSONAgent(
             {

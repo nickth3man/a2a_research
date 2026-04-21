@@ -1,4 +1,6 @@
-"""Tests for parallel Tavily + Brave + DuckDuckGo web search with explicit errors."""
+"""Tests for parallel Tavily + Brave + DuckDuckGo web search with explicit
+errors.
+"""
 
 from __future__ import annotations
 
@@ -155,7 +157,9 @@ async def test_web_search_records_ddg_request_failure(
 
     monkeypatch.setattr(search_module, "_search_tavily", ok_tavily)
     monkeypatch.setattr(search_module, "_search_brave", ok_brave)
-    monkeypatch.setattr(search_module, "_search_ddg_sync", raising_ddg_sync)
+    import a2a_research.tools.search_ddg as ddg_module
+
+    monkeypatch.setattr(ddg_module, "_search_ddg_sync", raising_ddg_sync)
 
     result = await web_search("any")
     urls = [h.url for h in result.hits]
@@ -165,7 +169,7 @@ async def test_web_search_records_ddg_request_failure(
 
 
 @pytest.mark.asyncio
-async def test_web_search_adds_diagnostic_when_zero_hits_and_no_provider_errors(
+async def test_web_search_adds_diagnostic_when_zero_hits_and_no_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def empty_tavily(q: str, n: int) -> tuple[list[WebHit], str | None]:

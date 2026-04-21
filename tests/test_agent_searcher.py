@@ -10,6 +10,7 @@ from a2a.types import Task, TaskState
 
 from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads
 from a2a_research.agents.smolagents.searcher import SearcherExecutor
+from a2a_research.agents.smolagents.searcher import core as searcher_core
 from a2a_research.agents.smolagents.searcher import main as searcher_main
 from a2a_research.agents.smolagents.searcher.main import SearcherBatchResult
 from a2a_research.models import AgentRole
@@ -31,7 +32,7 @@ async def test_searcher_uses_agent_for_queries(
 ) -> None:
     calls: list[str] = []
     monkeypatch.setattr(
-        searcher_main,
+        searcher_core,
         "build_agent",
         lambda: _FakeSearcherAgent(
             {
@@ -98,7 +99,7 @@ async def test_searcher_fails_when_agent_returns_only_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        searcher_main,
+        searcher_core,
         "build_agent",
         lambda: _FakeSearcherAgent(
             {
@@ -132,7 +133,7 @@ async def test_searcher_dedupes_hits_from_agent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        searcher_main,
+        searcher_core,
         "build_agent",
         lambda: _FakeSearcherAgent(
             {

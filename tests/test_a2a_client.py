@@ -33,7 +33,8 @@ class EchoExecutor(AgentExecutor):
     async def execute(
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
-        task = context.current_task or new_task(context.message)  # type: ignore[arg-type]
+        task = context.current_task or new_task(context.message)
+        # type: ignore[arg-type]
         await event_queue.enqueue_event(task)
 
         payloads: list[dict[str, Any]] = []

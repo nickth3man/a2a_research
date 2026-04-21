@@ -13,21 +13,19 @@ import pytest
 from a2a_research.a2a.registry import AgentRegistry
 from a2a_research.agents.langgraph.fact_checker import (
     main as fact_checker_main,
-)
-from a2a_research.agents.langgraph.fact_checker import (
     verify_route as fc_verify,
 )
 from a2a_research.agents.pocketflow.planner import main as planner_main
 from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
 from a2a_research.agents.pydantic_ai.synthesizer import main as synth_main
-from a2a_research.agents.smolagents.reader import main as reader_main
-from a2a_research.agents.smolagents.searcher import main as searcher_main
+from a2a_research.agents.smolagents.reader import (
+    core as reader_core, main as reader_main)
+from a2a_research.agents.smolagents.searcher import (
+    core as searcher_core, main as searcher_main)
 from a2a_research.models import AgentRole, AgentStatus, ReportOutput
 from a2a_research.progress import (
-    ProgressEvent,
-    ProgressPhase,
-    drain_progress_while_running,
+    ProgressEvent, ProgressPhase, drain_progress_while_running
 )
 from a2a_research.workflow import run_research_async
 from tests.http_harness import make_multi_app_client
@@ -89,7 +87,7 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     monkeypatch.setattr(planner_nodes, "get_llm", lambda: planner_model)
     monkeypatch.setattr(
-        searcher_main,
+        searcher_core,
         "build_agent",
         lambda: _FakeJSONAgent(
             {
@@ -107,7 +105,7 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
         ),
     )
     monkeypatch.setattr(
-        reader_main,
+        reader_core,
         "build_agent",
         lambda: _FakeJSONAgent(
             {
@@ -115,7 +113,9 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
                     {
                         "url": "https://nasa.example/jwst",
                         "title": "NASA JWST",
-                        "markdown": "# NASA\n\nJWST launched December 25, 2021.",
+                        "markdown": (
+                            "# NASA\n\nJWST launched December 25, 2021."
+                        ),
                         "word_count": 6,
                     }
                 ]
@@ -166,7 +166,9 @@ def _install_http_services(monkeypatch: pytest.MonkeyPatch) -> Any:
 
     monkeypatch.setattr(client_module.httpx, "AsyncClient", _client_factory)
     monkeypatch.setattr(client_module, "get_registry", lambda: registry)
-    monkeypatch.setattr(coordinator_module, "get_registry", lambda: registry)
+    import a2a_research.a2a as a2a_module
+
+    monkeypatch.setattr(a2a_module, "get_registry", lambda: registry)
     return shared_client
 
 

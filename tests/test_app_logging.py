@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import a2a_research.app_logging as logging_module
+import a2a_research.logging_formatters as _lf
 from a2a_research.app_logging import get_logger, log_event, setup_logging
 from a2a_research.models import AgentRole, AgentStatus
 
@@ -16,7 +17,7 @@ if TYPE_CHECKING:
 
 class TestNormalizeLogValue:
     def test_primitive_types_passthrough(self) -> None:
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         assert normalize("hello") == "hello"
         assert normalize(42) == 42
         assert normalize(3.14) == 3.14
@@ -24,22 +25,22 @@ class TestNormalizeLogValue:
         assert normalize(None) is None
 
     def test_path_converted_to_string(self) -> None:
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         assert normalize(Path("/tmp/foo")) == str(Path("/tmp/foo"))
 
     def test_dict_recursively_normalizes(self) -> None:
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         assert normalize({"role": AgentRole.PLANNER}) == {"role": "planner"}
 
     def test_list_recursively_normalizes(self) -> None:
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         assert normalize([Path("/tmp"), AgentStatus.COMPLETED]) == [
             str(Path("/tmp")),
             "COMPLETED",
         ]
 
     def test_pydantic_model_dumped(self) -> None:
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         result = normalize(AgentRole.SEARCHER)
         assert result == "searcher"
 
@@ -48,7 +49,7 @@ class TestNormalizeLogValue:
             def __init__(self) -> None:
                 self.role = AgentRole.PLANNER
 
-        normalize = logging_module._normalize_log_value
+        normalize = _lf._normalize_log_value
         assert normalize(Foo()) == {"role": "planner"}
 
 

@@ -8,6 +8,7 @@ import pytest
 
 from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads
 from a2a_research.agents.smolagents.reader import ReaderExecutor
+from a2a_research.agents.smolagents.reader import core as reader_core
 from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.models import AgentRole
 
@@ -28,7 +29,7 @@ async def test_reader_uses_agent_for_urls(
 ) -> None:
     calls: list[str] = []
     monkeypatch.setattr(
-        reader_main,
+        reader_core,
         "build_agent",
         lambda: _FakeReaderAgent(
             {
@@ -82,7 +83,7 @@ async def test_reader_propagates_errors_in_pages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        reader_main,
+        reader_core,
         "build_agent",
         lambda: _FakeReaderAgent(
             {
