@@ -34,7 +34,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         with:
-          model: openrouter/inclusionai/ling-2.6-flash:free
+          model: openrouter/mistralai/mistral-small-2603
           # share: true
           # token: ${{ secrets.GITHUB_TOKEN }}  # use runner token instead of the GitHub App
           prompt: |
