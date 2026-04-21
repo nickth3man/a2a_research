@@ -12,6 +12,7 @@ from a2a.server.agent_execution import AgentExecutor
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
+from a2a_research.a2a.cards import get_card
 from a2a_research.models import AgentRole
 from a2a_research.settings import settings
 
@@ -29,6 +30,13 @@ class AgentRegistry:
     reader_url: str = settings.reader_url
     fact_checker_url: str = settings.fact_checker_url
     synthesizer_url: str = settings.synthesizer_url
+    clarifier_url: str = settings.clarifier_url
+    preprocessor_url: str = settings.preprocessor_url
+    ranker_url: str = settings.ranker_url
+    evidence_deduplicator_url: str = settings.evidence_deduplicator_url
+    adversary_url: str = settings.adversary_url
+    critic_url: str = settings.critic_url
+    postprocessor_url: str = settings.postprocessor_url
 
     def __post_init__(self) -> None:
         self._store = InMemoryTaskStore()
@@ -42,14 +50,25 @@ class AgentRegistry:
             AgentRole.READER: self.reader_url,
             AgentRole.FACT_CHECKER: self.fact_checker_url,
             AgentRole.SYNTHESIZER: self.synthesizer_url,
+            AgentRole.PREPROCESSOR: self.preprocessor_url,
+            AgentRole.CLARIFIER: self.clarifier_url,
+            AgentRole.RANKER: self.ranker_url,
+            AgentRole.EVIDENCE_DEDUPLICATOR: self.evidence_deduplicator_url,
+            AgentRole.ADVERSARY: self.adversary_url,
+            AgentRole.CRITIC: self.critic_url,
+            AgentRole.POSTPROCESSOR: self.postprocessor_url,
         }
         return mapping[role]
 
-    def register_factory(self, role: AgentRole, factory: ExecutorFactory) -> None:
+    def register_factory(
+        self, role: AgentRole, factory: ExecutorFactory
+    ) -> None:
         self._factories[role] = factory
         self._handlers.pop(role, None)
 
-    def register_executor(self, role: AgentRole, executor: AgentExecutor) -> None:
+    def register_executor(
+        self, role: AgentRole, executor: AgentExecutor
+    ) -> None:
         self._factories[role] = lambda: executor
         self._handlers.pop(role, None)
 
@@ -62,6 +81,7 @@ class AgentRegistry:
             self._handlers[role] = DefaultRequestHandler(
                 agent_executor=executor,
                 task_store=self._store,
+                agent_card=get_card(role),
             )
         return self._handlers[role]
 

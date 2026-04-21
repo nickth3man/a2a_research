@@ -1,9 +1,10 @@
-"""AgentCard definitions for the five research agents."""
+"""AgentCard definitions for the research agents."""
 
 from __future__ import annotations
 
-from a2a.types import AgentCapabilities, AgentCard, AgentSkill
+from a2a.types import AgentCard
 
+from a2a_research.a2a.compat import make_agent_card, make_skill
 from a2a_research.models import AgentRole
 from a2a_research.settings import settings
 
@@ -30,24 +31,21 @@ def _card(
     skill_description: str,
     tags: list[str],
 ) -> AgentCard:
-    skill = AgentSkill(
-        id=skill_id,
+    skill = make_skill(
+        skill_id=skill_id,
         name=name,
         description=skill_description,
         tags=tags,
         input_modes=["text/plain", "application/json"],
         output_modes=["application/json"],
     )
-    return AgentCard(
+    return make_agent_card(
         name=name,
         description=description,
-        version="1.0.0",
-        protocol_version="0.3.0",
         url=_url_for(role),
-        preferred_transport="JSONRPC",
         default_input_modes=["text/plain", "application/json"],
         default_output_modes=["application/json"],
-        capabilities=AgentCapabilities(streaming=True),
+        streaming=True,
         skills=[skill],
     )
 

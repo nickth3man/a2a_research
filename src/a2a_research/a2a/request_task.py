@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a.utils import new_task
-
 if TYPE_CHECKING:
     from a2a.server.agent_execution import RequestContext
     from a2a.types import Task
+
+from a2a_research.a2a.proto import new_task
 
 __all__ = ["initial_task_or_new"]
 

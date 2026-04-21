@@ -17,7 +17,11 @@ from a2a_research.a2a.client import (
     extract_data_payloads,
     extract_text,
 )
-from a2a_research.a2a.registry import AgentRegistry, get_registry, reset_registry
+from a2a_research.a2a.registry import (
+    AgentRegistry,
+    get_registry,
+    reset_registry,
+)
 
 __all__ = [
     "AGENT_CARDS",
