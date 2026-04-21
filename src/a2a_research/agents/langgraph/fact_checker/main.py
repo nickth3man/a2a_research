@@ -10,25 +10,29 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
-    DataPart,
-    Part,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
     TaskStatusUpdateEvent,
-    TextPart,
 )
-from a2a.utils import new_agent_text_message
 from pydantic import ValidationError
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
+from a2a_research.a2a.proto import (
+    get_data_part,
+    get_text_part,
+    make_data_part,
+    new_agent_text_message,
+)
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.card import FACT_CHECKER_CARD
-from a2a_research.agents.langgraph.fact_checker.verify_route import verify_claims
+from a2a_research.agents.langgraph.fact_checker.verify_route import (
+    verify_claims,
+)
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, Verdict, WebSource
 from a2a_research.progress import ProgressPhase, emit
@@ -37,7 +41,9 @@ from a2a_research.tools import PageContent
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
 
-    from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult
+    from a2a_research.agents.langgraph.fact_checker.state import (
+        FactCheckRunResult,
+    )
 
 logger = get_logger(__name__)
 __all__ = ["FactCheckerExecutor", "build_http_app", "run_fact_check"]
@@ -83,7 +89,9 @@ async def run_fact_check(
             "rounds": 0,
         }
 
-    verified = await verify_claims(query, claims, evidence, session_id=session_id)
+    verified = await verify_claims(
+        query, claims, evidence, session_id=session_id
+    )
     emit(
         session_id,
         ProgressPhase.STEP_SUBSTEP,
@@ -103,7 +111,9 @@ async def run_fact_check(
 
 
 class FactCheckerExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
@@ -118,8 +128,12 @@ class FactCheckerExecutor(AgentExecutor):
                 role=AgentRole.FACT_CHECKER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
-                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
+                payload_bytes=len(
+                    json.dumps(payload, default=str).encode("utf-8")
+                ),
+                payload_preview=json.dumps(
+                    payload, default=str, indent=2, sort_keys=True
+                ),
                 session_id=session_id,
             )
         query = str(payload.get("query") or "")
@@ -144,7 +158,7 @@ class FactCheckerExecutor(AgentExecutor):
                 session_id=session_id,
             )
             error_text: str | None = None
-            status = TaskState.completed
+            status = TaskState.TASK_STATE_COMPLETED
         except Exception as exc:
             logger.exception("FactChecker crashed task_id=%s", task.id)
             result = {
@@ -154,25 +168,27 @@ class FactCheckerExecutor(AgentExecutor):
                 "search_exhausted": True,
                 "rounds": 0,
             }
-            status = TaskState.failed
+            status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
         artifact = Artifact(
             artifact_id="verified",
             name="verified",
             parts=[
-                Part(
-                    root=DataPart(
-                        data={
-                            "verified_claims": [
-                                c.model_dump(mode="json") for c in result["verified_claims"]
-                            ],
-                            "sources": [s.model_dump(mode="json") for s in result["sources"]],
-                            "errors": list(result["errors"]),
-                            "search_exhausted": bool(result["search_exhausted"]),
-                            "rounds": result["rounds"],
-                        }
-                    )
+                make_data_part(
+                    {
+                        "verified_claims": [
+                            c.model_dump(mode="json")
+                            for c in result["verified_claims"]
+                        ],
+                        "sources": [
+                            s.model_dump(mode="json")
+                            for s in result["sources"]
+                        ],
+                        "errors": list(result["errors"]),
+                        "search_exhausted": bool(result["search_exhausted"]),
+                        "rounds": result["rounds"],
+                    }
                 )
             ],
         )
@@ -191,24 +207,29 @@ class FactCheckerExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text) if error_text else None,
+                    message=new_agent_text_message(error_text)
+                    if error_text
+                    else None,
                 ),
-                final=True,
             )
         )
         emit(
             session_id,
             ProgressPhase.STEP_COMPLETED
-            if status == TaskState.completed
+            if status == TaskState.TASK_STATE_COMPLETED
             else ProgressPhase.STEP_FAILED,
             AgentRole.FACT_CHECKER,
             3,
             5,
-            "fact_checker_completed" if status == TaskState.completed else "fact_checker_failed",
+            "fact_checker_completed"
+            if status == TaskState.TASK_STATE_COMPLETED
+            else "fact_checker_failed",
             detail=f"rounds={result['rounds']} errors={len(result['errors'])}",
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
@@ -216,12 +237,13 @@ def _extract_payload(context: RequestContext) -> dict[str, Any]:
     if context.message is None:
         return {}
     for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            return dict(root.data)
-        if isinstance(root, TextPart):
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            return data_part
+        text_part = get_text_part(part)
+        if text_part:
             try:
-                data = json.loads(root.text)
+                data = json.loads(text_part)
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
@@ -273,6 +295,10 @@ def _coerce_sources(raw: Any) -> list[WebSource]:
 
 def build_http_app() -> Any:
     handler = DefaultRequestHandler(
-        agent_executor=FactCheckerExecutor(), task_store=InMemoryTaskStore()
+        agent_executor=FactCheckerExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=FACT_CHECKER_CARD,
     )
-    return A2AStarletteApplication(agent_card=FACT_CHECKER_CARD, http_handler=handler).build()
+    return build_starlette_http_app(
+        agent_card=FACT_CHECKER_CARD, http_handler=handler
+    )

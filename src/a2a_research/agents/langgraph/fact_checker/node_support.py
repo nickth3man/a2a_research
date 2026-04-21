@@ -42,7 +42,9 @@ def task_error_metadata(task: Any) -> str | None:
     return None
 
 
-def build_verify_prompt(query: str, claims: list[Claim], evidence: list[PageContent]) -> str:
+def build_verify_prompt(
+    query: str, claims: list[Claim], evidence: list[PageContent]
+) -> str:
     claim_block = json.dumps(
         [
             {
@@ -69,7 +71,9 @@ def build_verify_prompt(query: str, claims: list[Claim], evidence: list[PageCont
     )
 
 
-def parse_verifier(raw: str, *, fallback: list[Claim]) -> tuple[list[Claim], list[str]]:
+def parse_verifier(
+    raw: str, *, fallback: list[Claim]
+) -> tuple[list[Claim], list[str]]:
     data = parse_json_safely(raw)
     if not isinstance(data, dict):
         logger.warning("Verifier fallback path used for raw=%r", raw[:200])
@@ -79,7 +83,9 @@ def parse_verifier(raw: str, *, fallback: list[Claim]) -> tuple[list[Claim], lis
         if not isinstance(item, dict):
             continue
         try:
-            verdict = Verdict(str(item.get("verdict") or "NEEDS_MORE_EVIDENCE"))
+            verdict = Verdict(
+                str(item.get("verdict") or "NEEDS_MORE_EVIDENCE")
+            )
         except ValueError:
             verdict = Verdict.NEEDS_MORE_EVIDENCE
         verified.append(
@@ -89,12 +95,15 @@ def parse_verifier(raw: str, *, fallback: list[Claim]) -> tuple[list[Claim], lis
                 verdict=verdict,
                 confidence=clamp_conf(item.get("confidence")),
                 sources=[str(s) for s in (item.get("sources") or []) if s],
-                evidence_snippets=[str(s) for s in (item.get("evidence_snippets") or []) if s],
+                evidence_snippets=[
+                    str(s) for s in (item.get("evidence_snippets") or []) if s
+                ],
             )
         )
     if not verified:
         logger.warning(
-            "Verifier produced no valid claims; fallback path used for raw=%r", raw[:200]
+            "Verifier produced no valid claims; fallback path used for raw=%r",
+            raw[:200],
         )
         verified = fallback
     follow = [

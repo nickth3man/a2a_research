@@ -1,6 +1,6 @@
 """A2A AgentExecutor for the Reader role.
 
-Consumes ``{urls: list[str]}`` and returns a Task with a DataArtifact of
+Consumes ``{urls: list[str]}`` and returns a Task with a data artifact of
 ``{pages: [PageContent, …]}``. Pages that fail to fetch are included with
 ``error != None`` so the FactChecker can distinguish "no evidence" from
 "evidence retrieved but empty".
@@ -15,21 +15,23 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
-    DataPart,
-    Part,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
     TaskStatusUpdateEvent,
-    TextPart,
 )
-from a2a.utils import new_agent_text_message
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
+from a2a_research.a2a.proto import (
+    get_data_part,
+    get_text_part,
+    make_data_part,
+    new_agent_text_message,
+)
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.reader.agent import build_agent
 from a2a_research.agents.smolagents.reader.card import READER_CARD
@@ -55,7 +57,9 @@ __all__ = ["ReaderExecutor", "build_http_app", "read_urls"]
 
 
 class ReaderExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
@@ -70,23 +74,40 @@ class ReaderExecutor(AgentExecutor):
                 role=AgentRole.READER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
-                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
+                payload_bytes=len(
+                    json.dumps(payload, default=str).encode("utf-8")
+                ),
+                payload_preview=json.dumps(
+                    payload, default=str, indent=2, sort_keys=True
+                ),
                 session_id=session_id,
             )
         urls = _coerce_str_list(payload.get("urls") or payload.get("url"))
         max_chars_raw = payload.get("max_chars")
-        max_chars = int(max_chars_raw) if isinstance(max_chars_raw, (int, str)) else 8000
-        emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.READER, 2, 5, "reader_started")
+        max_chars = (
+            int(max_chars_raw)
+            if isinstance(max_chars_raw, (int, str))
+            else 8000
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.READER,
+            2,
+            5,
+            "reader_started",
+        )
 
         try:
-            pages = await read_urls(urls, max_chars=max_chars, session_id=session_id)
-            status = TaskState.completed
+            pages = await read_urls(
+                urls, max_chars=max_chars, session_id=session_id
+            )
+            status = TaskState.TASK_STATE_COMPLETED
             error_text: str | None = None
         except Exception as exc:
             logger.exception("Reader failed task_id=%s", task.id)
             pages = []
-            status = TaskState.failed
+            status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
         for index, page in enumerate(pages, start=1):
@@ -106,7 +127,9 @@ class ReaderExecutor(AgentExecutor):
             artifact_id="extracted-pages",
             name="extracted-pages",
             parts=[
-                Part(root=DataPart(data={"pages": [p.model_dump(mode="json") for p in pages]}))
+                make_data_part(
+                    {"pages": [p.model_dump(mode="json") for p in pages]}
+                )
             ],
         )
         await event_queue.enqueue_event(
@@ -124,23 +147,31 @@ class ReaderExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text) if error_text else None,
+                    message=new_agent_text_message(error_text)
+                    if error_text
+                    else None,
                 ),
-                final=True,
             )
         )
         emit(
             session_id,
             ProgressPhase.STEP_COMPLETED
-            if status == TaskState.completed
+            if status == TaskState.TASK_STATE_COMPLETED
             else ProgressPhase.STEP_FAILED,
             AgentRole.READER,
             2,
             5,
-            "reader_completed" if status == TaskState.completed else "reader_failed",
+            "reader_completed"
+            if status == TaskState.TASK_STATE_COMPLETED
+            else "reader_failed",
             detail=f"urls={len(urls)} pages={len(pages)}",
         )
-        logger.info("Reader task_id=%s urls=%s pages=%s", task.id, len(urls), len(pages))
+        logger.info(
+            "Reader task_id=%s urls=%s pages=%s",
+            task.id,
+            len(urls),
+            len(pages),
+        )
         log_event(
             logger,
             logging.INFO,
@@ -149,12 +180,19 @@ class ReaderExecutor(AgentExecutor):
             urls=urls,
             page_count=len(pages),
             pages_summary=[
-                {"url": p.url, "ok": not bool(p.error), "error": p.error, "words": p.word_count}
+                {
+                    "url": p.url,
+                    "ok": not bool(p.error),
+                    "error": p.error,
+                    "words": p.word_count,
+                }
                 for p in pages
             ],
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
@@ -162,12 +200,13 @@ def _extract_payload(context: RequestContext) -> dict[str, object]:
     if context.message is None:
         return {}
     for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            return dict(root.data)
-        if isinstance(root, TextPart):
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            return data_part
+        text_part = get_text_part(part)
+        if text_part:
             try:
-                data = json.loads(root.text)
+                data = json.loads(text_part)
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
@@ -216,8 +255,14 @@ async def read_urls(
     )
     data = parse_json_safely(str(raw_output))
     raw_pages_any = data.get("pages")
-    raw_pages: list[object] = raw_pages_any if isinstance(raw_pages_any, list) else []
-    pages = [PageContent.model_validate(item) for item in raw_pages if isinstance(item, dict)]
+    raw_pages: list[object] = (
+        raw_pages_any if isinstance(raw_pages_any, list) else []
+    )
+    pages = [
+        PageContent.model_validate(item)
+        for item in raw_pages
+        if isinstance(item, dict)
+    ]
     if pages:
         log_event(
             logger,
@@ -248,6 +293,10 @@ def _coerce_str_list(raw: Any) -> list[str]:
 
 def build_http_app() -> Any:
     handler = DefaultRequestHandler(
-        agent_executor=ReaderExecutor(), task_store=InMemoryTaskStore()
+        agent_executor=ReaderExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=READER_CARD,
     )
-    return A2AStarletteApplication(agent_card=READER_CARD, http_handler=handler).build()
+    return build_starlette_http_app(
+        agent_card=READER_CARD, http_handler=handler
+    )

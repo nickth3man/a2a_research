@@ -14,7 +14,9 @@ from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from a2a_research.agents.pydantic_ai.synthesizer.prompt import SYNTHESIZER_PROMPT
+from a2a_research.agents.pydantic_ai.synthesizer.prompt import (
+    SYNTHESIZER_PROMPT,
+)
 from a2a_research.models import ReportOutput
 from a2a_research.settings import settings
 
@@ -25,7 +27,9 @@ def build_model() -> OpenAIChatModel:
     """Return the OpenRouter-backed pydantic-ai model."""
     return OpenAIChatModel(
         settings.llm.model,
-        provider=OpenAIProvider(base_url=settings.llm.base_url, api_key=settings.llm.api_key),
+        provider=OpenAIProvider(
+            base_url=settings.llm.base_url, api_key=settings.llm.api_key
+        ),
     )
 
 

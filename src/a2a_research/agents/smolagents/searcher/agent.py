@@ -27,7 +27,11 @@ def _smolagents_step_callback(role: AgentRole) -> Any:
     def _callback(step: Any, _agent: Any | None = None) -> None:
         tool_calls = getattr(step, "tool_calls", None) or []
         for call in tool_calls:
-            name = getattr(call, "name", None) or getattr(call, "tool_name", "") or "?"
+            name = (
+                getattr(call, "name", None)
+                or getattr(call, "tool_name", "")
+                or "?"
+            )
             args = getattr(call, "arguments", None)
             if args is None:
                 args = getattr(call, "args", None)

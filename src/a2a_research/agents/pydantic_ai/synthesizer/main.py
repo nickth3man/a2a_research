@@ -1,10 +1,10 @@
 """A2A AgentExecutor for the Synthesizer.
 
 Consumes ``{query, verified_claims, sources}`` from an incoming Message's
-DataPart; returns a Task with two artifacts:
+data part; returns a Task with two artifacts:
 
-- ``report`` (DataPart) — the :class:`ReportOutput` model_dump
-- ``report-markdown`` (TextPart) — rendered markdown via :meth:`ReportOutput.to_markdown`
+- ``report`` (data part) — the :class:`ReportOutput` model_dump
+- ``report-markdown`` (text part) — rendered markdown via :meth:`ReportOutput.to_markdown`
 """
 
 from __future__ import annotations
@@ -13,29 +13,37 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
-    DataPart,
-    Part,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
     TaskStatusUpdateEvent,
-    TextPart,
 )
-from a2a.utils import new_agent_text_message
 from pydantic import ValidationError
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
+from a2a_research.a2a.proto import (
+    get_data_part,
+    get_text_part,
+    make_data_part,
+    make_text_part,
+    new_agent_text_message,
+)
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pydantic_ai.synthesizer import agent as _agent
 from a2a_research.agents.pydantic_ai.synthesizer.card import SYNTHESIZER_CARD
 from a2a_research.app_logging import get_logger
 from a2a_research.citation_sanitize import sanitize_report_output
 from a2a_research.models import AgentRole, Claim, ReportOutput, WebSource
-from a2a_research.progress import ProgressPhase, emit, emit_llm_response, emit_prompt
+from a2a_research.progress import (
+    ProgressPhase,
+    emit,
+    emit_llm_response,
+    emit_prompt,
+)
 from a2a_research.settings import settings as _app_settings
 
 if TYPE_CHECKING:
@@ -46,7 +54,9 @@ logger = get_logger(__name__)
 __all__ = ["SynthesizerExecutor", "build_http_app", "synthesize"]
 
 
-def _build_prompt(query: str, claims: list[Claim], sources: list[WebSource]) -> str:
+def _build_prompt(
+    query: str, claims: list[Claim], sources: list[WebSource]
+) -> str:
     claim_block = (
         "\n".join(
             f"- [{c.verdict.value}] ({c.confidence:.2f}) {c.text} sources={c.sources or []}"
@@ -67,7 +77,11 @@ def _build_prompt(query: str, claims: list[Claim], sources: list[WebSource]) -> 
 
 
 async def synthesize(
-    query: str, claims: list[Claim], sources: list[WebSource], *, session_id: str = ""
+    query: str,
+    claims: list[Claim],
+    sources: list[WebSource],
+    *,
+    session_id: str = "",
 ) -> ReportOutput:
     """Run the Synthesizer agent and return the :class:`ReportOutput`."""
     agent = _agent.build_agent()
@@ -88,7 +102,14 @@ async def synthesize(
         model=_app_settings.llm.model,
         session_id=session_id,
     )
-    emit(session_id, ProgressPhase.STEP_SUBSTEP, AgentRole.SYNTHESIZER, 4, 5, "llm_call")
+    emit(
+        session_id,
+        ProgressPhase.STEP_SUBSTEP,
+        AgentRole.SYNTHESIZER,
+        4,
+        5,
+        "llm_call",
+    )
     from time import perf_counter
 
     started = perf_counter()
@@ -113,9 +134,9 @@ async def synthesize(
             prompt_tokens = getattr(usage, "request_tokens", None) or getattr(
                 usage, "prompt_tokens", None
             )
-            completion_tokens = getattr(usage, "response_tokens", None) or getattr(
-                usage, "completion_tokens", None
-            )
+            completion_tokens = getattr(
+                usage, "response_tokens", None
+            ) or getattr(usage, "completion_tokens", None)
 
     emit_llm_response(
         AgentRole.SYNTHESIZER,
@@ -132,7 +153,9 @@ async def synthesize(
 
 
 class SynthesizerExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
@@ -147,12 +170,18 @@ class SynthesizerExecutor(AgentExecutor):
                 role=AgentRole.SYNTHESIZER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
-                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
+                payload_bytes=len(
+                    json.dumps(payload, default=str).encode("utf-8")
+                ),
+                payload_preview=json.dumps(
+                    payload, default=str, indent=2, sort_keys=True
+                ),
                 session_id=session_id,
             )
         query = str(payload.get("query") or "")
-        claims = _coerce_claims(payload.get("verified_claims") or payload.get("claims") or [])
+        claims = _coerce_claims(
+            payload.get("verified_claims") or payload.get("claims") or []
+        )
         sources = _coerce_sources(payload.get("sources") or [])
         emit(
             session_id,
@@ -164,8 +193,10 @@ class SynthesizerExecutor(AgentExecutor):
         )
 
         try:
-            report = await synthesize(query, claims, sources, session_id=session_id)
-            status = TaskState.completed
+            report = await synthesize(
+                query, claims, sources, session_id=session_id
+            )
+            status = TaskState.TASK_STATE_COMPLETED
             error_text: str | None = None
         except Exception as exc:
             logger.exception("Synthesizer failed task_id=%s", task.id)
@@ -173,7 +204,7 @@ class SynthesizerExecutor(AgentExecutor):
                 title="Report unavailable",
                 summary=f"The Synthesizer failed: {exc}",
             )
-            status = TaskState.failed
+            status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
         emit(
@@ -188,12 +219,12 @@ class SynthesizerExecutor(AgentExecutor):
         data_artifact = Artifact(
             artifact_id="report",
             name="report",
-            parts=[Part(root=DataPart(data={"report": report.model_dump(mode="json")}))],
+            parts=[make_data_part({"report": report.model_dump(mode="json")})],
         )
         text_artifact = Artifact(
             artifact_id="report-markdown",
             name="report-markdown",
-            parts=[Part(root=TextPart(text=markdown))],
+            parts=[make_text_part(markdown)],
         )
         for artifact in (data_artifact, text_artifact):
             await event_queue.enqueue_event(
@@ -211,24 +242,29 @@ class SynthesizerExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text) if error_text else None,
+                    message=new_agent_text_message(error_text)
+                    if error_text
+                    else None,
                 ),
-                final=True,
             )
         )
         emit(
             session_id,
             ProgressPhase.STEP_COMPLETED
-            if status == TaskState.completed
+            if status == TaskState.TASK_STATE_COMPLETED
             else ProgressPhase.STEP_FAILED,
             AgentRole.SYNTHESIZER,
             4,
             5,
-            "synthesizer_completed" if status == TaskState.completed else "synthesizer_failed",
+            "synthesizer_completed"
+            if status == TaskState.TASK_STATE_COMPLETED
+            else "synthesizer_failed",
             detail=f"report_title={report.title}",
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
@@ -236,12 +272,13 @@ def _extract_payload(context: RequestContext) -> dict[str, Any]:
     if context.message is None:
         return {}
     for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            return dict(root.data)
-        if isinstance(root, TextPart):
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            return data_part
+        text_part = get_text_part(part)
+        if text_part:
             try:
-                data = json.loads(root.text)
+                data = json.loads(text_part)
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
@@ -279,6 +316,10 @@ def _coerce_sources(raw: Any) -> list[WebSource]:
 
 def build_http_app() -> Any:
     handler = DefaultRequestHandler(
-        agent_executor=SynthesizerExecutor(), task_store=InMemoryTaskStore()
+        agent_executor=SynthesizerExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=SYNTHESIZER_CARD,
     )
-    return A2AStarletteApplication(agent_card=SYNTHESIZER_CARD, http_handler=handler).build()
+    return build_starlette_http_app(
+        agent_card=SYNTHESIZER_CARD, http_handler=handler
+    )

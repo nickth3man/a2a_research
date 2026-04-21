@@ -8,7 +8,9 @@ from smolagents import OpenAIServerModel, ToolCallingAgent
 
 from a2a_research.agents.smolagents.reader.prompt import READER_PROMPT
 from a2a_research.agents.smolagents.reader.tools import FetchAndExtractTool
-from a2a_research.agents.smolagents.searcher.agent import _smolagents_step_callback
+from a2a_research.agents.smolagents.searcher.agent import (
+    _smolagents_step_callback,
+)
 from a2a_research.models import AgentRole
 from a2a_research.settings import settings
 

@@ -1,11 +1,11 @@
 """A2A AgentExecutor for the Searcher role.
 
-Consumes ``{queries: list[str]}`` and returns a Task with a DataArtifact of
+Consumes ``{queries: list[str]}`` and returns a Task with a data artifact of
 ``{queries_used, hits, errors, providers_successful}``.
 
 Error handling:
 - If every provider fails for every query (no hits + at least one error): emit
-  ``TaskState.failed`` with the provider-level failure reasons so the
+  ``TaskState.TASK_STATE_FAILED`` with the provider-level failure reasons so the
   FactChecker can see exactly why the web was unavailable.
 - If some providers succeed (even with zero results): emit ``completed`` and
   attach any partial errors so downstream can log / annotate them.
@@ -25,22 +25,24 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
     Artifact,
-    DataPart,
-    Part,
     TaskArtifactUpdateEvent,
     TaskState,
     TaskStatus,
     TaskStatusUpdateEvent,
-    TextPart,
 )
-from a2a.utils import new_agent_text_message
 from pydantic import BaseModel, Field
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
+from a2a_research.a2a.proto import (
+    get_data_part,
+    get_text_part,
+    make_data_part,
+    new_agent_text_message,
+)
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.searcher.agent import build_agent
 from a2a_research.agents.smolagents.searcher.card import SEARCHER_CARD
@@ -62,7 +64,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["SearcherBatchResult", "SearcherExecutor", "build_http_app", "search_queries"]
+__all__ = [
+    "SearcherBatchResult",
+    "SearcherExecutor",
+    "build_http_app",
+    "search_queries",
+]
 
 
 class SearcherBatchResult(BaseModel):
@@ -71,7 +78,9 @@ class SearcherBatchResult(BaseModel):
     providers_successful: list[str] = Field(default_factory=list)
 
 
-async def search_queries(queries: list[str], *, session_id: str = "") -> SearcherBatchResult:
+async def search_queries(
+    queries: list[str], *, session_id: str = ""
+) -> SearcherBatchResult:
     """Run the smolagents Searcher tool-calling loop for ``queries``."""
     if not queries:
         return SearcherBatchResult()
@@ -109,7 +118,9 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
         successful_providers: set[str] = set()
 
         raw_hits_any = data.get("hits")
-        raw_hits: list[object] = raw_hits_any if isinstance(raw_hits_any, list) else []
+        raw_hits: list[object] = (
+            raw_hits_any if isinstance(raw_hits_any, list) else []
+        )
         for raw_hit in raw_hits:
             if not isinstance(raw_hit, dict):
                 continue
@@ -118,7 +129,9 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
             successful_providers.add(hit.source)
 
         raw_errors_any = data.get("errors")
-        raw_errors: list[object] = raw_errors_any if isinstance(raw_errors_any, list) else []
+        raw_errors: list[object] = (
+            raw_errors_any if isinstance(raw_errors_any, list) else []
+        )
         for err in raw_errors:
             if isinstance(err, str) and err not in seen_errors:
                 seen_errors.add(err)
@@ -126,7 +139,11 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
 
         queries_used_raw = data.get("queries_used") or queries
         queries_used = (
-            [item.strip() for item in queries_used_raw if isinstance(item, str) and item.strip()]
+            [
+                item.strip()
+                for item in queries_used_raw
+                if isinstance(item, str) and item.strip()
+            ]
             if isinstance(queries_used_raw, list)
             else queries
         )
@@ -138,7 +155,9 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
             for result in fallback_results:
                 for hit in result.hits:
                     by_url.setdefault(hit.url, hit)
-                errors.extend(err for err in result.errors if err not in errors)
+                errors.extend(
+                    err for err in result.errors if err not in errors
+                )
                 successful_providers.update(result.providers_successful)
             if not by_url and not errors:
                 errors.append("Searcher agent returned no usable hits.")
@@ -188,16 +207,20 @@ def _derive_status(
     successful_providers: list[str],
 ) -> tuple[TaskState, str | None]:
     if not queries:
-        return TaskState.completed, None
+        return TaskState.TASK_STATE_COMPLETED, None
     # All providers errored for every query → the web layer is unavailable.
     if not successful_providers and errors:
-        return TaskState.failed, ("All web-search providers failed: " + " | ".join(errors))
+        return TaskState.TASK_STATE_FAILED, (
+            "All web-search providers failed: " + " | ".join(errors)
+        )
     # Providers ran but the query simply had no matches: still a valid outcome.
-    return TaskState.completed, None
+    return TaskState.TASK_STATE_COMPLETED, None
 
 
 class SearcherExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
@@ -212,15 +235,26 @@ class SearcherExecutor(AgentExecutor):
                 role=AgentRole.SEARCHER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
-                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
+                payload_bytes=len(
+                    json.dumps(payload, default=str).encode("utf-8")
+                ),
+                payload_preview=json.dumps(
+                    payload, default=str, indent=2, sort_keys=True
+                ),
                 session_id=session_id,
             )
         queries = _coerce_str_list(payload.get("queries"))
         query_raw = payload.get("query")
         if not queries and isinstance(query_raw, str):
             queries = [query_raw]
-        emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.SEARCHER, 1, 5, "searcher_started")
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.SEARCHER,
+            1,
+            5,
+            "searcher_started",
+        )
 
         try:
             batch = await search_queries(queries, session_id=session_id)
@@ -231,23 +265,27 @@ class SearcherExecutor(AgentExecutor):
             )
         except Exception as exc:
             logger.exception("Searcher crashed task_id=%s", task.id)
-            hits, errors, successful_providers = [], [f"Searcher crashed: {exc}"], []
+            hits, errors, successful_providers = (
+                [],
+                [f"Searcher crashed: {exc}"],
+                [],
+            )
 
-        status, error_text = _derive_status(queries, hits, errors, successful_providers)
+        status, error_text = _derive_status(
+            queries, hits, errors, successful_providers
+        )
 
         artifact = Artifact(
             artifact_id="search-hits",
             name="search-hits",
             parts=[
-                Part(
-                    root=DataPart(
-                        data={
-                            "queries_used": queries,
-                            "hits": [h.model_dump(mode="json") for h in hits],
-                            "errors": errors,
-                            "providers_successful": successful_providers,
-                        }
-                    )
+                make_data_part(
+                    {
+                        "queries_used": queries,
+                        "hits": [h.model_dump(mode="json") for h in hits],
+                        "errors": errors,
+                        "providers_successful": successful_providers,
+                    }
                 )
             ],
         )
@@ -266,24 +304,29 @@ class SearcherExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text) if error_text else None,
+                    message=new_agent_text_message(error_text)
+                    if error_text
+                    else None,
                 ),
-                final=True,
             )
         )
         emit(
             session_id,
             ProgressPhase.STEP_COMPLETED
-            if status == TaskState.completed
+            if status == TaskState.TASK_STATE_COMPLETED
             else ProgressPhase.STEP_FAILED,
             AgentRole.SEARCHER,
             1,
             5,
-            "searcher_completed" if status == TaskState.completed else "searcher_failed",
+            "searcher_completed"
+            if status == TaskState.TASK_STATE_COMPLETED
+            else "searcher_failed",
             detail=f"hits={len(hits)} errors={len(errors)}",
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
@@ -291,12 +334,13 @@ def _extract_payload(context: RequestContext) -> dict[str, object]:
     if context.message is None:
         return {}
     for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            return dict(root.data)
-        if isinstance(root, TextPart):
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            return data_part
+        text_part = get_text_part(part)
+        if text_part:
             try:
-                data = json.loads(root.text)
+                data = json.loads(text_part)
             except (ValueError, TypeError):
                 continue
             if isinstance(data, dict):
@@ -314,6 +358,10 @@ def _coerce_str_list(raw: Any) -> list[str]:
 
 def build_http_app() -> Any:
     handler = DefaultRequestHandler(
-        agent_executor=SearcherExecutor(), task_store=InMemoryTaskStore()
+        agent_executor=SearcherExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=SEARCHER_CARD,
     )
-    return A2AStarletteApplication(agent_card=SEARCHER_CARD, http_handler=handler).build()
+    return build_starlette_http_app(
+        agent_card=SEARCHER_CARD, http_handler=handler
+    )

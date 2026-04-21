@@ -6,7 +6,7 @@ Exposes :func:`verify_claims` for direct use by the coordinator.
 from __future__ import annotations
 
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from a2a_research.agents.langgraph.fact_checker.node_support import (
     build_verify_prompt,
