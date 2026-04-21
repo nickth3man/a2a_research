@@ -1,6 +1,7 @@
 """CLI entry: ``python -m a2a_research.workflow "query"``.
 
-Prints the final markdown report to stdout and a short per-agent summary to stderr.
+Prints the final markdown report to stdout and a short per-agent summary to
+stderr.
 """
 
 from __future__ import annotations

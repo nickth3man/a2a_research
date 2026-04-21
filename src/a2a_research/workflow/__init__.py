@@ -2,7 +2,8 @@
 
 Two modes:
 - v1 (default): Linear 5-agent pipeline via :func:`run_research_async`.
-- v2 (claim-centric): Full workflow engine via :func:`run_workflow_v2_async`.
+- v2 (claim-centric): Full workflow engine via
+  :func:`run_workflow_v2_async`.
 """
 
 from __future__ import annotations
