@@ -1,27 +1,12 @@
 """Agent activity panel for the loading card."""
 
-import html
-
 import mesop as me
 
 from a2a_research.models import AgentStatus
+from a2a_research.ui.components.activity_render import render_activity_line
 from a2a_research.ui.tokens import (
     FONT_SIZE_TINY,
 )
-
-
-def _is_verbose_line(line: str) -> bool:
-    """Check if an activity line contains verbose prompt details."""
-    lowered = line.lower()
-    return any(
-        token in lowered
-        for token in (
-            "prompt sent",
-            "llm response",
-            "handoff sent",
-            "handoff received",
-        )
-    )
 
 
 def AgentActivityPanel(
@@ -124,48 +109,4 @@ def AgentActivityPanel(
             )
         ):
             for line in reversed(lines):
-                is_verbose = _is_verbose_line(line)
-                if " — " in line and (is_verbose or len(line) > 250):
-                    parts = line.split(" — ", 1)
-                    summary = parts[0]
-                    body = parts[1]
-                    is_warn = (
-                        "rate limit" in line.lower()
-                        or "claim verdict" in line.lower()
-                        or "status=error" in line.lower()
-                    )
-                    line_color = "#d97706" if is_warn else "#1e293b"
-                    if not show_verbose_prompts:
-                        if is_verbose:
-                            me.text(
-                                summary + " — hidden",
-                                style=me.Style(
-                                    margin=me.Margin(bottom=2),
-                                    color="#64748b",
-                                ),
-                            )
-                            continue
-                        me.text(
-                            summary,
-                            style=me.Style(
-                                margin=me.Margin(bottom=2), color=line_color
-                            ),
-                        )
-                        continue
-                    safe_body = html.escape(body[:4096])
-                    if len(body) > 4096:
-                        safe_body += "\n...[truncated]"
-                    html_content = (
-                        f'<details><summary style="color:{line_color}">'
-                        f"{html.escape(summary)}"
-                        f"</summary>"
-                        f'<pre style="color:{line_color};'
-                        f'white-space:pre-wrap">{safe_body}</pre>'
-                        f"</details>"
-                    )
-                    me.html(html_content)
-                else:
-                    me.text(
-                        line,
-                        style=me.Style(margin=me.Margin(bottom=2)),
-                    )
+                render_activity_line(line, show_verbose_prompts)
