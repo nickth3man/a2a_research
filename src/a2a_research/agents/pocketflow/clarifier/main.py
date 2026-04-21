@@ -1,7 +1,7 @@
-"""A2A AgentExecutor for the Planner role.
+"""A2A AgentExecutor for the Clarifier role.
 
-Consumes ``{query}`` (string or data part) and returns a Task with a data artifact
-of ``{claims, seed_queries}`` — the handoff shape the FactChecker expects.
+Consumes ``{query, query_class}`` and returns a Task with a DataArtifact
+of ``{disambiguations, committed_interpretation, audit_note}``.
 """
 
 from __future__ import annotations
@@ -28,8 +28,8 @@ from a2a_research.a2a.proto import (
     new_agent_text_message,
 )
 from a2a_research.a2a.request_task import initial_task_or_new
-from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
-from a2a_research.agents.pocketflow.planner.flow import plan
+from a2a_research.agents.pocketflow.clarifier.card import CLARIFIER_CARD
+from a2a_research.agents.pocketflow.clarifier.flow import clarify
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit, using_session
@@ -39,26 +39,30 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["PlannerExecutor", "build_http_app"]
+__all__ = ["ClarifierExecutor", "build_http_app"]
 
 
-class PlannerExecutor(AgentExecutor):
+class ClarifierExecutor(AgentExecutor):
     async def execute(
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
-        query = _extract_query(context)
         payload = _extract_payload(context)
+        query = _extract_query(context, payload)
+        query_class = (
+            str(payload.get("query_class") or "factual").strip().lower()
+        )
         session_id = str(payload.get("session_id") or "")
         handoff_from = payload.get("handoff_from")
+
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
 
             emit_handoff(
                 direction="received",
-                role=AgentRole.PLANNER,
+                role=AgentRole.CLARIFIER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
                 payload_bytes=len(
@@ -69,53 +73,45 @@ class PlannerExecutor(AgentExecutor):
                 ),
                 session_id=session_id,
             )
+
         emit(
             session_id,
             ProgressPhase.STEP_STARTED,
-            AgentRole.PLANNER,
-            0,
-            5,
-            "planner_started",
+            AgentRole.CLARIFIER,
+            1,
+            12,
+            "clarifier_started",
         )
         emit(
             session_id,
             ProgressPhase.STEP_SUBSTEP,
-            AgentRole.PLANNER,
-            0,
-            5,
-            "decompose",
+            AgentRole.CLARIFIER,
+            1,
+            12,
+            "disambiguate",
         )
 
         try:
             with using_session(session_id):
-                claims, claim_dag, seed_queries = await plan(
-                    query,
-                    session_id=session_id,
-                    include_dag=True,
+                result = await clarify(
+                    query, query_class=query_class, session_id=session_id
                 )
             status = TaskState.TASK_STATE_COMPLETED
             error_text: str | None = None
         except Exception as exc:
-            logger.exception("Planner failed task_id=%s", task.id)
-            claims, claim_dag, seed_queries = [], None, []
+            logger.exception("Clarifier failed task_id=%s", task.id)
+            result = {
+                "disambiguations": [],
+                "committed_interpretation": query,
+                "audit_note": f"Clarifier error: {exc}",
+            }
             status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
         artifact = Artifact(
-            artifact_id="plan",
-            name="plan",
-            parts=[
-                make_data_part(
-                    {
-                        "query": query,
-                        "claims": [c.model_dump(mode="json") for c in claims],
-                        "claim_dag": claim_dag.model_dump(mode="json")
-                        if claim_dag
-                        else {},
-                        "seed_queries": seed_queries,
-                    }
-                )
-            ],
+            artifact_id="clarify",
+            name="clarify",
+            parts=[make_data_part(result)],
         )
         await event_queue.enqueue_event(
             TaskArtifactUpdateEvent(
@@ -143,19 +139,19 @@ class PlannerExecutor(AgentExecutor):
             ProgressPhase.STEP_COMPLETED
             if status == TaskState.TASK_STATE_COMPLETED
             else ProgressPhase.STEP_FAILED,
-            AgentRole.PLANNER,
-            0,
-            5,
-            "planner_completed"
+            AgentRole.CLARIFIER,
+            1,
+            12,
+            "clarifier_completed"
             if status == TaskState.TASK_STATE_COMPLETED
-            else "planner_failed",
-            detail=f"claims={len(claims)} seeds={len(seed_queries)}",
+            else "clarifier_failed",
+            detail=f"disambiguations={len(result['disambiguations'])} committed={result['committed_interpretation'][:60]}",
         )
         logger.info(
-            "Planner task_id=%s claims=%s seeds=%s",
+            "Clarifier task_id=%s disambiguations=%s committed=%r",
             task.id,
-            len(claims),
-            len(seed_queries),
+            len(result["disambiguations"]),
+            result["committed_interpretation"],
         )
 
     async def cancel(
@@ -164,8 +160,7 @@ class PlannerExecutor(AgentExecutor):
         pass
 
 
-def _extract_query(context: RequestContext) -> str:
-    payload = _extract_payload(context)
+def _extract_query(context: RequestContext, payload: dict[str, Any]) -> str:
     query = payload.get("query")
     if isinstance(query, str) and query.strip():
         return query.strip()
@@ -173,14 +168,14 @@ def _extract_query(context: RequestContext) -> str:
         return ""
     text_parts: list[str] = []
     for part in context.message.parts:
-        part_data = get_data_part(part)
-        if isinstance(part_data, dict):
-            query = part_data.get("query")
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            query = data_part.get("query")
             if isinstance(query, str) and query.strip():
                 return query.strip()
-        part_text = get_text_part(part)
-        if part_text and part_text.strip():
-            text_parts.append(part_text.strip())
+        text_part = get_text_part(part)
+        if text_part and text_part.strip():
+            text_parts.append(text_part.strip())
     joined = "\n".join(text_parts).strip()
     try:
         data = json.loads(joined) if joined else None
@@ -195,18 +190,18 @@ def _extract_payload(context: RequestContext) -> dict[str, object]:
     if context.message is None:
         return {}
     for part in context.message.parts:
-        payload = get_data_part(part)
-        if isinstance(payload, dict):
-            return payload
+        data_part = get_data_part(part)
+        if isinstance(data_part, dict):
+            return data_part
     return {}
 
 
 def build_http_app() -> Any:
     handler = DefaultRequestHandler(
-        agent_executor=PlannerExecutor(),
+        agent_executor=ClarifierExecutor(),
         task_store=InMemoryTaskStore(),
-        agent_card=PLANNER_CARD,
+        agent_card=CLARIFIER_CARD,
     )
     return build_starlette_http_app(
-        agent_card=PLANNER_CARD, http_handler=handler
+        agent_card=CLARIFIER_CARD, http_handler=handler
     )

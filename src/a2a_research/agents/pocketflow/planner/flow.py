@@ -17,7 +17,7 @@ from a2a_research.agents.pocketflow.planner.nodes import (
 )
 
 if TYPE_CHECKING:
-    from a2a_research.models import Claim
+    from a2a_research.models import Claim, ClaimDAG
 
 __all__ = ["build_planner_flow", "plan"]
 
@@ -48,13 +48,28 @@ def build_planner_flow() -> AsyncFlow[Any, Any]:
     return AsyncFlow(start=classify)
 
 
-async def plan(query: str, *, session_id: str = "") -> tuple[list[Claim], list[str]]:
-    """Run the Planner flow and return (claims, seed_queries)."""
+async def plan(
+    query: str,
+    *,
+    session_id: str = "",
+    include_dag: bool = False,
+) -> tuple[list[Claim], list[str]] | tuple[list[Claim], ClaimDAG, list[str]]:
+    """Run the Planner flow.
+
+    Returns ``(claims, seed_queries)`` by default for backward compatibility.
+    Set ``include_dag=True`` to receive ``(claims, claim_dag, seed_queries)``.
+    """
     shared: dict[str, Any] = {
         "query": query,
         "claims": [],
+        "claim_dag": None,
         "seed_queries": [],
         "session_id": session_id,
     }
     await build_planner_flow().run_async(shared)
-    return list(shared.get("claims") or []), list(shared.get("seed_queries") or [])
+    claims = list(shared.get("claims") or [])
+    claim_dag = shared.get("claim_dag")
+    seed_queries = list(shared.get("seed_queries") or [])
+    if include_dag:
+        return claims, claim_dag, seed_queries
+    return claims, seed_queries
