@@ -1,47 +1,44 @@
 """
-Test that Python files don't exceed 500 lines.
+Test Python source constraints: max file size (lines) and max line width (chars).
+
+Scans ``src/`` and ``tests/``. Skips cache directories only (``__pycache__``,
+``.pytest_cache``, etc.); everything else under those trees is included.
+
+Target file size is at most 150 non-empty lines, with a hard cap at 200 lines.
 
 Long files are difficult to maintain, understand, and test.
 Files should be kept concise and focused on a single responsibility.
+
+Line width matches ``[tool.ruff] line-length`` (single place to change the cap in
+``pyproject.toml``; this test keeps CI honest if Ruff is skipped).
 """
 from pathlib import Path
 
 import pytest
 
-# --- Configuration ---
-SOFT_LIMIT = 500   # Target: where we want to be
-HARD_LIMIT = 550   # Absolute max before CI fails (grace buffer for edge cases)
+# --- Configuration: file size (non-empty lines) ---
+SOFT_LIMIT = 150   # Target: where we want to be
+HARD_LIMIT = 200   # Absolute max before CI fails (grace buffer for edge cases)
+
+# --- Configuration: characters per physical line (align with Ruff) ---
+MAX_LINE_CHAR_LIMIT = 79
 
 # Directories relative to project root to scan
 SCAN_DIRECTORIES = ["src", "tests"]
 
-# Glob patterns for paths to ignore (matched against path parts)
+# Path parts that indicate cache dirs only (matched against path parts)
 IGNORED_PATH_PATTERNS = [
-    "migrations",      # Generated schema migration files
-    "__pycache__",     # Compiled bytecode directories
-    ".venv",           # Virtual environment
-    "venv",
-    "node_modules",    # JS dependencies that might contain .py files
-    "vendor",          # Vendored third-party code
-    "generated",       # Auto-generated code
-    "proto_pb2",       # Generated protobuf files
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
 ]
-
-# Specific filenames to ignore
-IGNORED_FILE_NAMES = {
-    "settings.py",     # Django settings with large dicts
-    "constants.py",    # Large data tables
-}
 
 
 def _should_ignore(path: Path) -> bool:
-    """Determine if a file should be skipped based on path patterns."""
+    """Skip only cache directories; all other files under SCAN_DIRECTORIES count."""
     parts = set(path.parts)
-    if any(pattern in parts for pattern in IGNORED_PATH_PATTERNS):
-        return True
-    if path.name in IGNORED_FILE_NAMES:
-        return True
-    return False
+    return any(pattern in parts for pattern in IGNORED_PATH_PATTERNS)
 
 
 def _count_lines(file_path: Path) -> int:
@@ -59,16 +56,16 @@ def _count_lines(file_path: Path) -> int:
         return -1
 
 
-def test_python_files_max_500_lines():
+def test_python_files_max_150_lines():
     """
-    Ensure all Python files in configured directories are at most 550 lines long.
+    Ensure all Python files in configured directories are at most 200 lines long.
 
-    Files exceeding 500 lines indicate:
+    Files exceeding 150 lines indicate:
     - Too many responsibilities in a single module
     - Need for refactoring into smaller, focused modules
     - Potential violation of the Single Responsibility Principle
 
-    A 50-line grace buffer (550 hard limit) exists for:
+    A 50-line grace buffer (200 hard limit) exists for:
     - Complex dispatch tables or registries
     - Protocol implementations with many required methods
     - Comprehensive test modules covering a full integration flow
@@ -141,4 +138,63 @@ def test_python_files_max_500_lines():
         pytest.fail("\n".join(lines))
 
     # Always print a summary so the test feels substantive even when passing
-    print(f"\n✅ Line-length check passed: {scanned} files scanned, {skipped} skipped.")
+    print(f"\n✅ File-length check passed: {scanned} files scanned, {skipped} skipped.")
+
+
+def _scan_line_width_violations(project_root: Path, max_chars: int) -> tuple[list[str], int, int]:
+    """Return (messages, scanned, skipped). Each message is one over-long line."""
+    messages: list[str] = []
+    scanned = 0
+    skipped = 0
+
+    for directory in SCAN_DIRECTORIES:
+        dir_path = project_root / directory
+        if not dir_path.exists():
+            continue
+
+        for py_file in dir_path.rglob("*.py"):
+            if _should_ignore(py_file):
+                skipped += 1
+                continue
+
+            scanned += 1
+            try:
+                text = py_file.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                skipped += 1
+                continue
+
+            relative = py_file.relative_to(project_root)
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                n = len(line)
+                if n > max_chars:
+                    messages.append(
+                        f"{relative}:{lineno}: {n} chars (max {max_chars})"
+                    )
+
+    return messages, scanned, skipped
+
+
+def test_python_source_line_width_max_79_chars():
+    """No physical line may exceed MAX_LINE_CHAR_LIMIT (kept in sync with Ruff)."""
+    project_root = Path(__file__).resolve().parent.parent
+    violations, scanned, skipped = _scan_line_width_violations(
+        project_root, MAX_LINE_CHAR_LIMIT
+    )
+
+    if violations:
+        head = [
+            f"\n{'=' * 60}",
+            "PYTHON LINE WIDTH VIOLATIONS",
+            f"(max {MAX_LINE_CHAR_LIMIT} characters per line; see pyproject.toml [tool.ruff])",
+            f"{'=' * 60}",
+            f"Scanned: {scanned} files | Skipped: {skipped} files",
+            f"{'-' * 60}",
+        ]
+        violations.sort()
+        pytest.fail("\n".join(head + violations + [f"{'=' * 60}"]))
+
+    print(
+        f"\n✅ Line-width check passed: {scanned} files scanned, "
+        f"{skipped} skipped (max {MAX_LINE_CHAR_LIMIT} chars/line)."
+    )
