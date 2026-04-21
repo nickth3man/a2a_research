@@ -26,7 +26,9 @@ class _FakeSearcherAgent:
 
 
 @pytest.mark.asyncio
-async def test_searcher_uses_agent_for_queries(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_searcher_uses_agent_for_queries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[str] = []
     monkeypatch.setattr(
         searcher_main,
@@ -62,14 +64,18 @@ async def test_searcher_uses_agent_for_queries(monkeypatch: pytest.MonkeyPatch) 
     task = cast(
         "Task",
         await client.send(
-            AgentRole.SEARCHER, payload={"queries": ["jwst launch", "mirror diameter"]}
+            AgentRole.SEARCHER,
+            payload={"queries": ["jwst launch", "mirror diameter"]},
         ),
     )
     payloads = extract_data_payloads(task)
     assert payloads
     hits = payloads[0]["hits"]
-    assert {hit["url"] for hit in hits} == {"https://jwst.example", "https://mirror.example"}
-    assert task.status.state == TaskState.completed
+    assert {hit["url"] for hit in hits} == {
+        "https://jwst.example",
+        "https://mirror.example",
+    }
+    assert task.status.state == TaskState.TASK_STATE_COMPLETED
     assert calls and "jwst launch" in calls[0]
 
 
@@ -79,10 +85,12 @@ async def test_searcher_empty_queries_returns_empty_hits() -> None:
     registry.register_factory(AgentRole.SEARCHER, SearcherExecutor)
     client = A2AClient(registry)
 
-    task = cast("Task", await client.send(AgentRole.SEARCHER, payload={"queries": []}))
+    task = cast(
+        "Task", await client.send(AgentRole.SEARCHER, payload={"queries": []})
+    )
     payloads = extract_data_payloads(task)
     assert payloads[0]["hits"] == []
-    assert task.status.state == TaskState.completed
+    assert task.status.state == TaskState.TASK_STATE_COMPLETED
 
 
 @pytest.mark.asyncio
@@ -109,15 +117,20 @@ async def test_searcher_fails_when_agent_returns_only_errors(
     registry.register_factory(AgentRole.SEARCHER, SearcherExecutor)
     client = A2AClient(registry)
 
-    task = cast("Task", await client.send(AgentRole.SEARCHER, payload={"queries": ["q"]}))
-    assert task.status.state == TaskState.failed
+    task = cast(
+        "Task",
+        await client.send(AgentRole.SEARCHER, payload={"queries": ["q"]}),
+    )
+    assert task.status.state == TaskState.TASK_STATE_FAILED
     payload = extract_data_payloads(task)[0]
     assert payload["hits"] == []
     assert any("Tavily disabled" in err for err in payload["errors"])
 
 
 @pytest.mark.asyncio
-async def test_searcher_dedupes_hits_from_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_searcher_dedupes_hits_from_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         searcher_main,
         "build_agent",

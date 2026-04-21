@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 from a2a_research.ui.session_state import has_results
 
 

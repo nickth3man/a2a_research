@@ -60,7 +60,9 @@ async def test_tavily_live_search_returns_hits() -> None:
 @pytest.mark.asyncio
 async def test_web_search_includes_tavily_when_configured() -> None:
     # Obscure thermodynamics puzzle; title/snippet should name it, unlike generic "science" hits.
-    result = await web_search('"Mpemba effect" hot water freezing paradox', max_results=5)
+    result = await web_search(
+        '"Mpemba effect" hot water freezing paradox', max_results=5
+    )
     assert "tavily" in result.providers_successful
     assert "brave" in result.providers_successful
     assert any("tavily" in h.source for h in result.hits)
@@ -211,7 +213,9 @@ async def test_web_search_error_field_structure() -> None:
         for error in result.errors:
             assert isinstance(error, str) and len(error) > 0
             assert (
-                "failed" in error.lower() or "error" in error.lower() or "timeout" in error.lower()
+                "failed" in error.lower()
+                or "error" in error.lower()
+                or "timeout" in error.lower()
             )
 
 
@@ -224,7 +228,9 @@ async def test_web_search_error_field_structure() -> None:
 async def test_web_search_providers_metadata() -> None:
     result = await web_search("Python programming", max_results=5)
     assert set(result.providers_attempted) == {"tavily", "brave", "duckduckgo"}
-    assert set(result.providers_successful).issubset(set(result.providers_attempted))
+    assert set(result.providers_successful).issubset(
+        set(result.providers_attempted)
+    )
     assert result.any_provider_succeeded == bool(result.providers_successful)
 
 

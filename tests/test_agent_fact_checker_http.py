@@ -11,13 +11,23 @@ from a2a.types import Task
 
 from a2a_research.a2a.client import extract_data_payloads
 from a2a_research.a2a.registry import AgentRegistry
-from a2a_research.agents.langgraph.fact_checker import main as fact_checker_main
-from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
-from tests.http_harness import build_sdk_client, make_multi_app_client, send_and_get_result
+from a2a_research.agents.langgraph.fact_checker import (
+    main as fact_checker_main,
+)
+from a2a_research.agents.langgraph.fact_checker import (
+    verify_route as fc_verify,
+)
+from tests.http_harness import (
+    build_sdk_client,
+    make_multi_app_client,
+    send_and_get_result,
+)
 
 
 @pytest.mark.asyncio
-async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_fact_checker_http_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     model = MagicMock()
     model.ainvoke = AsyncMock(
         return_value=MagicMock(
@@ -58,12 +68,16 @@ async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> No
         ),
     )
 
-    sdk_client = build_sdk_client(shared_client, "http://localhost:10004")
+    sdk_client = await build_sdk_client(
+        shared_client, "http://localhost:10004"
+    )
     result = await send_and_get_result(
         sdk_client,
         payload={
             "query": "When did JWST launch?",
-            "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
+            "claims": [
+                {"id": "c0", "text": "JWST launched in December 2021."}
+            ],
             "evidence": [
                 {
                     "url": "https://nasa.example/jwst",
@@ -73,7 +87,11 @@ async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> No
                 }
             ],
             "sources": [
-                {"url": "https://nasa.example/jwst", "title": "NASA JWST", "excerpt": "JWST launched"}
+                {
+                    "url": "https://nasa.example/jwst",
+                    "title": "NASA JWST",
+                    "excerpt": "JWST launched",
+                }
             ],
         },
     )

@@ -58,7 +58,9 @@ class TestGetAgentLabel:
         assert get_agent_label(AgentRole.FACT_CHECKER) == "FactChecker"
 
     def test_fallback_to_role_value(self) -> None:
-        with patch.dict("a2a_research.ui.data_access.AGENT_CARDS", {}, clear=True):
+        with patch.dict(
+            "a2a_research.ui.data_access.AGENT_CARDS", {}, clear=True
+        ):
             assert get_agent_label(AgentRole.SEARCHER) == "searcher"
 
 
@@ -77,7 +79,10 @@ class TestGetAllRoles:
 
 class TestFormatSourceDisplay:
     def test_formats_url_host_and_tail(self) -> None:
-        assert format_source_display("https://nasa.example/jwst") == "nasa.example/jwst"
+        assert (
+            format_source_display("https://nasa.example/jwst")
+            == "nasa.example/jwst"
+        )
 
     def test_host_only_when_root(self) -> None:
         assert format_source_display("https://example.com/") == "example.com"

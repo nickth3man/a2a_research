@@ -13,11 +13,19 @@ from tests.http_harness import build_sdk_client, send_and_get_result
 
 
 @pytest.mark.asyncio
-async def test_synthesizer_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_synthesizer_http_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def _fake_synthesize(
-        query: str, claims: list[object], sources: list[object], *, session_id: str = ""
+        query: str,
+        claims: list[object],
+        sources: list[object],
+        *,
+        session_id: str = "",
     ) -> ReportOutput:
-        return ReportOutput(title="JWST Launch", summary="JWST launched in December 2021.")
+        return ReportOutput(
+            title="JWST Launch", summary="JWST launched in December 2021."
+        )
 
     monkeypatch.setattr(synth_main, "synthesize", _fake_synthesize)
 
@@ -25,7 +33,7 @@ async def test_synthesizer_http_contract(monkeypatch: pytest.MonkeyPatch) -> Non
         transport=httpx.ASGITransport(app=synth_main.build_http_app()),
         base_url="http://localhost:10005",
     ) as http_client:
-        client = build_sdk_client(http_client, "http://localhost:10005")
+        client = await build_sdk_client(http_client, "http://localhost:10005")
         result = await send_and_get_result(
             client,
             payload={

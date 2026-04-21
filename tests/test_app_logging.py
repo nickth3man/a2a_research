@@ -75,7 +75,9 @@ class TestLogEvent:
 
 class TestSetupLogging:
     def test_setup_logging_is_idempotent(self, tmp_path: Path) -> None:
-        def make_file_handler(*_args: object, **_kwargs: object) -> logging.Handler:
+        def make_file_handler(
+            *_args: object, **_kwargs: object
+        ) -> logging.Handler:
             return logging.StreamHandler(io.StringIO())
 
         root = logging.getLogger()
@@ -86,8 +88,14 @@ class TestSetupLogging:
 
         with (
             patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
-            patch("a2a_research.app_logging._APP_LOG", tmp_path / "logs" / "app.log"),
-            patch("a2a_research.app_logging.logging.FileHandler", side_effect=make_file_handler),
+            patch(
+                "a2a_research.app_logging._APP_LOG",
+                tmp_path / "logs" / "app.log",
+            ),
+            patch(
+                "a2a_research.app_logging.logging.FileHandler",
+                side_effect=make_file_handler,
+            ),
         ):
             import a2a_research.app_logging as logging_mod
 
@@ -107,7 +115,9 @@ class TestSetupLogging:
                 logging_mod._CONFIGURED = original
 
     def test_get_logger_triggers_setup(self, tmp_path: Path) -> None:
-        def make_file_handler(*_args: object, **_kwargs: object) -> logging.Handler:
+        def make_file_handler(
+            *_args: object, **_kwargs: object
+        ) -> logging.Handler:
             return logging.StreamHandler(io.StringIO())
 
         root = logging.getLogger()
@@ -118,8 +128,14 @@ class TestSetupLogging:
 
         with (
             patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
-            patch("a2a_research.app_logging._APP_LOG", tmp_path / "logs" / "app.log"),
-            patch("a2a_research.app_logging.logging.FileHandler", side_effect=make_file_handler),
+            patch(
+                "a2a_research.app_logging._APP_LOG",
+                tmp_path / "logs" / "app.log",
+            ),
+            patch(
+                "a2a_research.app_logging.logging.FileHandler",
+                side_effect=make_file_handler,
+            ),
         ):
             import a2a_research.app_logging as logging_mod
 

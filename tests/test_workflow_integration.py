@@ -11,8 +11,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from a2a_research.a2a.registry import AgentRegistry
-from a2a_research.agents.langgraph.fact_checker import main as fact_checker_main
-from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
+from a2a_research.agents.langgraph.fact_checker import (
+    main as fact_checker_main,
+)
+from a2a_research.agents.langgraph.fact_checker import (
+    verify_route as fc_verify,
+)
 from a2a_research.agents.pocketflow.planner import main as planner_main
 from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
@@ -20,14 +24,20 @@ from a2a_research.agents.pydantic_ai.synthesizer import main as synth_main
 from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.agents.smolagents.searcher import main as searcher_main
 from a2a_research.models import AgentRole, AgentStatus, ReportOutput
-from a2a_research.progress import ProgressEvent, ProgressPhase, drain_progress_while_running
+from a2a_research.progress import (
+    ProgressEvent,
+    ProgressPhase,
+    drain_progress_while_running,
+)
 from a2a_research.workflow import run_research_async
 from tests.http_harness import make_multi_app_client
 
 
 def _llm_stub(payload: dict[str, Any]) -> Any:
     model = MagicMock()
-    model.ainvoke = AsyncMock(return_value=MagicMock(content=json.dumps(payload)))
+    model.ainvoke = AsyncMock(
+        return_value=MagicMock(content=json.dumps(payload))
+    )
     return model
 
 
@@ -65,7 +75,12 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
             MagicMock(
                 content=json.dumps(
                     {
-                        "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
+                        "claims": [
+                            {
+                                "id": "c0",
+                                "text": "JWST launched in December 2021.",
+                            }
+                        ],
                         "seed_queries": ["JWST launch date"],
                     }
                 )
@@ -131,7 +146,9 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
         "build_agent",
         lambda: _FakePydAgent(
             ReportOutput(
-                title="JWST Launch", summary="JWST launched in December 2021.", sections=[]
+                title="JWST Launch",
+                summary="JWST launched in December 2021.",
+                sections=[],
             )
         ),
     )
@@ -166,13 +183,17 @@ async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "JWST" in session.final_report
     assert len(session.sources) == 1
     assert session.sources[0].url == "https://nasa.example/jwst"
-    statuses = {role: result.status for role, result in session.agent_results.items()}
+    statuses = {
+        role: result.status for role, result in session.agent_results.items()
+    }
     assert all(status == AgentStatus.COMPLETED for status in statuses.values())
     await shared_client.aclose()
 
 
 @pytest.mark.asyncio
-async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_progress_events_emitted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _configure_success_path(monkeypatch)
     shared_client = _install_http_services(monkeypatch)
 
@@ -180,11 +201,18 @@ async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
     workflow_task = asyncio.create_task(
         run_research_async("When did JWST launch?", progress_queue=queue)
     )
-    events = [event async for event in drain_progress_while_running(queue, workflow_task)]
+    events = [
+        event
+        async for event in drain_progress_while_running(queue, workflow_task)
+    ]
     session = await workflow_task
 
     assert session.error is None
-    started_roles = {event.role for event in events if event.phase == ProgressPhase.STEP_STARTED}
+    started_roles = {
+        event.role
+        for event in events
+        if event.phase == ProgressPhase.STEP_STARTED
+    }
     assert started_roles == {
         AgentRole.PLANNER,
         AgentRole.SEARCHER,
@@ -193,7 +221,8 @@ async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
         AgentRole.SYNTHESIZER,
     }
     assert any(
-        event.substep_label == "verify" and event.phase == ProgressPhase.STEP_SUBSTEP
+        event.substep_label == "verify"
+        and event.phase == ProgressPhase.STEP_SUBSTEP
         for event in events
     )
     await shared_client.aclose()

@@ -8,7 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from a2a_research.agents.langgraph.fact_checker import run_fact_check
-from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
+from a2a_research.agents.langgraph.fact_checker import (
+    verify_route as fc_verify,
+)
 from a2a_research.models import Claim, Verdict
 from a2a_research.tools import PageContent
 
@@ -17,12 +19,16 @@ def _fake_llm(payload: dict[str, Any]) -> Any:
     import json
 
     model = MagicMock()
-    model.ainvoke = AsyncMock(return_value=MagicMock(content=json.dumps(payload)))
+    model.ainvoke = AsyncMock(
+        return_value=MagicMock(content=json.dumps(payload))
+    )
     return model
 
 
 @pytest.mark.asyncio
-async def test_fact_checker_verifies_with_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_fact_checker_verifies_with_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     evidence = [
         PageContent(
             url="https://a.example",
@@ -72,13 +78,18 @@ async def test_fact_checker_short_circuits_without_evidence(
 
     def _tripwire() -> Any:
         llm_calls["count"] += 1
-        raise AssertionError("verify must NOT call the LLM when no evidence is available")
+        raise AssertionError(
+            "verify must NOT call the LLM when no evidence is available"
+        )
 
     monkeypatch.setattr(fc_verify, "get_llm", _tripwire)
 
     result = await run_fact_check(
         query="q",
-        claims=[Claim(id="c0", text="claim A"), Claim(id="c1", text="claim B")],
+        claims=[
+            Claim(id="c0", text="claim A"),
+            Claim(id="c1", text="claim B"),
+        ],
         evidence=[],
         sources=[],
     )
@@ -91,7 +102,9 @@ async def test_fact_checker_short_circuits_without_evidence(
 
 
 @pytest.mark.asyncio
-async def test_fact_checker_preserves_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_fact_checker_preserves_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from a2a_research.models import WebSource
 
     evidence = [
@@ -102,7 +115,9 @@ async def test_fact_checker_preserves_sources(monkeypatch: pytest.MonkeyPatch) -
             word_count=2,
         )
     ]
-    sources = [WebSource(url="https://a.example", title="A", excerpt="Evidence.")]
+    sources = [
+        WebSource(url="https://a.example", title="A", excerpt="Evidence.")
+    ]
     monkeypatch.setattr(
         fc_verify,
         "get_llm",

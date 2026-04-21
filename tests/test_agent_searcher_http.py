@@ -47,7 +47,12 @@ async def test_searcher_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
         base_url="http://localhost:10002",
     ) as http_client:
         client = build_sdk_client(http_client, "http://localhost:10002")
-        result = await send_and_get_result(client, payload={"queries": ["jwst launch"]})
+        result = await send_and_get_result(
+            client, payload={"queries": ["jwst launch"]}
+        )
 
     assert isinstance(result, Task)
-    assert extract_data_payloads(result)[0]["hits"][0]["url"] == "https://jwst.example"
+    assert (
+        extract_data_payloads(result)[0]["hits"][0]["url"]
+        == "https://jwst.example"
+    )

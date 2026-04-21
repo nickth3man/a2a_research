@@ -23,7 +23,9 @@ class _FakeReaderAgent:
 
 
 @pytest.mark.asyncio
-async def test_reader_uses_agent_for_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_reader_uses_agent_for_urls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     calls: list[str] = []
     monkeypatch.setattr(
         reader_main,
@@ -54,10 +56,14 @@ async def test_reader_uses_agent_for_urls(monkeypatch: pytest.MonkeyPatch) -> No
     client = A2AClient(registry)
 
     task = await client.send(
-        AgentRole.READER, payload={"urls": ["https://a.example", "https://b.example"]}
+        AgentRole.READER,
+        payload={"urls": ["https://a.example", "https://b.example"]},
     )
     pages = extract_data_payloads(task)[0]["pages"]
-    assert [page["url"] for page in pages] == ["https://a.example", "https://b.example"]
+    assert [page["url"] for page in pages] == [
+        "https://a.example",
+        "https://b.example",
+    ]
     assert calls and "https://a.example" in calls[0]
 
 
@@ -72,7 +78,9 @@ async def test_reader_empty_urls() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reader_propagates_errors_in_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_reader_propagates_errors_in_pages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         reader_main,
         "build_agent",
@@ -100,7 +108,8 @@ async def test_reader_propagates_errors_in_pages(monkeypatch: pytest.MonkeyPatch
     client = A2AClient(registry)
 
     task = await client.send(
-        AgentRole.READER, payload={"urls": ["https://ok.example", "https://bad.example"]}
+        AgentRole.READER,
+        payload={"urls": ["https://ok.example", "https://bad.example"]},
     )
     pages = extract_data_payloads(task)[0]["pages"]
     assert pages[1]["error"] == "fetch failed: boom"

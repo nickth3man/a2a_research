@@ -155,7 +155,9 @@ async def test_brave_results_have_distinct_urls() -> None:
     hits, err = await search_module._search_brave(query, max_results=10)
     assert err is None, f"Brave error: {err}"
     urls = [h.url for h in hits]
-    assert len(urls) == len(set(urls)), "No duplicate URLs should appear in results"
+    assert len(urls) == len(set(urls)), (
+        "No duplicate URLs should appear in results"
+    )
 
 
 @pytest.mark.integration

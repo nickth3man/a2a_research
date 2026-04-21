@@ -30,7 +30,9 @@ def _response_with(content: str | None) -> MagicMock:
 
 
 class TestSingletonBehavior:
-    def test_get_llm_returns_cached_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_get_llm_returns_cached_model(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         reset_provider_singletons()
         created: list[object] = []
 
@@ -72,8 +74,14 @@ class TestOpenRouterChatModel:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_response_with("hi there"))
-        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_response_with("hi there")
+        )
+        monkeypatch.setattr(
+            providers_module,
+            "AsyncOpenAI",
+            MagicMock(return_value=mock_client),
+        )
 
         model = OpenRouterChatModel(
             model="openrouter/test-model",
@@ -95,8 +103,14 @@ class TestOpenRouterChatModel:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(return_value=_response_with(None))
-        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+        mock_client.chat.completions.create = AsyncMock(
+            return_value=_response_with(None)
+        )
+        monkeypatch.setattr(
+            providers_module,
+            "AsyncOpenAI",
+            MagicMock(return_value=mock_client),
+        )
 
         model = OpenRouterChatModel(api_key="test-key")
         result = await model.ainvoke([{"role": "user", "content": "ping"}])
@@ -121,8 +135,14 @@ class TestOpenRouterChatModel:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(side_effect=Exception("openrouter failed"))
-        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=Exception("openrouter failed")
+        )
+        monkeypatch.setattr(
+            providers_module,
+            "AsyncOpenAI",
+            MagicMock(return_value=mock_client),
+        )
 
         model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
         with pytest.raises(ProviderRequestError, match="openrouter failed"):
@@ -136,8 +156,14 @@ class TestOpenRouterChatModel:
             status_code = 429
 
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(side_effect=FakeError("rate limited"))
-        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=FakeError("rate limited")
+        )
+        monkeypatch.setattr(
+            providers_module,
+            "AsyncOpenAI",
+            MagicMock(return_value=mock_client),
+        )
 
         model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
         with pytest.raises(ProviderRateLimitError):
@@ -151,8 +177,14 @@ class TestOpenRouterChatModel:
             pass
 
         mock_client = MagicMock()
-        mock_client.chat.completions.create = AsyncMock(side_effect=RateLimitError("throttled"))
-        monkeypatch.setattr(providers_module, "AsyncOpenAI", MagicMock(return_value=mock_client))
+        mock_client.chat.completions.create = AsyncMock(
+            side_effect=RateLimitError("throttled")
+        )
+        monkeypatch.setattr(
+            providers_module,
+            "AsyncOpenAI",
+            MagicMock(return_value=mock_client),
+        )
 
         model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
         with pytest.raises(ProviderRateLimitError):
@@ -160,17 +192,26 @@ class TestOpenRouterChatModel:
 
 
 class TestParseStructuredResponse:
-    def test_parse_structured_response_returns_none_for_invalid_json(self) -> None:
+    def test_parse_structured_response_returns_none_for_invalid_json(
+        self,
+    ) -> None:
         assert parse_structured_response("not json", _FakeSchema) is None
 
-    def test_parse_structured_response_returns_none_for_empty_string(self) -> None:
+    def test_parse_structured_response_returns_none_for_empty_string(
+        self,
+    ) -> None:
         assert parse_structured_response("", _FakeSchema) is None
 
-    def test_parse_structured_response_returns_none_for_json_that_fails_schema(self) -> None:
+    def test_parse_structured_response_returns_none_for_json_that_fails_schema(
+        self,
+    ) -> None:
         class StrictSchema(BaseModel):
             value: int
 
-        assert parse_structured_response('{"value": "not-an-int"}', StrictSchema) is None
+        assert (
+            parse_structured_response('{"value": "not-an-int"}', StrictSchema)
+            is None
+        )
 
     def test_parse_structured_response_uses_model_validate(self) -> None:
         class SimpleSchema(BaseModel):

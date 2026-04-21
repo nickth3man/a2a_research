@@ -7,13 +7,20 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 
 if TYPE_CHECKING:
     from mesop.events import InputEvent
 
 
-async def _drain_on_submit(app_mod, mock_event: MagicMock | None = None) -> None:
+async def _drain_on_submit(
+    app_mod, mock_event: MagicMock | None = None
+) -> None:
     agen = app_mod._on_submit(mock_event or MagicMock())
     async for _ in agen:
         pass
@@ -131,7 +138,9 @@ async def test_on_submit_cancelled_sets_recoverable_error() -> None:
 
     assert st.loading is False
     assert st.progress_pct == 0.0
-    assert st.session.error == "Live update stream was interrupted. Please retry."
+    assert (
+        st.session.error == "Live update stream was interrupted. Please retry."
+    )
 
 
 async def test_on_submit_success_yields_twice() -> None:

@@ -7,7 +7,14 @@ from a2a_research.citation_sanitize import (
     normalize_url,
     sanitize_report_output,
 )
-from a2a_research.models import Citation, Claim, ReportOutput, ReportSection, Verdict, WebSource
+from a2a_research.models import (
+    Citation,
+    Claim,
+    ReportOutput,
+    ReportSection,
+    Verdict,
+    WebSource,
+)
 
 
 def test_normalize_url_strips_www_and_trailing_slash() -> None:
@@ -40,7 +47,9 @@ def test_sanitize_drops_hallucinated_citations() -> None:
                 body="Ref [x](https://evil.test/y).",
                 citations=[
                     Citation(url="https://real.example/doc", title="ok"),
-                    Citation(url="https://fake.example/hallucination", title="bad"),
+                    Citation(
+                        url="https://fake.example/hallucination", title="bad"
+                    ),
                 ],
             )
         ],

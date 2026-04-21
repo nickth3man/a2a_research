@@ -29,7 +29,14 @@ async def test_bus_register_get_unregister_lifecycle() -> None:
 
 @pytest.mark.asyncio
 async def test_emit_returns_silently_when_no_queue_registered() -> None:
-    emit("missing-session", ProgressPhase.STEP_STARTED, AgentRole.PLANNER, 0, 5, "planner_started")
+    emit(
+        "missing-session",
+        ProgressPhase.STEP_STARTED,
+        AgentRole.PLANNER,
+        0,
+        5,
+        "planner_started",
+    )
 
 
 @pytest.mark.asyncio
@@ -37,7 +44,14 @@ async def test_emit_puts_event_on_registered_queue() -> None:
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     Bus.register("session-1", queue)
 
-    emit("session-1", ProgressPhase.STEP_STARTED, AgentRole.PLANNER, 0, 5, "planner_started")
+    emit(
+        "session-1",
+        ProgressPhase.STEP_STARTED,
+        AgentRole.PLANNER,
+        0,
+        5,
+        "planner_started",
+    )
 
     event = await asyncio.wait_for(queue.get(), timeout=0.5)
     assert event is not None
@@ -48,7 +62,9 @@ async def test_emit_puts_event_on_registered_queue() -> None:
 
 
 @pytest.mark.asyncio
-async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> None:
+async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> (
+    None
+):
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
         session_id="session-1",
@@ -80,7 +96,9 @@ async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> None
 
 
 @pytest.mark.asyncio
-async def test_drain_progress_drains_trailing_events_after_workflow_done() -> None:
+async def test_drain_progress_drains_trailing_events_after_workflow_done() -> (
+    None
+):
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
         session_id="session-1",
@@ -99,7 +117,9 @@ async def test_drain_progress_drains_trailing_events_after_workflow_done() -> No
     await queue.put(event)
     await queue.put(None)
 
-    events = [evt async for evt in drain_progress_while_running(queue, workflow_task)]
+    events = [
+        evt async for evt in drain_progress_while_running(queue, workflow_task)
+    ]
 
     assert events == [event]
 

@@ -12,13 +12,14 @@ Files should be kept concise and focused on a single responsibility.
 Line width matches ``[tool.ruff] line-length`` (single place to change the cap in
 ``pyproject.toml``; this test keeps CI honest if Ruff is skipped).
 """
+
 from pathlib import Path
 
 import pytest
 
 # --- Configuration: file size (non-empty lines) ---
-SOFT_LIMIT = 150   # Target: where we want to be
-HARD_LIMIT = 200   # Absolute max before CI fails (grace buffer for edge cases)
+SOFT_LIMIT = 150  # Target: where we want to be
+HARD_LIMIT = 200  # Absolute max before CI fails (grace buffer for edge cases)
 
 # --- Configuration: characters per physical line (align with Ruff) ---
 MAX_LINE_CHAR_LIMIT = 79
@@ -44,13 +45,9 @@ def _should_ignore(path: Path) -> bool:
 def _count_lines(file_path: Path) -> int:
     """Count non-empty lines in a file (more meaningful than raw line count)."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             # Count lines that have at least one non-whitespace character
-            return sum(
-                1
-                for line in f
-                if line.strip()
-            )
+            return sum(1 for line in f if line.strip())
     except (OSError, UnicodeDecodeError):
         # Skip unreadable files rather than crashing the entire test suite
         return -1
@@ -111,7 +108,7 @@ def test_python_files_max_150_lines():
 
         lines = [
             f"\n{'=' * 60}",
-            f"PYTHON FILE LENGTH VIOLATIONS",
+            "PYTHON FILE LENGTH VIOLATIONS",
             f"{'=' * 60}",
             f"Scanned: {scanned} files | Skipped: {skipped} files",
             f"Soft limit: {SOFT_LIMIT} | Hard limit: {HARD_LIMIT}",
@@ -125,23 +122,29 @@ def test_python_files_max_150_lines():
                 f"({v['over_soft_limit']} over soft limit){marker}"
             )
 
-        lines.extend([
-            f"{'-' * 60}",
-            "Refactoring suggestions:",
-            "  • Extract classes/functions into dedicated modules",
-            "  • Split large test files by feature or domain",
-            "  • Move configuration/data tables to separate constants files",
-            "  • Consider the 'Composition over Inheritance' principle",
-            f"{'=' * 60}",
-        ])
+        lines.extend(
+            [
+                f"{'-' * 60}",
+                "Refactoring suggestions:",
+                "  • Extract classes/functions into dedicated modules",
+                "  • Split large test files by feature or domain",
+                "  • Move configuration/data tables to separate constants files",
+                "  • Consider the 'Composition over Inheritance' principle",
+                f"{'=' * 60}",
+            ]
+        )
 
         pytest.fail("\n".join(lines))
 
     # Always print a summary so the test feels substantive even when passing
-    print(f"\n✅ File-length check passed: {scanned} files scanned, {skipped} skipped.")
+    print(
+        f"\n✅ File-length check passed: {scanned} files scanned, {skipped} skipped."
+    )
 
 
-def _scan_line_width_violations(project_root: Path, max_chars: int) -> tuple[list[str], int, int]:
+def _scan_line_width_violations(
+    project_root: Path, max_chars: int
+) -> tuple[list[str], int, int]:
     """Return (messages, scanned, skipped). Each message is one over-long line."""
     messages: list[str] = []
     scanned = 0

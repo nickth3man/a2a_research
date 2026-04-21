@@ -6,8 +6,9 @@ import warnings
 from typing import Any
 
 import httpx
-from a2a.client import A2AClient as SDKClient
-from a2a.types import JSONRPCErrorResponse, Message, MessageSendParams, SendMessageRequest, Task
+from a2a.client import Client as SDKClient
+from a2a.client import ClientConfig, create_client
+from a2a.types import Message, SendMessageRequest, StreamResponse, Task
 
 from a2a_research.a2a.client import build_message
 
@@ -19,7 +20,9 @@ class MultiAppTransport(httpx.AsyncBaseTransport):
             for base_url, app in apps_by_url.items()
         }
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(
+        self, request: httpx.Request
+    ) -> httpx.Response:
         base_url = f"{request.url.scheme}://{request.url.host}"
         if request.url.port is not None:
             base_url = f"{base_url}:{request.url.port}"
@@ -32,24 +35,48 @@ class MultiAppTransport(httpx.AsyncBaseTransport):
 
 
 def make_multi_app_client(apps_by_url: dict[str, Any]) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=MultiAppTransport(apps_by_url), timeout=30.0)
+    return httpx.AsyncClient(
+        transport=MultiAppTransport(apps_by_url), timeout=30.0
+    )
 
 
-def build_sdk_client(http_client: httpx.AsyncClient, url: str) -> SDKClient:
+async def build_sdk_client(
+    http_client: httpx.AsyncClient, url: str
+) -> SDKClient:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", DeprecationWarning)
-        return SDKClient(httpx_client=http_client, url=url)
+        return await create_client(
+            url,
+            client_config=ClientConfig(
+                httpx_client=http_client, streaming=True
+            ),
+        )
+
+
+def _accumulate_stream(
+    result: Task | Message | None, item: StreamResponse
+) -> Task | Message | None:
+    if item.HasField("task"):
+        return item.task
+    if item.HasField("message"):
+        return item.message
+    if result is None or not isinstance(result, Task):
+        return result
+    if item.HasField("artifact_update"):
+        result.artifacts.append(item.artifact_update.artifact)
+    if item.HasField("status_update"):
+        result.status.CopyFrom(item.status_update.status)
+    return result
 
 
 async def send_and_get_result(
     client: SDKClient, *, payload: dict[str, Any] | None = None, text: str = ""
 ) -> Task | Message:
-    response = await client.send_message(
-        SendMessageRequest(
-            id="1",
-            params=MessageSendParams(message=build_message(data=payload, text=text)),
-        )
-    )
-    if isinstance(response.root, JSONRPCErrorResponse):
-        raise AssertionError(response.root.error.message)
-    return response.root.result
+    result: Task | Message | None = None
+    async for response in client.send_message(
+        SendMessageRequest(message=build_message(data=payload, text=text))
+    ):
+        result = _accumulate_stream(result, response)
+    if result is None:
+        raise AssertionError("A2A client returned no task or message")
+    return result
