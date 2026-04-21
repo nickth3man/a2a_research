@@ -1,4 +1,4 @@
-"""Searcher — smolagents ToolCallingAgent wrapping the parallel web search tool."""
+"""Searcher — smolagents ToolCallingAgent wrapping the parallel web search"""
 
 from __future__ import annotations
 

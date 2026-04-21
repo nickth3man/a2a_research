@@ -8,7 +8,10 @@ RANKER_CARD = make_agent_card(
         make_skill(
             skill_id="rank",
             name="Hit Ranking",
-            description="Rank search hits by claim relevance, credibility, and freshness.",
+            description=(
+                "Rank search hits by claim relevance, credibility, and"
+                " freshness."
+            ),
             tags=["rank", "score", "credibility"],
         )
     ],

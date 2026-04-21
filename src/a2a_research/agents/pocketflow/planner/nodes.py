@@ -2,33 +2,24 @@
 
 from __future__ import annotations
 
-from time import perf_counter
-from typing import Any, Literal
+from typing import Any
 
 from pocketflow import AsyncNode
 
-from a2a_research.agents.pocketflow.planner.prompt import (
+from a2a_research.agents.pocketflow.planner.nodes_base import (
     CLASSIFIER_PROMPT,
     COMPARATIVE_PROMPT,
     FACTUAL_PROMPT,
     TEMPORAL_PROMPT,
+    _BaseDecomposeNode,
 )
 from a2a_research.app_logging import get_logger
-from a2a_research.json_utils import parse_json_safely
-from a2a_research.models import (
-    AgentRole,
-    Claim,
-    ClaimDAG,
-    ClaimDependency,
-    FreshnessWindow,
-)
+from a2a_research.models import AgentRole, Claim, ClaimDAG, ClaimDependency
 from a2a_research.progress import emit_llm_response, emit_prompt
 from a2a_research.providers import ProviderRequestError, get_llm
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
-
-PlannerStrategy = Literal["factual", "comparative", "temporal", "fallback"]
 
 __all__ = [
     "ClassifyNode",
@@ -62,6 +53,11 @@ class ClassifyNode(AsyncNode):
         return query
 
     async def exec_async(self, prep_res: str) -> dict[str, str]:
+        from a2a_research.agents.pocketflow.planner.nodes_base import (
+            _heuristic_strategy,
+        )
+        from time import perf_counter
+
         query = prep_res
         emit_prompt(
             AgentRole.PLANNER,
@@ -93,6 +89,8 @@ class ClassifyNode(AsyncNode):
             finish_reason=getattr(response, "finish_reason", ""),
         )
 
+        from a2a_research.json_utils import parse_json_safely
+
         data = parse_json_safely(raw)
         strategy = str((data or {}).get("strategy") or "").strip().lower()
         if strategy not in {"factual", "comparative", "temporal", "fallback"}:
@@ -105,69 +103,6 @@ class ClassifyNode(AsyncNode):
         strategy = exec_res["strategy"]
         shared["strategy"] = strategy
         return strategy
-
-
-class _BaseDecomposeNode(AsyncNode):
-    prompt: str
-
-    async def prep_async(self, shared: dict[str, Any]) -> str:
-        return str(shared.get("query") or "").strip()
-
-    async def exec_async(self, prep_res: str) -> dict[str, Any]:
-        query = prep_res
-        logger.info(
-            "Planner decomposing strategy=%s query=%r",
-            self.__class__.__name__,
-            query,
-        )
-        label = f"decompose_{self.__class__.__name__.replace('DecomposeNode', '').lower()}"
-        emit_prompt(
-            AgentRole.PLANNER,
-            label,
-            query,
-            system_text=self.prompt,
-            model=settings.llm.model,
-        )
-        started = perf_counter()
-        try:
-            model = get_llm()
-            response = await model.ainvoke(
-                [
-                    {"role": "system", "content": self.prompt},
-                    {"role": "user", "content": query},
-                ]
-            )
-            raw = getattr(response, "content", None) or str(response)
-        except ProviderRequestError as exc:
-            logger.warning(
-                "Planner LLM failed in %s: %s", self.__class__.__name__, exc
-            )
-            return {"raw": "", "error": str(exc)}
-        emit_llm_response(
-            AgentRole.PLANNER,
-            label,
-            raw,
-            elapsed_ms=(perf_counter() - started) * 1000,
-            model=settings.llm.model,
-            prompt_tokens=getattr(response, "prompt_tokens", None),
-            completion_tokens=getattr(response, "completion_tokens", None),
-            finish_reason=getattr(response, "finish_reason", ""),
-        )
-        return {"raw": raw, "error": None}
-
-    async def post_async(
-        self, shared: dict[str, Any], prep_res: str, exec_res: dict[str, Any]
-    ) -> str:
-        shared["raw"] = exec_res.get("raw") or ""
-        shared["error"] = exec_res.get("error")
-        data = parse_json_safely(shared["raw"])
-        claims, seed_queries = _extract(data)
-        if not claims:
-            return "fallback"
-        shared["claims"] = claims
-        shared["claim_dag"] = _build_default_dag(claims)
-        shared["seed_queries"] = seed_queries
-        return "default"
 
 
 class FactualDecomposeNode(_BaseDecomposeNode):
@@ -220,6 +155,11 @@ class FallbackNode(AsyncNode):
         return str(shared.get("query") or "")
 
     async def exec_async(self, prep_res: str) -> dict[str, Any]:
+        from a2a_research.agents.pocketflow.planner.nodes_base import (
+            _build_default_dag,
+            _infer_freshness,
+        )
+
         query = prep_res
         claim = Claim(
             id="c0",
@@ -239,146 +179,3 @@ class FallbackNode(AsyncNode):
         shared["claim_dag"] = exec_res["claim_dag"]
         shared["seed_queries"] = exec_res["seed_queries"]
         return "default"
-
-
-def _heuristic_strategy(query: str) -> PlannerStrategy:
-    lowered = query.lower()
-    if any(
-        token in lowered
-        for token in ("compare", "vs", "versus", "better", "difference")
-    ):
-        return "comparative"
-    if any(
-        token in lowered
-        for token in (
-            "when",
-            "timeline",
-            "history",
-            "date",
-            "year",
-            "launched",
-            "before",
-            "after",
-        )
-    ):
-        return "temporal"
-    return "factual"
-
-
-def _extract(data: dict[str, Any] | None) -> tuple[list[Claim], list[str]]:
-    if not isinstance(data, dict):
-        return [], []
-    claims: list[Claim] = []
-    raw_claims = data.get("claims") or []
-    if isinstance(raw_claims, list):
-        for index, item in enumerate(raw_claims):
-            if isinstance(item, dict):
-                text = str(item.get("text") or "").strip()
-                if not text:
-                    continue
-                raw_id = item.get("id") or f"c{index}"
-                claims.append(
-                    Claim(
-                        id=str(raw_id),
-                        text=text,
-                        freshness=_extract_freshness(item, fallback_text=text),
-                    )
-                )
-            elif isinstance(item, str) and item.strip():
-                text = item.strip()
-                claims.append(
-                    Claim(
-                        id=f"c{index}",
-                        text=text,
-                        freshness=_infer_freshness(text),
-                    )
-                )
-
-    raw_seeds = data.get("seed_queries") or []
-    seeds: list[str] = []
-    if isinstance(raw_seeds, list):
-        seeds = [
-            str(item).strip()
-            for item in raw_seeds
-            if isinstance(item, str) and item.strip()
-        ]
-    return claims, seeds
-
-
-def _extract_freshness(
-    item: dict[str, Any], *, fallback_text: str
-) -> FreshnessWindow:
-    raw = item.get("freshness")
-    if isinstance(raw, dict):
-        try:
-            return FreshnessWindow.model_validate(raw)
-        except Exception:
-            pass
-    max_age_days = item.get("max_age_days")
-    if isinstance(max_age_days, int) or (
-        isinstance(max_age_days, str) and max_age_days.strip().isdigit()
-    ):
-        return FreshnessWindow(
-            max_age_days=int(max_age_days),
-            strict=bool(item.get("strict_freshness", False)),
-            rationale=str(
-                item.get("freshness_rationale")
-                or "planner supplied max_age_days"
-            ),
-        )
-    return _infer_freshness(fallback_text)
-
-
-def _infer_freshness(text: str) -> FreshnessWindow:
-    lowered = text.lower()
-    if any(
-        token in lowered
-        for token in (
-            "today",
-            "latest",
-            "recent",
-            "current",
-            "2026",
-            "2025",
-            "new",
-        )
-    ):
-        return FreshnessWindow(
-            max_age_days=30,
-            strict=True,
-            rationale="Recency-sensitive claim inferred from query wording.",
-        )
-    if any(
-        token in lowered
-        for token in (
-            "announced",
-            "launched",
-            "released",
-            "quarter",
-            "earnings",
-        )
-    ):
-        return FreshnessWindow(
-            max_age_days=365,
-            strict=False,
-            rationale="Time-bounded factual claim inferred from query wording.",
-        )
-    return FreshnessWindow(
-        max_age_days=None,
-        strict=False,
-        rationale="No recency requirement inferred.",
-    )
-
-
-def _build_default_dag(claims: list[Claim]) -> ClaimDAG:
-    return ClaimDAG(
-        nodes=[claim.id for claim in claims],
-        edges=[
-            ClaimDependency(
-                parent_id=claims[index - 1].id,
-                child_id=claims[index].id,
-                relation="refines",
-            )
-            for index in range(1, len(claims))
-        ],
-    )

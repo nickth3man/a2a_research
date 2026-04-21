@@ -1,4 +1,5 @@
-"""Reader — smolagents ToolCallingAgent wrapping trafilatura fetch + extract."""
+"""Reader — smolagents ToolCallingAgent wrapping trafilatura fetch +
+extract."""
 
 from __future__ import annotations
 

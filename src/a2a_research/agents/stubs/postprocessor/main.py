@@ -66,9 +66,11 @@ class PostprocessorExecutor(AgentExecutor):
         result = {
             "formatted_outputs": {
                 "markdown": markdown,
-                "json": json.dumps(report)
-                if isinstance(report, dict)
-                else str(report),
+                "json": (
+                    json.dumps(report)
+                    if isinstance(report, dict)
+                    else str(report)
+                ),
             }
         }
 

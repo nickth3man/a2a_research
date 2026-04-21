@@ -1,4 +1,6 @@
-"""smolagents ``Tool`` subclass wrapping :func:`a2a_research.tools.search.web_search`."""
+"""smolagents ``Tool`` subclass wrapping
+:func:`a2a_research.tools.search.web_search`.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +20,8 @@ class WebSearchTool(Tool):
         "Search the web in parallel across Tavily and DuckDuckGo, returning a "
         "deduplicated ranked list of hits for a single query string."
     )
-    inputs = {  # noqa: RUF012  # smolagents Tool requires this as a class attribute
+    inputs = {
+        # noqa: RUF012 # smolagents Tool requires this as a class attribute
         "query": {
             "type": "string",
             "description": "Natural-language search query (keep it focused).",

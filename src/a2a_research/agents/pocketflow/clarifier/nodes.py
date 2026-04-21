@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from time import perf_counter
 from typing import Any
 
 from pocketflow import AsyncNode
 
-from a2a_research.agents.pocketflow.clarifier.prompt import (
-    AUDIT_PROMPT,
-    DISAMBIGUATE_PROMPT,
+from a2a_research.agents.pocketflow.clarifier.nodes_audit import AuditNode
+from a2a_research.agents.pocketflow.clarifier.nodes_helpers import (
+    _extract_disambiguations,
+    _is_likely_unambiguous,
 )
+from a2a_research.agents.pocketflow.clarifier.prompt import DISAMBIGUATE_PROMPT
 from a2a_research.app_logging import get_logger
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
@@ -54,9 +55,10 @@ class DisambiguateNode(AsyncNode):
         return query, query_class
 
     async def exec_async(self, prep_res: tuple[str, str]) -> dict[str, Any]:
+        from time import perf_counter
+
         query, query_class = prep_res
 
-        # Fast path: factual + unambiguous (heuristic: short, no slash/or/versus)
         if query_class == "factual" and _is_likely_unambiguous(query):
             return {
                 "disambiguations": [],
@@ -113,7 +115,6 @@ class DisambiguateNode(AsyncNode):
             (data or {}).get("needs_disambiguation", len(disambiguations) > 0)
         )
 
-        # If LLM says no disambiguation needed but gave alternatives, normalize
         if not needs and disambiguations:
             needs = False
             disambiguations = []
@@ -163,7 +164,6 @@ class CommitNode(AsyncNode):
                 "committed_interpretation": committed or query,
                 "confidence": 1.0,
             }
-        # Pick highest confidence if committed is empty or not in list
         if not committed:
             best = max(disambiguations, key=lambda d: d.get("confidence", 0.0))
             committed = best["interpretation"]
@@ -179,124 +179,3 @@ class CommitNode(AsyncNode):
             "committed_interpretation"
         ]
         return "default"
-
-
-class AuditNode(AsyncNode):
-    async def prep_async(self, shared: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "original_query": shared.get("query") or "",
-            "query_class": shared.get("query_class") or "factual",
-            "chosen_interpretation": shared.get("committed_interpretation")
-            or "",
-            "disambiguations": shared.get("disambiguations") or [],
-        }
-
-    async def exec_async(self, prep_res: dict[str, Any]) -> str:
-        disambiguations = prep_res["disambiguations"]
-        chosen = prep_res["chosen_interpretation"]
-        query_class = prep_res["query_class"]
-
-        # Fast path: no disambiguation needed
-        if not disambiguations:
-            if query_class == "factual":
-                return "Query is factual and unambiguous; committed to original wording."
-            return "No alternative interpretations required; committed to original query."
-
-        user_content = (
-            f"original_query: {prep_res['original_query']}\n"
-            f"query_class: {query_class}\n"
-            f"chosen_interpretation: {chosen}\n"
-            f"disambiguations: {disambiguations}"
-        )
-        emit_prompt(
-            AgentRole.CLARIFIER,
-            "audit",
-            user_content,
-            system_text=AUDIT_PROMPT,
-            model=settings.llm.model,
-        )
-        started = perf_counter()
-        try:
-            model = get_llm()
-            response = await model.ainvoke(
-                [
-                    {"role": "system", "content": AUDIT_PROMPT},
-                    {"role": "user", "content": user_content},
-                ]
-            )
-            raw = getattr(response, "content", None) or str(response)
-        except ProviderRequestError as exc:
-            logger.warning("Clarifier LLM audit failed: %s", exc)
-            return f"Committed to highest-confidence interpretation: {chosen}"
-        emit_llm_response(
-            AgentRole.CLARIFIER,
-            "audit",
-            raw,
-            elapsed_ms=(perf_counter() - started) * 1000,
-            model=settings.llm.model,
-            prompt_tokens=getattr(response, "prompt_tokens", None),
-            completion_tokens=getattr(response, "completion_tokens", None),
-            finish_reason=getattr(response, "finish_reason", ""),
-        )
-
-        data = parse_json_safely(raw)
-        note = str((data or {}).get("audit_note") or "").strip()
-        if note:
-            return note
-        return f"Committed to highest-confidence interpretation: {chosen}"
-
-    async def post_async(
-        self, shared: dict[str, Any], prep_res: dict[str, Any], exec_res: str
-    ) -> str:
-        shared["audit_note"] = exec_res
-        return "default"
-
-
-def _is_likely_unambiguous(query: str) -> bool:
-    """Heuristic: short queries without comparison/opinion tokens are likely unambiguous."""
-    lowered = query.lower()
-    ambiguous_tokens = (
-        " or ",
-        " vs ",
-        " versus ",
-        " better ",
-        " best ",
-        " compare ",
-        " difference ",
-        " between ",
-        " should i ",
-        " pros and cons ",
-        " opinion ",
-        " think ",
-        " believe ",
-        " feel ",
-    )
-    return len(query) < 120 and not any(
-        token in lowered for token in ambiguous_tokens
-    )
-
-
-def _extract_disambiguations(
-    data: dict[str, Any] | None,
-) -> list[dict[str, Any]]:
-    """Extract and normalize disambiguation list from LLM JSON output."""
-    if not isinstance(data, dict):
-        return []
-    raw = data.get("disambiguations")
-    if not isinstance(raw, list):
-        return []
-    result: list[dict[str, Any]] = []
-    for item in raw:
-        if isinstance(item, dict):
-            interp = str(item.get("interpretation") or "").strip()
-            if interp:
-                conf = float(item.get("confidence", 0.5))
-                result.append(
-                    {
-                        "interpretation": interp,
-                        "confidence": max(0.0, min(1.0, conf)),
-                    }
-                )
-        elif isinstance(item, str) and item.strip():
-            result.append({"interpretation": item.strip(), "confidence": 0.5})
-    return result

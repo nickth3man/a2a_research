@@ -1,0 +1,183 @@
+"""Searcher core logic."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from time import perf_counter
+from typing import Any, cast
+
+from a2a.types import TaskState
+
+from a2a_research.agents.smolagents.searcher.agent import build_agent
+from a2a_research.app_logging import get_logger, log_event
+from a2a_research.json_utils import parse_json_safely
+from a2a_research.models import AgentRole
+from a2a_research.progress import (
+    ProgressPhase,
+    emit,
+    emit_llm_response,
+    emit_prompt,
+    using_session,
+)
+from a2a_research.settings import settings as _app_settings
+from a2a_research.tools import WebHit, web_search
+
+logger = get_logger(__name__)
+
+
+class SearcherBatchResult:
+    hits: list[WebHit]
+    errors: list[str]
+    providers_successful: list[str]
+
+    def __init__(
+        self,
+        hits: list[WebHit] | None = None,
+        errors: list[str] | None = None,
+        providers_successful: list[str] | None = None,
+    ) -> None:
+        self.hits = hits or []
+        self.errors = errors or []
+        self.providers_successful = providers_successful or []
+
+
+async def search_queries(
+    queries: list[str], *, session_id: str = ""
+) -> SearcherBatchResult:
+    """Run the smolagents Searcher tool-calling loop for ``queries``."""
+    if not queries:
+        return SearcherBatchResult()
+
+    prompt = (
+        "Queries to search:\n"
+        + "\n".join(f"- {query}" for query in queries)
+        + "\n\nReturn JSON only with keys queries_used and hits."
+    )
+
+    with using_session(session_id):
+        emit_prompt(
+            AgentRole.SEARCHER,
+            "react_loop",
+            prompt,
+            model=_app_settings.llm.model,
+            session_id=session_id,
+        )
+        agent = build_agent()
+        runner = cast("Any", agent.run)
+        started = perf_counter()
+        raw_output = await asyncio.to_thread(runner, prompt)
+        emit_llm_response(
+            AgentRole.SEARCHER,
+            "react_loop",
+            str(raw_output),
+            elapsed_ms=(perf_counter() - started) * 1000,
+            model=_app_settings.llm.model,
+            session_id=session_id,
+        )
+        data = parse_json_safely(str(raw_output))
+        by_url: dict[str, WebHit] = {}
+        errors: list[str] = []
+        seen_errors: set[str] = set()
+        successful_providers: set[str] = set()
+
+        raw_hits_any = data.get("hits")
+        raw_hits: list[object] = (
+            raw_hits_any if isinstance(raw_hits_any, list) else []
+        )
+        for raw_hit in raw_hits:
+            if not isinstance(raw_hit, dict):
+                continue
+            hit = WebHit.model_validate(raw_hit)
+            by_url.setdefault(hit.url, hit)
+            successful_providers.add(hit.source)
+
+        raw_errors_any = data.get("errors")
+        raw_errors: list[object] = (
+            raw_errors_any if isinstance(raw_errors_any, list) else []
+        )
+        for err in raw_errors:
+            if isinstance(err, str) and err not in seen_errors:
+                seen_errors.add(err)
+                errors.append(err)
+
+        queries_used_raw = data.get("queries_used") or queries
+        queries_used = (
+            [
+                item.strip()
+                for item in queries_used_raw
+                if isinstance(item, str) and item.strip()
+            ]
+            if isinstance(queries_used_raw, list)
+            else queries
+        )
+        if not by_url and not errors:
+            fallback_results = await asyncio.gather(
+                *[web_search(query) for query in queries],
+                return_exceptions=False,
+            )
+            for result in fallback_results:
+                for hit in result.hits:
+                    by_url.setdefault(hit.url, hit)
+                errors.extend(
+                    err for err in result.errors if err not in errors
+                )
+                successful_providers.update(result.providers_successful)
+            if not by_url and not errors:
+                errors.append("Searcher agent returned no usable hits.")
+
+    for index, query in enumerate(queries_used, start=1):
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.SEARCHER,
+            1,
+            5,
+            f"search_query_{index}",
+            substep_index=index,
+            substep_total=max(len(queries_used), 1),
+            detail=(
+                f"query={query[:80]} providers="
+                f"{','.join(sorted(successful_providers)) or 'none'}"
+            ),
+        )
+    hits = sorted(by_url.values(), key=lambda h: (-h.score, h.source, h.url))
+    logger.info(
+        "Searcher searched queries=%s merged_hits=%s"
+        " errors=%s successful_providers=%s",
+        len(queries),
+        len(hits),
+        len(errors),
+        sorted(successful_providers),
+    )
+    log_event(
+        logger,
+        logging.INFO,
+        "searcher.batch_completed",
+        input_queries=queries,
+        queries_used=queries_used,
+        merged_hits=len(hits),
+        errors=errors,
+        successful_providers=sorted(successful_providers),
+        top_hit_urls=[h.url for h in hits[:20]],
+    )
+    return SearcherBatchResult(
+        hits=hits,
+        errors=errors,
+        providers_successful=sorted(successful_providers),
+    )
+
+
+def _derive_status(
+    queries: list[str],
+    hits: list[WebHit],
+    errors: list[str],
+    successful_providers: list[str],
+) -> tuple[TaskState, str | None]:
+    if not queries:
+        return TaskState.TASK_STATE_COMPLETED, None
+    if not successful_providers and errors:
+        return TaskState.TASK_STATE_FAILED, (
+            "All web-search providers failed: " + " | ".join(errors)
+        )
+    return TaskState.TASK_STATE_COMPLETED, None

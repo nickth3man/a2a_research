@@ -1,18 +1,10 @@
-"""A2A AgentExecutor for the Reader role.
-
-Consumes ``{urls: list[str]}`` and returns a Task with a data artifact of
-``{pages: [PageContent, …]}``. Pages that fail to fetch are included with
-``error != None`` so the FactChecker can distinguish "no evidence" from
-"evidence retrieved but empty".
-"""
+"""A2A AgentExecutor for the Reader role."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from time import perf_counter
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -26,27 +18,17 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import (
-    get_data_part,
-    get_text_part,
-    make_data_part,
-    new_agent_text_message,
-)
+from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
-from a2a_research.agents.smolagents.reader.agent import build_agent
 from a2a_research.agents.smolagents.reader.card import READER_CARD
-from a2a_research.app_logging import get_logger, log_event
-from a2a_research.json_utils import parse_json_safely
-from a2a_research.models import AgentRole
-from a2a_research.progress import (
-    ProgressPhase,
-    emit,
-    emit_llm_response,
-    emit_prompt,
-    using_session,
+from a2a_research.agents.smolagents.reader.core import read_urls
+from a2a_research.agents.smolagents.reader.payload import (
+    _coerce_str_list,
+    _extract_payload,
 )
-from a2a_research.settings import settings as _app_settings
-from a2a_research.tools import PageContent, fetch_many
+from a2a_research.app_logging import get_logger, log_event
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -147,23 +129,29 @@ class ReaderExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text)
-                    if error_text
-                    else None,
+                    message=(
+                        new_agent_text_message(error_text)
+                        if error_text
+                        else None
+                    ),
                 ),
             )
         )
         emit(
             session_id,
-            ProgressPhase.STEP_COMPLETED
-            if status == TaskState.TASK_STATE_COMPLETED
-            else ProgressPhase.STEP_FAILED,
+            (
+                ProgressPhase.STEP_COMPLETED
+                if status == TaskState.TASK_STATE_COMPLETED
+                else ProgressPhase.STEP_FAILED
+            ),
             AgentRole.READER,
             2,
             5,
-            "reader_completed"
-            if status == TaskState.TASK_STATE_COMPLETED
-            else "reader_failed",
+            (
+                "reader_completed"
+                if status == TaskState.TASK_STATE_COMPLETED
+                else "reader_failed"
+            ),
             detail=f"urls={len(urls)} pages={len(pages)}",
         )
         logger.info(
@@ -194,101 +182,6 @@ class ReaderExecutor(AgentExecutor):
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         pass
-
-
-def _extract_payload(context: RequestContext) -> dict[str, object]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        data_part = get_data_part(part)
-        if isinstance(data_part, dict):
-            return data_part
-        text_part = get_text_part(part)
-        if text_part:
-            try:
-                data = json.loads(text_part)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict):
-                return dict(data)
-    return {}
-
-
-async def read_urls(
-    urls: list[str], *, max_chars: int = 8000, session_id: str = ""
-) -> list[PageContent]:
-    if not urls:
-        return []
-
-    log_event(
-        logger,
-        logging.INFO,
-        "reader.read_urls_start",
-        urls=urls,
-        max_chars=max_chars,
-    )
-    prompt = (
-        "URLs to read:\n"
-        + "\n".join(f"- {url}" for url in urls)
-        + f"\n\nmax_chars={max_chars}. Return JSON only with a pages array."
-    )
-
-    emit_prompt(
-        AgentRole.READER,
-        "react_loop",
-        prompt,
-        model=_app_settings.llm.model,
-        session_id=session_id,
-    )
-    agent = build_agent()
-    runner = cast("Any", agent.run)
-    started = perf_counter()
-    with using_session(session_id):
-        raw_output = await asyncio.to_thread(runner, prompt)
-    emit_llm_response(
-        AgentRole.READER,
-        "react_loop",
-        str(raw_output),
-        elapsed_ms=(perf_counter() - started) * 1000,
-        model=_app_settings.llm.model,
-        session_id=session_id,
-    )
-    data = parse_json_safely(str(raw_output))
-    raw_pages_any = data.get("pages")
-    raw_pages: list[object] = (
-        raw_pages_any if isinstance(raw_pages_any, list) else []
-    )
-    pages = [
-        PageContent.model_validate(item)
-        for item in raw_pages
-        if isinstance(item, dict)
-    ]
-    if pages:
-        log_event(
-            logger,
-            logging.INFO,
-            "reader.read_urls_agent_json",
-            url_count=len(urls),
-            page_count=len(pages),
-            via="smolagents_json",
-        )
-        return pages
-    log_event(
-        logger,
-        logging.INFO,
-        "reader.read_urls_fallback",
-        url_count=len(urls),
-        via="fetch_many_trafilatura",
-    )
-    return await fetch_many(urls, max_chars=max_chars)
-
-
-def _coerce_str_list(raw: Any) -> list[str]:
-    if isinstance(raw, str):
-        return [raw] if raw.strip() else []
-    if isinstance(raw, list):
-        return [str(item).strip() for item in raw if str(item).strip()]
-    return []
 
 
 def build_http_app() -> Any:

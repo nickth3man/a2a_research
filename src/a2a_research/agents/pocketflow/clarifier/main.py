@@ -128,24 +128,33 @@ class ClarifierExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text)
-                    if error_text
-                    else None,
+                    message=(
+                        new_agent_text_message(error_text)
+                        if error_text
+                        else None
+                    ),
                 ),
             )
         )
         emit(
             session_id,
-            ProgressPhase.STEP_COMPLETED
-            if status == TaskState.TASK_STATE_COMPLETED
-            else ProgressPhase.STEP_FAILED,
+            (
+                ProgressPhase.STEP_COMPLETED
+                if status == TaskState.TASK_STATE_COMPLETED
+                else ProgressPhase.STEP_FAILED
+            ),
             AgentRole.CLARIFIER,
             1,
             12,
-            "clarifier_completed"
-            if status == TaskState.TASK_STATE_COMPLETED
-            else "clarifier_failed",
-            detail=f"disambiguations={len(result['disambiguations'])} committed={result['committed_interpretation'][:60]}",
+            (
+                "clarifier_completed"
+                if status == TaskState.TASK_STATE_COMPLETED
+                else "clarifier_failed"
+            ),
+            detail=(
+                f"disambiguations={len(result['disambiguations'])}"
+                f" committed={result['committed_interpretation'][:60]}"
+            ),
         )
         logger.info(
             "Clarifier task_id=%s disambiguations=%s committed=%r",

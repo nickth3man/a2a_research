@@ -1,4 +1,6 @@
-"""smolagents ``Tool`` subclass wrapping :func:`a2a_research.tools.fetch.fetch_and_extract`."""
+"""smolagents ``Tool`` subclass wrapping
+:func:`a2a_research.tools.fetch.fetch_and_extract`.
+"""
 
 from __future__ import annotations
 
@@ -15,10 +17,11 @@ __all__ = ["FetchAndExtractTool"]
 class FetchAndExtractTool(Tool):
     name = "fetch_and_extract"
     description = (
-        "Fetch a URL and extract its main content as markdown using trafilatura. "
-        "Returns {url, title, markdown, word_count, error}."
+        "Fetch a URL and extract its main content as markdown using"
+        " trafilatura. Returns {url, title, markdown, word_count, error}."
     )
-    inputs = {  # noqa: RUF012  # smolagents Tool requires this as a class attribute
+    inputs = {
+        # noqa: RUF012 # smolagents Tool requires this as a class attribute
         "url": {
             "type": "string",
             "description": "Absolute http(s) URL to fetch and extract.",

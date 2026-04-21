@@ -1,4 +1,5 @@
-"""Shared helpers for FactChecker LangGraph nodes (prompt building, parsing, task metadata)."""
+"""Shared helpers for FactChecker LangGraph nodes (prompt building, parsing,
+task metadata)."""
 
 from __future__ import annotations
 

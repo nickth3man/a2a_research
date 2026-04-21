@@ -1,8 +1,4 @@
-"""A2A AgentExecutor for the FactChecker role.
-
-Consumes ``{query, claims, evidence, sources}`` and emits ``{verified_claims, sources}``.
-Runs a single verification pass over the provided evidence.
-"""
+"""A2A AgentExecutor for the FactChecker role."""
 
 from __future__ import annotations
 
@@ -19,24 +15,21 @@ from a2a.types import (
     TaskStatus,
     TaskStatusUpdateEvent,
 )
-from pydantic import ValidationError
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import (
-    get_data_part,
-    get_text_part,
-    make_data_part,
-    new_agent_text_message,
-)
+from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.card import FACT_CHECKER_CARD
-from a2a_research.agents.langgraph.fact_checker.verify_route import (
-    verify_claims,
+from a2a_research.agents.langgraph.fact_checker.core import run_fact_check
+from a2a_research.agents.langgraph.fact_checker.payload import (
+    _coerce_claims,
+    _coerce_pages,
+    _coerce_sources,
+    _extract_payload,
 )
 from a2a_research.app_logging import get_logger
-from a2a_research.models import AgentRole, Claim, Verdict, WebSource
+from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import PageContent
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
@@ -47,67 +40,6 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 __all__ = ["FactCheckerExecutor", "build_http_app", "run_fact_check"]
-
-
-async def run_fact_check(
-    query: str,
-    claims: list[Claim],
-    evidence: list[PageContent],
-    sources: list[WebSource],
-    *,
-    session_id: str = "",
-) -> FactCheckRunResult:
-    """Verify claims against provided evidence; return ``{verified_claims, sources}``."""
-    if not evidence:
-        reason = "No web evidence was provided for verification."
-        logger.warning("FactChecker verify short-circuit reason=%s", reason)
-        degraded = [
-            c.model_copy(
-                update={
-                    "verdict": Verdict.INSUFFICIENT_EVIDENCE,
-                    "confidence": 0.0,
-                    "sources": [],
-                    "evidence_snippets": [reason],
-                }
-            )
-            for c in claims
-        ]
-        emit(
-            session_id,
-            ProgressPhase.STEP_SUBSTEP,
-            AgentRole.FACT_CHECKER,
-            3,
-            5,
-            "exhausted",
-            detail=reason,
-        )
-        return {
-            "verified_claims": degraded,
-            "sources": sources,
-            "errors": [reason],
-            "search_exhausted": True,
-            "rounds": 0,
-        }
-
-    verified = await verify_claims(
-        query, claims, evidence, session_id=session_id
-    )
-    emit(
-        session_id,
-        ProgressPhase.STEP_SUBSTEP,
-        AgentRole.FACT_CHECKER,
-        3,
-        5,
-        "completed",
-        detail=f"claims={len(verified)}",
-    )
-    return {
-        "verified_claims": verified,
-        "sources": sources,
-        "errors": [],
-        "search_exhausted": False,
-        "rounds": 1,
-    }
 
 
 class FactCheckerExecutor(AgentExecutor):
@@ -207,23 +139,29 @@ class FactCheckerExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text)
-                    if error_text
-                    else None,
+                    message=(
+                        new_agent_text_message(error_text)
+                        if error_text
+                        else None
+                    ),
                 ),
             )
         )
         emit(
             session_id,
-            ProgressPhase.STEP_COMPLETED
-            if status == TaskState.TASK_STATE_COMPLETED
-            else ProgressPhase.STEP_FAILED,
+            (
+                ProgressPhase.STEP_COMPLETED
+                if status == TaskState.TASK_STATE_COMPLETED
+                else ProgressPhase.STEP_FAILED
+            ),
             AgentRole.FACT_CHECKER,
             3,
             5,
-            "fact_checker_completed"
-            if status == TaskState.TASK_STATE_COMPLETED
-            else "fact_checker_failed",
+            (
+                "fact_checker_completed"
+                if status == TaskState.TASK_STATE_COMPLETED
+                else "fact_checker_failed"
+            ),
             detail=f"rounds={result['rounds']} errors={len(result['errors'])}",
         )
 
@@ -231,66 +169,6 @@ class FactCheckerExecutor(AgentExecutor):
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         pass
-
-
-def _extract_payload(context: RequestContext) -> dict[str, Any]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        data_part = get_data_part(part)
-        if isinstance(data_part, dict):
-            return data_part
-        text_part = get_text_part(part)
-        if text_part:
-            try:
-                data = json.loads(text_part)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict):
-                return data
-    return {}
-
-
-def _coerce_claims(raw: Any) -> list[Claim]:
-    claims: list[Claim] = []
-    for item in raw or []:
-        if isinstance(item, Claim):
-            claims.append(item)
-            continue
-        if isinstance(item, dict):
-            try:
-                claims.append(Claim.model_validate(item))
-            except ValidationError:
-                continue
-    return claims
-
-
-def _coerce_pages(raw: Any) -> list[PageContent]:
-    pages: list[PageContent] = []
-    for item in raw or []:
-        if isinstance(item, PageContent):
-            pages.append(item)
-            continue
-        if isinstance(item, dict):
-            try:
-                pages.append(PageContent.model_validate(item))
-            except ValidationError:
-                continue
-    return pages
-
-
-def _coerce_sources(raw: Any) -> list[WebSource]:
-    sources: list[WebSource] = []
-    for item in raw or []:
-        if isinstance(item, WebSource):
-            sources.append(item)
-            continue
-        if isinstance(item, dict):
-            try:
-                sources.append(WebSource.model_validate(item))
-            except ValidationError:
-                continue
-    return sources
 
 
 def build_http_app() -> Any:

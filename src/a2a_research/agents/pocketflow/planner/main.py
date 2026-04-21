@@ -1,7 +1,8 @@
 """A2A AgentExecutor for the Planner role.
 
-Consumes ``{query}`` (string or data part) and returns a Task with a data artifact
-of ``{claims, seed_queries}`` — the handoff shape the FactChecker expects.
+Consumes ``{query}`` (string or data part) and returns a Task with a data
+artifact of ``{claims, seed_queries}`` — the handoff shape the FactChecker
+expects.
 """
 
 from __future__ import annotations
@@ -21,14 +22,13 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import (
-    get_data_part,
-    get_text_part,
-    make_data_part,
-    new_agent_text_message,
-)
+from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
+from a2a_research.agents.pocketflow.planner.extract import (
+    extract_payload,
+    extract_query,
+)
 from a2a_research.agents.pocketflow.planner.flow import plan
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
@@ -49,50 +49,57 @@ class PlannerExecutor(AgentExecutor):
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
-        query = _extract_query(context)
-        payload = _extract_payload(context)
+        query = extract_query(context)
+        payload = extract_payload(context)
         session_id = str(payload.get("session_id") or "")
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
 
+            preview = json.dumps(
+                payload, default=str, indent=2, sort_keys=True
+            )
             emit_handoff(
                 direction="received",
                 role=AgentRole.PLANNER,
                 peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(
-                    json.dumps(payload, default=str).encode("utf-8")
-                ),
-                payload_preview=json.dumps(
-                    payload, default=str, indent=2, sort_keys=True
-                ),
+                payload_bytes=len(preview.encode("utf-8")),
+                payload_preview=preview,
                 session_id=session_id,
             )
+        from a2a_research.workflow.definitions import (
+            STEP_INDEX_V2 as SI,
+            TOTAL_STEPS_V2 as TS,
+        )
+        planner_step = SI[AgentRole.PLANNER]
         emit(
             session_id,
             ProgressPhase.STEP_STARTED,
             AgentRole.PLANNER,
-            0,
-            5,
+            planner_step,
+            TS,
             "planner_started",
         )
         emit(
             session_id,
             ProgressPhase.STEP_SUBSTEP,
             AgentRole.PLANNER,
-            0,
-            5,
+            planner_step,
+            TS,
             "decompose",
         )
 
         try:
             with using_session(session_id):
-                claims, claim_dag, seed_queries = await plan(
+                plan_result = await plan(
                     query,
                     session_id=session_id,
                     include_dag=True,
                 )
+                claims = plan_result[0]
+                claim_dag = plan_result[1] if len(plan_result) > 2 else None
+                seed_queries = plan_result[-1]
             status = TaskState.TASK_STATE_COMPLETED
             error_text: str | None = None
         except Exception as exc:
@@ -109,9 +116,11 @@ class PlannerExecutor(AgentExecutor):
                     {
                         "query": query,
                         "claims": [c.model_dump(mode="json") for c in claims],
-                        "claim_dag": claim_dag.model_dump(mode="json")
-                        if claim_dag
-                        else {},
+                        "claim_dag": (
+                            claim_dag.model_dump(mode="json")
+                            if claim_dag
+                            else {}
+                        ),
                         "seed_queries": seed_queries,
                     }
                 )
@@ -132,23 +141,29 @@ class PlannerExecutor(AgentExecutor):
                 context_id=task.context_id,
                 status=TaskStatus(
                     state=status,
-                    message=new_agent_text_message(error_text)
-                    if error_text
-                    else None,
+                    message=(
+                        new_agent_text_message(error_text)
+                        if error_text
+                        else None
+                    ),
                 ),
             )
         )
         emit(
             session_id,
-            ProgressPhase.STEP_COMPLETED
-            if status == TaskState.TASK_STATE_COMPLETED
-            else ProgressPhase.STEP_FAILED,
+            (
+                ProgressPhase.STEP_COMPLETED
+                if status == TaskState.TASK_STATE_COMPLETED
+                else ProgressPhase.STEP_FAILED
+            ),
             AgentRole.PLANNER,
-            0,
-            5,
-            "planner_completed"
-            if status == TaskState.TASK_STATE_COMPLETED
-            else "planner_failed",
+            planner_step,
+            TS,
+            (
+                "planner_completed"
+                if status == TaskState.TASK_STATE_COMPLETED
+                else "planner_failed"
+            ),
             detail=f"claims={len(claims)} seeds={len(seed_queries)}",
         )
         logger.info(
@@ -162,43 +177,6 @@ class PlannerExecutor(AgentExecutor):
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         pass
-
-
-def _extract_query(context: RequestContext) -> str:
-    payload = _extract_payload(context)
-    query = payload.get("query")
-    if isinstance(query, str) and query.strip():
-        return query.strip()
-    if context.message is None:
-        return ""
-    text_parts: list[str] = []
-    for part in context.message.parts:
-        part_data = get_data_part(part)
-        if isinstance(part_data, dict):
-            query = part_data.get("query")
-            if isinstance(query, str) and query.strip():
-                return query.strip()
-        part_text = get_text_part(part)
-        if part_text and part_text.strip():
-            text_parts.append(part_text.strip())
-    joined = "\n".join(text_parts).strip()
-    try:
-        data = json.loads(joined) if joined else None
-    except (ValueError, TypeError):
-        data = None
-    if isinstance(data, dict) and isinstance(data.get("query"), str):
-        return str(data["query"]).strip()
-    return joined
-
-
-def _extract_payload(context: RequestContext) -> dict[str, object]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        payload = get_data_part(part)
-        if isinstance(payload, dict):
-            return payload
-    return {}
 
 
 def build_http_app() -> Any:

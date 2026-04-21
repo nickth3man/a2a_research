@@ -1,10 +1,12 @@
 """smolagents ``ToolCallingAgent`` factory for the Searcher role.
 
-Used by the standalone ``python -m a2a_research.agents.smolagents.searcher``
-demo. The A2A :class:`SearcherExecutor` calls :func:`a2a_research.tools.web_search`
-directly for batch efficiency — see the note in ``main.py``.
+Used by the standalone
+``python -m a2a_research.agents.smolagents.searcher`` demo. The A2A
+:class:`SearcherExecutor` calls :func:`a2a_research.tools.web_search` directly
+for batch efficiency — see the note in ``main.py``.
 
-Env vars: ``LLM_MODEL``, ``LLM_BASE_URL``, ``LLM_API_KEY`` via :data:`settings.llm`.
+Env vars: ``LLM_MODEL``, ``LLM_BASE_URL``, ``LLM_API_KEY`` via
+:data:`settings.llm`.
 """
 
 from __future__ import annotations

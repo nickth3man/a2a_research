@@ -53,7 +53,10 @@ async def plan(
     *,
     session_id: str = "",
     include_dag: bool = False,
-) -> tuple[list[Claim], list[str]] | tuple[list[Claim], ClaimDAG, list[str]]:
+) -> (
+    tuple[list[Claim], list[str]]
+    | tuple[list[Claim], ClaimDAG | None, list[str]]
+):
     """Run the Planner flow.
 
     Returns ``(claims, seed_queries)`` by default for backward compatibility.
