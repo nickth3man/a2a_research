@@ -17,7 +17,11 @@ from typing import Any
 from a2a.types import TaskState
 from pydantic import ValidationError
 
-from a2a_research.a2a import A2AClient, extract_data_payload_or_warn, get_registry
+from a2a_research.a2a import (
+    A2AClient,
+    extract_data_payload_or_warn,
+    get_registry,
+)
 from a2a_research.app_logging import get_logger
 from a2a_research.models import (
     AgentResult,
@@ -59,11 +63,13 @@ async def run_research_async(
         Bus.register(session.id, progress_queue)
 
     try:
-        await asyncio.wait_for(_drive(session, client, query), timeout=settings.workflow_timeout)
-    except TimeoutError:  # asyncio.TimeoutError is the same class on Python 3.11+
-        session.error = (
-            f"Workflow timed out after {settings.workflow_timeout:.0f}s — partial results below."
+        await asyncio.wait_for(
+            _drive(session, client, query), timeout=settings.workflow_timeout
         )
+    except (
+        TimeoutError
+    ):  # asyncio.TimeoutError is the same class on Python 3.11+
+        session.error = f"Workflow timed out after {settings.workflow_timeout:.0f}s — partial results below."
         _mark_running_failed(session)
         logger.warning("workflow timed out session_id=%s", session.id)
     except Exception as exc:
@@ -103,9 +109,18 @@ def run_research(query: str) -> ResearchSession:
     return run_research_sync(query)
 
 
-async def _drive(session: ResearchSession, client: A2AClient, query: str) -> None:
-    _emit_role_event(session.id, AgentRole.PLANNER, ProgressPhase.STEP_STARTED, "planner_started")
-    _set_status(session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…")
+async def _drive(
+    session: ResearchSession, client: A2AClient, query: str
+) -> None:
+    _emit_role_event(
+        session.id,
+        AgentRole.PLANNER,
+        ProgressPhase.STEP_STARTED,
+        "planner_started",
+    )
+    _set_status(
+        session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…"
+    )
     plan_task = await client.send(
         AgentRole.PLANNER,
         payload={"query": query, "session_id": session.id},
@@ -113,37 +128,72 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     plan = _payload(plan_task)
     plan_failed = _task_failed(plan_task)
     claims: list[Claim] = [
-        c for c in (_coerce_claim(item) for item in (plan.get("claims") or [])) if c is not None
+        c
+        for c in (_coerce_claim(item) for item in (plan.get("claims") or []))
+        if c is not None
     ]
-    seed_queries = [str(q) for q in (plan.get("seed_queries") or []) if isinstance(q, str)]
+    seed_queries = [
+        str(q) for q in (plan.get("seed_queries") or []) if isinstance(q, str)
+    ]
     session.claims = claims
     _set_status(
         session,
         AgentRole.PLANNER,
         AgentStatus.FAILED if plan_failed else AgentStatus.COMPLETED,
-        ("Failed to decompose query." if plan_failed else f"Extracted {len(claims)} claim(s)."),
+        (
+            "Failed to decompose query."
+            if plan_failed
+            else f"Extracted {len(claims)} claim(s)."
+        ),
     )
     if plan_failed:
         _emit_role_event(
-            session.id, AgentRole.PLANNER, ProgressPhase.STEP_FAILED, "planner_failed"
+            session.id,
+            AgentRole.PLANNER,
+            ProgressPhase.STEP_FAILED,
+            "planner_failed",
         )
         session.error = "Planner failed to decompose query."
-        _set_status(session, AgentRole.SEARCHER, AgentStatus.FAILED, "Skipped: planner failed.")
-        _set_status(session, AgentRole.READER, AgentStatus.FAILED, "Skipped: planner failed.")
         _set_status(
-            session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: planner failed."
+            session,
+            AgentRole.SEARCHER,
+            AgentStatus.FAILED,
+            "Skipped: planner failed.",
         )
-        _set_status(session, AgentRole.SYNTHESIZER, AgentStatus.FAILED, "Skipped: planner failed.")
+        _set_status(
+            session,
+            AgentRole.READER,
+            AgentStatus.FAILED,
+            "Skipped: planner failed.",
+        )
+        _set_status(
+            session,
+            AgentRole.FACT_CHECKER,
+            AgentStatus.FAILED,
+            "Skipped: planner failed.",
+        )
+        _set_status(
+            session,
+            AgentRole.SYNTHESIZER,
+            AgentStatus.FAILED,
+            "Skipped: planner failed.",
+        )
         session.report = None
         session.final_report = _planner_failed_report(query)
         return
     _emit_role_event(
-        session.id, AgentRole.PLANNER, ProgressPhase.STEP_COMPLETED, "planner_completed"
+        session.id,
+        AgentRole.PLANNER,
+        ProgressPhase.STEP_COMPLETED,
+        "planner_completed",
     )
 
     _set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
     _emit_role_event(
-        session.id, AgentRole.SEARCHER, ProgressPhase.STEP_STARTED, "searcher_started"
+        session.id,
+        AgentRole.SEARCHER,
+        ProgressPhase.STEP_STARTED,
+        "searcher_started",
     )
     search_task = await client.send(
         AgentRole.SEARCHER,
@@ -155,13 +205,30 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     raw_hits = search_data.get("hits") or []
     hits = [_coerce_web_hit(h) for h in raw_hits]
     hits = [h for h in hits if h is not None]
-    search_errors = [str(e) for e in (search_data.get("errors") or []) if isinstance(e, str)]
+    search_errors = [
+        str(e) for e in (search_data.get("errors") or []) if isinstance(e, str)
+    ]
 
     if search_failed or not hits:
         reason = " | ".join(search_errors) or "web search produced no results."
-        _set_status(session, AgentRole.SEARCHER, AgentStatus.FAILED, f"Search failed: {reason}")
-        _set_status(session, AgentRole.READER, AgentStatus.FAILED, "Skipped: search failed.")
-        _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: no evidence.")
+        _set_status(
+            session,
+            AgentRole.SEARCHER,
+            AgentStatus.FAILED,
+            f"Search failed: {reason}",
+        )
+        _set_status(
+            session,
+            AgentRole.READER,
+            AgentStatus.FAILED,
+            "Skipped: search failed.",
+        )
+        _set_status(
+            session,
+            AgentRole.FACT_CHECKER,
+            AgentStatus.FAILED,
+            "Skipped: no evidence.",
+        )
         _set_status(
             session,
             AgentRole.SYNTHESIZER,
@@ -169,7 +236,10 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
             "Skipped: no verified evidence to synthesize.",
         )
         _emit_role_event(
-            session.id, AgentRole.SEARCHER, ProgressPhase.STEP_FAILED, "searcher_failed"
+            session.id,
+            AgentRole.SEARCHER,
+            ProgressPhase.STEP_FAILED,
+            "searcher_failed",
         )
         session.error = "Research pipeline aborted: " + reason
         session.final_report = _error_report(query, reason, search_errors)
@@ -183,11 +253,21 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         f"{len(hits)} hit(s), {len(urls)} URL(s) selected.",
     )
     _emit_role_event(
-        session.id, AgentRole.SEARCHER, ProgressPhase.STEP_COMPLETED, "searcher_completed"
+        session.id,
+        AgentRole.SEARCHER,
+        ProgressPhase.STEP_COMPLETED,
+        "searcher_completed",
     )
 
-    _set_status(session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…")
-    _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_STARTED, "reader_started")
+    _set_status(
+        session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…"
+    )
+    _emit_role_event(
+        session.id,
+        AgentRole.READER,
+        ProgressPhase.STEP_STARTED,
+        "reader_started",
+    )
     read_task = await client.send(
         AgentRole.READER,
         payload={
@@ -215,14 +295,24 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     if read_failed or not successful_pages:
         reason = "All URLs failed to extract."
         _set_status(session, AgentRole.READER, AgentStatus.FAILED, reason)
-        _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: no evidence.")
+        _set_status(
+            session,
+            AgentRole.FACT_CHECKER,
+            AgentStatus.FAILED,
+            "Skipped: no evidence.",
+        )
         _set_status(
             session,
             AgentRole.SYNTHESIZER,
             AgentStatus.FAILED,
             "Skipped: no verified evidence to synthesize.",
         )
-        _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_FAILED, "reader_failed")
+        _emit_role_event(
+            session.id,
+            AgentRole.READER,
+            ProgressPhase.STEP_FAILED,
+            "reader_failed",
+        )
         session.error = "Research pipeline aborted: " + reason
         session.final_report = _error_report(query, reason, [])
         return
@@ -234,10 +324,18 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         f"{len(successful_pages)} page(s) extracted.",
     )
     _emit_role_event(
-        session.id, AgentRole.READER, ProgressPhase.STEP_COMPLETED, "reader_completed"
+        session.id,
+        AgentRole.READER,
+        ProgressPhase.STEP_COMPLETED,
+        "reader_completed",
     )
 
-    _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.RUNNING, "Verifying claims…")
+    _set_status(
+        session,
+        AgentRole.FACT_CHECKER,
+        AgentStatus.RUNNING,
+        "Verifying claims…",
+    )
     _emit_role_event(
         session.id,
         AgentRole.FACT_CHECKER,
@@ -258,7 +356,10 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
     fc_data = _payload(fc_task)
     verified: list[Claim] = [
         c
-        for c in (_coerce_claim(item) for item in (fc_data.get("verified_claims") or []))
+        for c in (
+            _coerce_claim(item)
+            for item in (fc_data.get("verified_claims") or [])
+        )
         if c is not None
     ]
     fc_failed = _task_failed(fc_task)
@@ -303,7 +404,9 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         "fact_checker_completed",
     )
 
-    _set_status(session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…")
+    _set_status(
+        session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…"
+    )
     _emit_role_event(
         session.id,
         AgentRole.SYNTHESIZER,
@@ -315,7 +418,9 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         payload={
             "session_id": session.id,
             "query": query,
-            "verified_claims": [c.model_dump(mode="json") for c in (verified or claims)],
+            "verified_claims": [
+                c.model_dump(mode="json") for c in (verified or claims)
+            ],
             "sources": [s.model_dump(mode="json") for s in sources],
         },
         from_role=AgentRole.FACT_CHECKER,
@@ -329,7 +434,9 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         session,
         AgentRole.SYNTHESIZER,
         AgentStatus.FAILED if syn_failed else AgentStatus.COMPLETED,
-        "Failed to synthesize report." if syn_failed else "Report synthesized.",
+        "Failed to synthesize report."
+        if syn_failed
+        else "Report synthesized.",
     )
     if syn_failed:
         _emit_role_event(
@@ -338,7 +445,9 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
             ProgressPhase.STEP_FAILED,
             "synthesizer_failed",
         )
-        session.error = session.error or "Synthesizer failed to produce a report."
+        session.error = (
+            session.error or "Synthesizer failed to produce a report."
+        )
     else:
         _emit_role_event(
             session.id,
@@ -351,7 +460,7 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
 def _task_failed(task: Any) -> bool:
     status = getattr(task, "status", None)
     state = getattr(status, "state", None)
-    return state == TaskState.failed
+    return state == TaskState.TASK_STATE_FAILED
 
 
 def _planner_failed_report(query: str) -> str:
@@ -393,7 +502,9 @@ def _error_report(query: str, reason: str, errors: list[str]) -> str:
         "- Wait and retry if DuckDuckGo rate-limited the request, or run "
         "behind a different egress."
     )
-    lines.append("- Re-run after verifying network connectivity to the search endpoints.")
+    lines.append(
+        "- Re-run after verifying network connectivity to the search endpoints."
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -404,13 +515,22 @@ def _payload(task: Any) -> dict[str, Any]:
 
 
 def _set_status(
-    session: ResearchSession, role: AgentRole, status: AgentStatus, message: str
+    session: ResearchSession,
+    role: AgentRole,
+    status: AgentStatus,
+    message: str,
 ) -> None:
-    session.agent_results[role] = AgentResult(role=role, status=status, message=message)
+    session.agent_results[role] = AgentResult(
+        role=role, status=status, message=message
+    )
 
 
 def _emit_role_event(
-    session_id: str, role: AgentRole, phase: ProgressPhase, label: str, detail: str = ""
+    session_id: str,
+    role: AgentRole,
+    phase: ProgressPhase,
+    label: str,
+    detail: str = "",
 ) -> None:
     emit(
         session_id,
@@ -474,6 +594,8 @@ def _coerce_page_content(raw: Any) -> PageContent | None:
         try:
             return PageContent.model_validate(raw)
         except ValidationError as exc:
-            logger.warning("Failed to coerce PageContent from payload: %s", exc)
+            logger.warning(
+                "Failed to coerce PageContent from payload: %s", exc
+            )
             return None
     return None

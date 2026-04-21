@@ -12,7 +12,10 @@ from a2a_research.workflow import run_research_sync
 
 def main() -> None:
     if len(sys.argv) < 2:
-        print('Usage: python -m a2a_research.workflow "your research query"', file=sys.stderr)
+        print(
+            'Usage: python -m a2a_research.workflow "your research query"',
+            file=sys.stderr,
+        )
         sys.exit(2)
     query = " ".join(sys.argv[1:]).strip()
     if not query:
