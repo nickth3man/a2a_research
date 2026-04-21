@@ -1,8 +1,7 @@
-"""End-to-end workflow test over in-memory HTTP A2A services."""
+"""Shared helpers for workflow integration tests."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from types import SimpleNamespace
 from typing import Any
@@ -23,11 +22,7 @@ from a2a_research.agents.smolagents.reader import (
     core as reader_core, main as reader_main)
 from a2a_research.agents.smolagents.searcher import (
     core as searcher_core, main as searcher_main)
-from a2a_research.models import AgentRole, AgentStatus, ReportOutput
-from a2a_research.progress import (
-    ProgressEvent, ProgressPhase, drain_progress_while_running
-)
-from a2a_research.workflow import run_research_async
+from a2a_research.models import ReportOutput
 from tests.http_harness import make_multi_app_client
 
 
@@ -170,61 +165,3 @@ def _install_http_services(monkeypatch: pytest.MonkeyPatch) -> Any:
 
     monkeypatch.setattr(a2a_module, "get_registry", lambda: registry)
     return shared_client
-
-
-@pytest.mark.asyncio
-async def test_full_pipeline(monkeypatch: pytest.MonkeyPatch) -> None:
-    _configure_success_path(monkeypatch)
-    shared_client = _install_http_services(monkeypatch)
-
-    session = await run_research_async("When did JWST launch?")
-
-    assert session.error is None
-    assert session.report is not None
-    assert session.report.title == "JWST Launch"
-    assert "JWST" in session.final_report
-    assert len(session.sources) == 1
-    assert session.sources[0].url == "https://nasa.example/jwst"
-    statuses = {
-        role: result.status for role, result in session.agent_results.items()
-    }
-    assert all(status == AgentStatus.COMPLETED for status in statuses.values())
-    await shared_client.aclose()
-
-
-@pytest.mark.asyncio
-async def test_progress_events_emitted(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _configure_success_path(monkeypatch)
-    shared_client = _install_http_services(monkeypatch)
-
-    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
-    workflow_task = asyncio.create_task(
-        run_research_async("When did JWST launch?", progress_queue=queue)
-    )
-    events = [
-        event
-        async for event in drain_progress_while_running(queue, workflow_task)
-    ]
-    session = await workflow_task
-
-    assert session.error is None
-    started_roles = {
-        event.role
-        for event in events
-        if event.phase == ProgressPhase.STEP_STARTED
-    }
-    assert started_roles == {
-        AgentRole.PLANNER,
-        AgentRole.SEARCHER,
-        AgentRole.READER,
-        AgentRole.FACT_CHECKER,
-        AgentRole.SYNTHESIZER,
-    }
-    assert any(
-        event.substep_label == "verify"
-        and event.phase == ProgressPhase.STEP_SUBSTEP
-        for event in events
-    )
-    await shared_client.aclose()

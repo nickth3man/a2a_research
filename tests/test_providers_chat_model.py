@@ -1,11 +1,10 @@
-"""Tests for src/a2a_research/providers.py — OpenRouter-only async behavior."""
+"""Tests for OpenRouterChatModel."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pydantic import BaseModel
 
 import a2a_research.providers as providers_module
 from a2a_research.providers import (
@@ -13,59 +12,13 @@ from a2a_research.providers import (
     OpenRouterChatModel,
     ProviderRateLimitError,
     ProviderRequestError,
-    get_llm,
-    parse_structured_response,
-    reset_provider_singletons,
 )
-
-
-class _FakeSchema(BaseModel):
-    value: str
 
 
 def _response_with(content: str | None) -> MagicMock:
     response = MagicMock()
     response.choices = [MagicMock(message=MagicMock(content=content))]
     return response
-
-
-class TestSingletonBehavior:
-    def test_get_llm_returns_cached_model(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        reset_provider_singletons()
-        created: list[object] = []
-
-        class FakeModel:
-            def __init__(self) -> None:
-                created.append(self)
-
-        monkeypatch.setattr(providers_module, "OpenRouterChatModel", FakeModel)
-
-        first = get_llm()
-        second = get_llm()
-
-        assert first is second
-        assert len(created) == 1
-
-    def test_reset_provider_singletons_clears_cached_model(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        reset_provider_singletons()
-        created: list[object] = []
-
-        class FakeModel:
-            def __init__(self) -> None:
-                created.append(self)
-
-        monkeypatch.setattr(providers_module, "OpenRouterChatModel", FakeModel)
-
-        first = get_llm()
-        reset_provider_singletons()
-        second = get_llm()
-
-        assert first is not second
-        assert len(created) == 2
 
 
 class TestOpenRouterChatModel:
@@ -189,34 +142,3 @@ class TestOpenRouterChatModel:
         model = OpenRouterChatModel(model="gpt-4o", api_key="test-key")
         with pytest.raises(ProviderRateLimitError):
             await model.ainvoke([{"role": "user", "content": "hello"}])
-
-
-class TestParseStructuredResponse:
-    def test_parse_structured_response_returns_none_for_invalid_json(
-        self,
-    ) -> None:
-        assert parse_structured_response("not json", _FakeSchema) is None
-
-    def test_parse_structured_response_returns_none_for_empty_string(
-        self,
-    ) -> None:
-        assert parse_structured_response("", _FakeSchema) is None
-
-    def test_parse_structured_response_returns_none_for_json_that_fails_schema(
-        self,
-    ) -> None:
-        class StrictSchema(BaseModel):
-            value: int
-
-        assert (
-            parse_structured_response('{"value": "not-an-int"}', StrictSchema)
-            is None
-        )
-
-    def test_parse_structured_response_uses_model_validate(self) -> None:
-        class SimpleSchema(BaseModel):
-            value: int
-
-        result = parse_structured_response('{"value": 42}', SimpleSchema)
-        assert result is not None
-        assert result.value == 42
