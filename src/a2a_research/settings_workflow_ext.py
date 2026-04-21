@@ -5,6 +5,14 @@ from __future__ import annotations
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from a2a_research.settings_workflow_ext_defaults import (
+    DEFAULT_AB_TESTING_WEIGHTS,
+    DEFAULT_CHECKPOINT_STAGES,
+    DEFAULT_COST_ATTRIBUTION_TAGS,
+    DEFAULT_OUTPUT_FORMATS,
+    DEFAULT_TELEMETRY_TRACE_IDS,
+)
+
 __all__ = ["WorkflowConfigExt"]
 
 
@@ -17,7 +25,6 @@ class WorkflowConfigExt(BaseSettings):
         extra="ignore",
     )
 
-    # ── Adversary ─────────────────────────────────────────────────────────
     adversary_enabled: bool = Field(
         default=True,
         description="Enable adversary (env: WF_ADVERSARY__ENABLED).",
@@ -39,7 +46,6 @@ class WorkflowConfigExt(BaseSettings):
         "(env: WF_ADVERSARY__COUNTER_EXPERT_LOOKUP).",
     )
 
-    # ── Verification ──────────────────────────────────────────────────────
     verification_cache_results: bool = Field(
         default=True,
         description="Cache results (env: WF_VERIFICATION__CACHE_RESULTS).",
@@ -59,7 +65,6 @@ class WorkflowConfigExt(BaseSettings):
         "SHORT_CIRCUIT_WHEN_ADVERSARY_HOLDS).",
     )
 
-    # ── Synthesis ─────────────────────────────────────────────────────────
     synthesis_streaming: str = Field(
         default="sse_via_coordinator",
         description="Streaming mode (env: WF_SYNTHESIS__STREAMING).",
@@ -71,9 +76,8 @@ class WorkflowConfigExt(BaseSettings):
         "TENTATIVE_SNAPSHOT_STRATEGY).",
     )
 
-    # ── Output ────────────────────────────────────────────────────────────
     output_formats: list[str] = Field(
-        default=["markdown", "json"],
+        default=DEFAULT_OUTPUT_FORMATS,
         description="Allowed output formats (env: WF_OUTPUT__FORMATS).",
     )
     output_citation_style: str = Field(
@@ -81,17 +85,15 @@ class WorkflowConfigExt(BaseSettings):
         description="Citation style (env: WF_OUTPUT__CITATION_STYLE).",
     )
 
-    # ── Checkpointing ─────────────────────────────────────────────────────
     checkpointing_enabled: bool = Field(
         default=True,
         description="Enable checkpointing (env: WF_CHECKPOINTING__ENABLED).",
     )
     checkpointing_stages: list[str] = Field(
-        default=["plan", "verify", "adversary_gate", "synthesize"],
+        default=DEFAULT_CHECKPOINT_STAGES,
         description="Checkpoint stages (env: WF_CHECKPOINTING__STAGES).",
     )
 
-    # ── PII ───────────────────────────────────────────────────────────────
     pii_query_egress: str = Field(
         default="hash_with_session_key",
         description="PII on query egress (env: WF_PII__QUERY_EGRESS).",
@@ -109,7 +111,6 @@ class WorkflowConfigExt(BaseSettings):
         description="PII before synthesis (env: WF_PII__PRE_SYNTHESIS).",
     )
 
-    # ── Telemetry ─────────────────────────────────────────────────────────
     telemetry_opentelemetry: bool = Field(
         default=True,
         description="OpenTelemetry traces (env: WF_TELEMETRY__OPENTELEMETRY).",
@@ -123,21 +124,19 @@ class WorkflowConfigExt(BaseSettings):
         description="Structured trace log (env: WF_TELEMETRY__TRACE_LOG).",
     )
     telemetry_trace_ids: list[str] = Field(
-        default=["session_id", "trace_id", "span_id"],
+        default=DEFAULT_TELEMETRY_TRACE_IDS,
         description="IDs per span (env: WF_TELEMETRY__TRACE_IDS).",
     )
 
-    # ── Cost Attribution ──────────────────────────────────────────────────
     cost_attribution_enabled: bool = Field(
         default=True,
         description="Cost attribution (env: WF_COST_ATTRIBUTION__ENABLED).",
     )
     cost_attribution_tags: list[str] = Field(
-        default=["session_id", "claim_id", "user_id"],
+        default=DEFAULT_COST_ATTRIBUTION_TAGS,
         description="Cost tags (env: WF_COST_ATTRIBUTION__TAGS).",
     )
 
-    # ── A/B Testing ───────────────────────────────────────────────────────
     ab_testing_enabled: bool = Field(
         default=True,
         description="Enable A/B testing (env: WF_AB_TESTING__ENABLED).",
@@ -151,12 +150,7 @@ class WorkflowConfigExt(BaseSettings):
         description="Winner metric (env: WF_AB_TESTING__WINNER_METRIC).",
     )
     ab_testing_weights: dict[str, float] = Field(
-        default={
-            "claim_recall": 0.35,
-            "citation_accuracy": 0.35,
-            "latency": 0.15,
-            "cost": 0.15,
-        },
+        default=DEFAULT_AB_TESTING_WEIGHTS,
         description="Composite weights (env: WF_AB_TESTING__WEIGHTS).",
     )
 

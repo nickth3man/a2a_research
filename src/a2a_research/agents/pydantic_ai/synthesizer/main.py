@@ -8,21 +8,13 @@ from typing import TYPE_CHECKING, Any
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    Artifact,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import TaskState
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import (
-    make_data_part,
-    make_text_part,
-    new_agent_text_message,
-)
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.pydantic_ai.synthesizer.artifacts import (
+    enqueue_report_artifacts,
+)
 from a2a_research.agents.pydantic_ai.synthesizer.card import SYNTHESIZER_CARD
 from a2a_research.agents.pydantic_ai.synthesizer.core import synthesize
 from a2a_research.agents.pydantic_ai.synthesizer.payload import (
@@ -105,57 +97,8 @@ class SynthesizerExecutor(AgentExecutor):
             5,
             "rendering_markdown",
         )
-        markdown = report.to_markdown()
-        data_artifact = Artifact(
-            artifact_id="report",
-            name="report",
-            parts=[make_data_part({"report": report.model_dump(mode="json")})],
-        )
-        text_artifact = Artifact(
-            artifact_id="report-markdown",
-            name="report-markdown",
-            parts=[make_text_part(markdown)],
-        )
-        for artifact in (data_artifact, text_artifact):
-            await event_queue.enqueue_event(
-                TaskArtifactUpdateEvent(
-                    task_id=task.id,
-                    context_id=task.context_id,
-                    artifact=artifact,
-                    append=False,
-                    last_chunk=True,
-                )
-            )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(
-                    state=status,
-                    message=(
-                        new_agent_text_message(error_text)
-                        if error_text
-                        else None
-                    ),
-                ),
-            )
-        )
-        emit(
-            session_id,
-            (
-                ProgressPhase.STEP_COMPLETED
-                if status == TaskState.TASK_STATE_COMPLETED
-                else ProgressPhase.STEP_FAILED
-            ),
-            AgentRole.SYNTHESIZER,
-            4,
-            5,
-            (
-                "synthesizer_completed"
-                if status == TaskState.TASK_STATE_COMPLETED
-                else "synthesizer_failed"
-            ),
-            detail=f"report_title={report.title}",
+        await enqueue_report_artifacts(
+            task, event_queue, report, status, error_text, session_id
         )
 
     async def cancel(

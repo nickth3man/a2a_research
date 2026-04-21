@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-from typing import Any
-from urllib.parse import urlparse
-
-from a2a.server.agent_execution import AgentExecutor, RequestContext
+from a2a.server.agent_execution import AgentExecutor
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import (
@@ -19,10 +14,16 @@ from a2a.types import (
 )
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import get_data_part, get_text_part, make_data_part
+from a2a_research.a2a.proto import make_data_part
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.stubs.evidence_deduplicator.card import (
     EVIDENCE_DEDUPLICATOR_CARD,
+)
+from a2a_research.agents.stubs.evidence_deduplicator.normalize import (
+    normalize_pages_to_evidence,
+)
+from a2a_research.agents.stubs.evidence_deduplicator.payload import (
+    _extract_payload,
 )
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
@@ -53,49 +54,7 @@ class EvidenceDeduplicatorExecutor(AgentExecutor):
         )
 
         existing_ids = {e.get("id") for e in existing if isinstance(e, dict)}
-        new_evidence = []
-        for p in pages:
-            if not isinstance(p, dict):
-                continue
-            url = p.get("url", "")
-            content = p.get("markdown", "")
-            ev_id = hashlib.sha256(
-                f"{url}:{content[:200]}".encode()
-            ).hexdigest()[:16]
-            if ev_id not in existing_ids:
-                hostname = urlparse(url).hostname or ""
-                publisher_id = hostname.removeprefix("www.")
-                new_evidence.append(
-                    {
-                        "id": ev_id,
-                        "url": url,
-                        "canonical_url": url,
-                        "title": p.get("title", ""),
-                        "source_type": "other",
-                        "domain_authority": 0.5,
-                        "publisher_id": publisher_id,
-                        "syndication_cluster_id": None,
-                        "published_at": None,
-                        "fetched_at": "",
-                        "content_hash": ev_id,
-                        "main_text": content,
-                        "quoted_passages": [
-                            {
-                                "id": f"psg_{ev_id[:8]}",
-                                "evidence_id": ev_id,
-                                "text": content[:500],
-                                "claim_relevance_scores": {},
-                                "is_quotation": False,
-                            }
-                        ],
-                        "credibility_signals": {
-                            "domain_reputation": 0.5,
-                            "author_verified": False,
-                            "has_citations": False,
-                            "content_freshness_days": None,
-                        },
-                    }
-                )
+        new_evidence = normalize_pages_to_evidence(pages, existing_ids)
 
         result = {
             "new_evidence": new_evidence,
@@ -142,24 +101,6 @@ class EvidenceDeduplicatorExecutor(AgentExecutor):
 
     async def cancel(self, context, event_queue):
         pass
-
-
-def _extract_payload(context: RequestContext) -> dict[str, Any]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        data_part = get_data_part(part)
-        if isinstance(data_part, dict):
-            return data_part
-        text_part = get_text_part(part)
-        if text_part:
-            try:
-                data = json.loads(text_part)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict):
-                return data
-    return {}
 
 
 def build_http_app():

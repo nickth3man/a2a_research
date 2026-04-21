@@ -13,18 +13,12 @@ from typing import TYPE_CHECKING, Any
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    Artifact,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import TaskState
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
+from a2a_research.agents.pocketflow.planner.events import enqueue_plan_result
 from a2a_research.agents.pocketflow.planner.extract import (
     extract_payload,
     extract_query,
@@ -108,63 +102,18 @@ class PlannerExecutor(AgentExecutor):
             status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
-        artifact = Artifact(
-            artifact_id="plan",
-            name="plan",
-            parts=[
-                make_data_part(
-                    {
-                        "query": query,
-                        "claims": [c.model_dump(mode="json") for c in claims],
-                        "claim_dag": (
-                            claim_dag.model_dump(mode="json")
-                            if claim_dag
-                            else {}
-                        ),
-                        "seed_queries": seed_queries,
-                    }
-                )
-            ],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
-            )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(
-                    state=status,
-                    message=(
-                        new_agent_text_message(error_text)
-                        if error_text
-                        else None
-                    ),
-                ),
-            )
-        )
-        emit(
+        await enqueue_plan_result(
+            task,
+            event_queue,
+            query,
+            claims,
+            claim_dag,
+            seed_queries,
+            status,
+            error_text,
             session_id,
-            (
-                ProgressPhase.STEP_COMPLETED
-                if status == TaskState.TASK_STATE_COMPLETED
-                else ProgressPhase.STEP_FAILED
-            ),
-            AgentRole.PLANNER,
             planner_step,
             TS,
-            (
-                "planner_completed"
-                if status == TaskState.TASK_STATE_COMPLETED
-                else "planner_failed"
-            ),
-            detail=f"claims={len(claims)} seeds={len(seed_queries)}",
         )
         logger.info(
             "Planner task_id=%s claims=%s seeds=%s",

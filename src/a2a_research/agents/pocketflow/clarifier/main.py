@@ -12,23 +12,18 @@ from typing import TYPE_CHECKING, Any
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    Artifact,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import TaskState
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import (
-    get_data_part,
-    get_text_part,
-    make_data_part,
-    new_agent_text_message,
-)
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.pocketflow.clarifier.card import CLARIFIER_CARD
+from a2a_research.agents.pocketflow.clarifier.events import (
+    enqueue_clarifier_result,
+)
+from a2a_research.agents.pocketflow.clarifier.extract import (
+    _extract_payload,
+    _extract_query,
+)
 from a2a_research.agents.pocketflow.clarifier.flow import clarify
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
@@ -108,53 +103,8 @@ class ClarifierExecutor(AgentExecutor):
             status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
-        artifact = Artifact(
-            artifact_id="clarify",
-            name="clarify",
-            parts=[make_data_part(result)],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
-            )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(
-                    state=status,
-                    message=(
-                        new_agent_text_message(error_text)
-                        if error_text
-                        else None
-                    ),
-                ),
-            )
-        )
-        emit(
-            session_id,
-            (
-                ProgressPhase.STEP_COMPLETED
-                if status == TaskState.TASK_STATE_COMPLETED
-                else ProgressPhase.STEP_FAILED
-            ),
-            AgentRole.CLARIFIER,
-            1,
-            12,
-            (
-                "clarifier_completed"
-                if status == TaskState.TASK_STATE_COMPLETED
-                else "clarifier_failed"
-            ),
-            detail=(
-                f"disambiguations={len(result['disambiguations'])}"
-                f" committed={result['committed_interpretation'][:60]}"
-            ),
+        await enqueue_clarifier_result(
+            task, event_queue, result, status, error_text, session_id
         )
         logger.info(
             "Clarifier task_id=%s disambiguations=%s committed=%r",
@@ -167,42 +117,6 @@ class ClarifierExecutor(AgentExecutor):
         self, context: RequestContext, event_queue: EventQueue
     ) -> None:
         pass
-
-
-def _extract_query(context: RequestContext, payload: dict[str, Any]) -> str:
-    query = payload.get("query")
-    if isinstance(query, str) and query.strip():
-        return query.strip()
-    if context.message is None:
-        return ""
-    text_parts: list[str] = []
-    for part in context.message.parts:
-        data_part = get_data_part(part)
-        if isinstance(data_part, dict):
-            query = data_part.get("query")
-            if isinstance(query, str) and query.strip():
-                return query.strip()
-        text_part = get_text_part(part)
-        if text_part and text_part.strip():
-            text_parts.append(text_part.strip())
-    joined = "\n".join(text_parts).strip()
-    try:
-        data = json.loads(joined) if joined else None
-    except (ValueError, TypeError):
-        data = None
-    if isinstance(data, dict) and isinstance(data.get("query"), str):
-        return str(data["query"]).strip()
-    return joined
-
-
-def _extract_payload(context: RequestContext) -> dict[str, object]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        data_part = get_data_part(part)
-        if isinstance(data_part, dict):
-            return data_part
-    return {}
 
 
 def build_http_app() -> Any:

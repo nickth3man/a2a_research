@@ -8,16 +8,9 @@ from typing import TYPE_CHECKING, Any
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    Artifact,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import TaskState
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.card import FACT_CHECKER_CARD
 from a2a_research.agents.langgraph.fact_checker.core import run_fact_check
@@ -26,6 +19,9 @@ from a2a_research.agents.langgraph.fact_checker.payload import (
     _coerce_pages,
     _coerce_sources,
     _extract_payload,
+)
+from a2a_research.agents.langgraph.fact_checker.result import (
+    enqueue_verified_result,
 )
 from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
@@ -103,66 +99,8 @@ class FactCheckerExecutor(AgentExecutor):
             status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
-        artifact = Artifact(
-            artifact_id="verified",
-            name="verified",
-            parts=[
-                make_data_part(
-                    {
-                        "verified_claims": [
-                            c.model_dump(mode="json")
-                            for c in result["verified_claims"]
-                        ],
-                        "sources": [
-                            s.model_dump(mode="json")
-                            for s in result["sources"]
-                        ],
-                        "errors": list(result["errors"]),
-                        "search_exhausted": bool(result["search_exhausted"]),
-                        "rounds": result["rounds"],
-                    }
-                )
-            ],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
-            )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(
-                    state=status,
-                    message=(
-                        new_agent_text_message(error_text)
-                        if error_text
-                        else None
-                    ),
-                ),
-            )
-        )
-        emit(
-            session_id,
-            (
-                ProgressPhase.STEP_COMPLETED
-                if status == TaskState.TASK_STATE_COMPLETED
-                else ProgressPhase.STEP_FAILED
-            ),
-            AgentRole.FACT_CHECKER,
-            3,
-            5,
-            (
-                "fact_checker_completed"
-                if status == TaskState.TASK_STATE_COMPLETED
-                else "fact_checker_failed"
-            ),
-            detail=f"rounds={result['rounds']} errors={len(result['errors'])}",
+        await enqueue_verified_result(
+            task, event_queue, result, status, error_text, session_id
         )
 
     async def cancel(

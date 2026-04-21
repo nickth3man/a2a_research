@@ -3,30 +3,27 @@
 from __future__ import annotations
 
 import json
-import logging
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
-from a2a.types import (
-    Artifact,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-)
+from a2a.types import TaskState
 
 from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
-from a2a_research.a2a.proto import make_data_part, new_agent_text_message
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.smolagents.reader.card import READER_CARD
 from a2a_research.agents.smolagents.reader.core import read_urls
+from a2a_research.agents.smolagents.reader.events import (
+    emit_page_progress,
+    enqueue_reader_result,
+    log_reader_completion,
+)
 from a2a_research.agents.smolagents.reader.payload import (
     _coerce_str_list,
     _extract_payload,
 )
-from a2a_research.app_logging import get_logger, log_event
+from a2a_research.app_logging import get_logger
 from a2a_research.models import AgentRole
 from a2a_research.progress import ProgressPhase, emit
 
@@ -92,67 +89,9 @@ class ReaderExecutor(AgentExecutor):
             status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
-        for index, page in enumerate(pages, start=1):
-            emit(
-                session_id,
-                ProgressPhase.STEP_SUBSTEP,
-                AgentRole.READER,
-                2,
-                5,
-                f"fetch_url_{index}",
-                substep_index=index,
-                substep_total=max(len(urls), 1),
-                detail=page.error or page.title or page.url,
-            )
-
-        artifact = Artifact(
-            artifact_id="extracted-pages",
-            name="extracted-pages",
-            parts=[
-                make_data_part(
-                    {"pages": [p.model_dump(mode="json") for p in pages]}
-                )
-            ],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
-            )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(
-                    state=status,
-                    message=(
-                        new_agent_text_message(error_text)
-                        if error_text
-                        else None
-                    ),
-                ),
-            )
-        )
-        emit(
-            session_id,
-            (
-                ProgressPhase.STEP_COMPLETED
-                if status == TaskState.TASK_STATE_COMPLETED
-                else ProgressPhase.STEP_FAILED
-            ),
-            AgentRole.READER,
-            2,
-            5,
-            (
-                "reader_completed"
-                if status == TaskState.TASK_STATE_COMPLETED
-                else "reader_failed"
-            ),
-            detail=f"urls={len(urls)} pages={len(pages)}",
+        emit_page_progress(session_id, pages, urls)
+        await enqueue_reader_result(
+            task, event_queue, pages, urls, status, error_text, session_id
         )
         logger.info(
             "Reader task_id=%s urls=%s pages=%s",
@@ -160,23 +99,7 @@ class ReaderExecutor(AgentExecutor):
             len(urls),
             len(pages),
         )
-        log_event(
-            logger,
-            logging.INFO,
-            "reader.task_completed",
-            task_id=str(task.id),
-            urls=urls,
-            page_count=len(pages),
-            pages_summary=[
-                {
-                    "url": p.url,
-                    "ok": not bool(p.error),
-                    "error": p.error,
-                    "words": p.word_count,
-                }
-                for p in pages
-            ],
-        )
+        log_reader_completion(logger, task, urls, pages)
 
     async def cancel(
         self, context: RequestContext, event_queue: EventQueue
