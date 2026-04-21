@@ -11,28 +11,31 @@ Files under ``logs/``:
 - ``a2a_sdk.log`` — third-party ``a2a`` SDK (``a2a.*``, not ``a2a_research``).
 - ``http_clients.log`` — ``httpx`` / ``httpcore``.
 - ``mesop_server.log`` — Mesop, Flask, Werkzeug, Uvicorn.
-- ``stdio.log`` — captured ``stdout`` / ``stderr`` when using  :func:`redirect_stdio_to_logging`.
+- ``stdio.log`` — captured ``stdout`` / ``stderr`` when using
+  :func:`redirect_stdio_to_logging`.
 - ``warnings.log`` — Python :mod:`warnings` (``py.warnings``).
 """
 
 from __future__ import annotations
 
 import asyncio
-import itertools
-import json
 import logging
-import os
 import sys
 import threading
-from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO, cast
+from typing import Any
 
+from a2a_research.logging_formatters import (
+    A2aSdkFilter,
+    HttpClientsFilter,
+    MesopServerFilter,
+    PrefixFilter,
+    WarningsFilter,
+    build_formatter,
+    log_event,
+)
+from a2a_research.logging_streams import StreamToLogger
 from a2a_research.settings import settings
-
-if TYPE_CHECKING:
-    from types import TracebackType
 
 _CONFIGURED = False
 _LOG_DIR = Path.cwd() / "logs"
@@ -45,123 +48,6 @@ _LOG_STDIO = _LOG_DIR / "stdio.log"
 _LOG_WARNINGS = _LOG_DIR / "warnings.log"
 _ORIGINAL_STDOUT = sys.stdout
 _ORIGINAL_STDERR = sys.stderr
-_EVENT_COUNTER = itertools.count(1)
-
-
-@dataclass(frozen=True)
-class _PrefixFilter:
-    """Pass records whose logger name starts with any of the given prefixes."""
-
-    prefixes: tuple[str, ...]
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return any(record.name.startswith(p) for p in self.prefixes)
-
-
-@dataclass(frozen=True)
-class _A2aSdkFilter:
-    """Third-party A2A SDK loggers (exclude our ``a2a_research`` package)."""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        name = record.name
-        if name.startswith("a2a_research"):
-            return False
-        return name == "a2a" or name.startswith("a2a.")
-
-
-@dataclass(frozen=True)
-class _HttpClientsFilter:
-    def filter(self, record: logging.LogRecord) -> bool:
-        name = record.name
-        if name == "httpcore" or name.startswith("httpcore."):
-            return True
-        return name == "httpx" or name.startswith("httpx.")
-
-
-@dataclass(frozen=True)
-class _MesopServerFilter:
-    _roots: frozenset[str] = frozenset(
-        {"mesop", "flask", "werkzeug", "uvicorn"}
-    )
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        base = record.name.split(".", 1)[0]
-        return base in self._roots
-
-
-@dataclass(frozen=True)
-class _WarningsFilter:
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.name == "py.warnings"
-
-
-class _StreamToLogger:
-    """Mirror writes into the logging system while preserving terminal output."""
-
-    def __init__(
-        self, logger: logging.Logger, level: int, original_stream: TextIO
-    ) -> None:
-        self._logger = logger
-        self._level = level
-        self._original_stream = original_stream
-
-    def write(self, message: str) -> None:
-        self._original_stream.write(message)
-        text = message.strip()
-        if text:
-            self._logger.log(self._level, text)
-
-    def flush(self) -> None:
-        self._original_stream.flush()
-
-    def isatty(self) -> bool:
-        return bool(getattr(self._original_stream, "isatty", lambda: False)())
-
-
-def _build_formatter() -> logging.Formatter:
-    return logging.Formatter(
-        "%(asctime)s %(levelname)s [%(name)s] pid=%(process)d tid=%(thread)d %(message)s"
-    )
-
-
-def _normalize_log_value(value: Any) -> Any:
-    if isinstance(value, (str, int, float, bool)) or value is None:
-        return value
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, dict):
-        return {
-            str(key): _normalize_log_value(val) for key, val in value.items()
-        }
-    if isinstance(value, (list, tuple, set)):
-        return [_normalize_log_value(item) for item in value]
-    if hasattr(value, "value"):
-        return _normalize_log_value(value.value)
-    if hasattr(value, "model_dump"):
-        return _normalize_log_value(value.model_dump())
-    if hasattr(value, "__dict__"):
-        return _normalize_log_value(vars(value))
-    return repr(value)
-
-
-def log_event(
-    logger: logging.Logger, level: int, event: str, **fields: Any
-) -> None:
-    """Write a granular structured log line (``event=`` + JSON payload)."""
-    payload = {
-        "seq": next(_EVENT_COUNTER),
-        "ts": datetime.now(UTC).isoformat(),
-        "event": event,
-        "pid": os.getpid(),
-        "thread": threading.current_thread().name,
-        **{key: _normalize_log_value(value) for key, value in fields.items()},
-    }
-    logger.log(
-        level,
-        "event=%s payload=%s",
-        event,
-        json.dumps(payload, sort_keys=True),
-    )
 
 
 def _configure_named_logger(
@@ -181,22 +67,15 @@ def _install_exception_hooks() -> None:
     def _log_unhandled_exception(
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        exc_traceback: TracebackType | None,
+        exc_traceback: Any,
     ) -> None:
-        if (
-            exc_type is not None
-            and exc_value is not None
-            and not issubclass(exc_type, KeyboardInterrupt)
-        ):
-            logging.getLogger("a2a_research.unhandled").error(
-                "Unhandled exception",
-                exc_info=(exc_type, exc_value, exc_traceback),
-            )
-        original_excepthook(
-            cast("type[BaseException]", exc_type),
-            cast("BaseException", exc_value),
-            exc_traceback,
-        )
+        if exc_type is not None and exc_value is not None:
+            if not issubclass(exc_type, KeyboardInterrupt):
+                logging.getLogger("a2a_research.unhandled").error(
+                    "Unhandled exception",
+                    exc_info=(exc_type, exc_value, exc_traceback),
+                )
+        original_excepthook(exc_type, exc_value, exc_traceback)
 
     def _log_thread_exception(args: threading.ExceptHookArgs) -> None:
         if args.exc_type is not None and args.exc_value is not None:
@@ -264,7 +143,7 @@ def setup_logging() -> None:
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
     level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.DEBUG)
-    formatter = _build_formatter()
+    formatter = build_formatter()
 
     root = logging.getLogger()
     root.setLevel(level)
@@ -277,19 +156,19 @@ def setup_logging() -> None:
     everything_handler = _file_handler(_LOG_EVERYTHING, level, formatter)
 
     app_handler = _file_handler(_APP_LOG, level, formatter)
-    app_handler.addFilter(_PrefixFilter(("a2a_research",)))
+    app_handler.addFilter(PrefixFilter(("a2a_research",)))
 
     a2a_sdk_handler = _file_handler(_LOG_A2A_SDK, level, formatter)
-    a2a_sdk_handler.addFilter(_A2aSdkFilter())
+    a2a_sdk_handler.addFilter(A2aSdkFilter())
 
     http_handler = _file_handler(_LOG_HTTP_CLIENTS, level, formatter)
-    http_handler.addFilter(_HttpClientsFilter())
+    http_handler.addFilter(HttpClientsFilter())
 
     mesop_handler = _file_handler(_LOG_MESOP_SERVER, level, formatter)
-    mesop_handler.addFilter(_MesopServerFilter())
+    mesop_handler.addFilter(MesopServerFilter())
 
     warnings_handler = _file_handler(_LOG_WARNINGS, level, formatter)
-    warnings_handler.addFilter(_WarningsFilter())
+    warnings_handler.addFilter(WarningsFilter())
 
     root.addHandler(console_handler)
     root.addHandler(everything_handler)
@@ -304,12 +183,8 @@ def setup_logging() -> None:
     _configure_named_logger("mesop", level)
     _configure_named_logger("werkzeug", level)
     _configure_named_logger("flask", level)
-    # Trafilatura logs ERROR for non-200 HTTP (e.g. 403) and WARNING for empty extraction;
-    # outcomes are summarized in ``a2a_research.tools.fetch`` batch events.
     logging.getLogger("trafilatura.downloads").setLevel(logging.CRITICAL)
     logging.getLogger("trafilatura.core").setLevel(logging.ERROR)
-    # stdout/stderr loggers: disable propagation to avoid duplicate console output
-    # (they write directly to terminal via _StreamToLogger._original_stream)
     stderr_logger = _configure_named_logger("stderr", level, propagate=False)
     stdout_logger = _configure_named_logger("stdout", level, propagate=False)
     stderr_logger.handlers.clear()
@@ -343,10 +218,10 @@ def redirect_stdio_to_logging() -> None:
     setup_logging()
     level_name = settings.log_level.upper()
     level = getattr(logging, level_name, logging.DEBUG)
-    sys.stdout = _StreamToLogger(
+    sys.stdout = StreamToLogger(
         logging.getLogger("stdout"), level, _ORIGINAL_STDOUT
     )
-    sys.stderr = _StreamToLogger(
+    sys.stderr = StreamToLogger(
         logging.getLogger("stderr"), level, _ORIGINAL_STDERR
     )
 
