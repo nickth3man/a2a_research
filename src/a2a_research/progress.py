@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 from collections.abc import AsyncGenerator, Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from time import perf_counter
@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 __all__ = [
-    "Bus",
     "PROMPT_DETAIL_MAX_CHARS",
+    "Bus",
     "ProgressEvent",
     "ProgressGranularity",
     "ProgressPhase",
@@ -62,15 +62,20 @@ def using_session(session_id: str) -> Iterator[None]:
         _session_var.reset(token)
 
 
-def truncate_text(text: str, limit: int = PROMPT_DETAIL_MAX_CHARS) -> str:
-    """Trim ``text`` to ``limit`` chars, appending a ``[truncated N chars]`` marker."""
+def truncate_text(text: str | None, limit: int = PROMPT_DETAIL_MAX_CHARS) -> str:
+    """Trim ``text`` to ``limit`` chars per line, appending truncation markers."""
     if text is None:
         return ""
     text = str(text)
-    if len(text) <= limit:
-        return text
-    dropped = len(text) - limit
-    return text[:limit] + f"\n…[truncated {dropped} chars]"
+    lines = text.splitlines() or [text]
+    clipped_lines: list[str] = []
+    for line in lines:
+        if len(line) <= limit:
+            clipped_lines.append(line)
+            continue
+        dropped = len(line) - limit
+        clipped_lines.append(line[:limit] + f" …[truncated {dropped} chars]")
+    return "\n".join(clipped_lines)
 
 
 class ProgressGranularity(IntEnum):
@@ -121,10 +126,8 @@ class Bus:
     @classmethod
     def register(cls, session_id: str, queue: ProgressQueue) -> None:
         cls._queues[session_id] = queue
-        try:
+        with suppress(RuntimeError):
             cls._loops[session_id] = asyncio.get_running_loop()
-        except RuntimeError:
-            pass
 
     @classmethod
     def get(cls, session_id: str) -> ProgressQueue | None:
@@ -170,14 +173,20 @@ def emit_prompt(
 ) -> None:
     """Emit a ``prompt_sent`` substep carrying (truncated) rendered prompt text."""
     sid = _session_or_current(session_id)
-    full = (
-        f"[SYSTEM]\n{system_text}\n\n[USER]\n{prompt_text}" if system_text else str(prompt_text)
-    )
+    full = f"[SYSTEM]\n{system_text}\n\n[USER]\n{prompt_text}" if system_text else str(prompt_text)
     summary = f"chars={len(full)}"
     if model:
         summary += f" model={model}"
     detail = f"{summary}\n{truncate_text(full)}"
-    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, f"prompt_sent:{label}", detail=detail)
+    emit(
+        sid,
+        ProgressPhase.STEP_SUBSTEP,
+        role,
+        _step_index(role),
+        5,
+        f"prompt_sent:{label}",
+        detail=detail,
+    )
 
 
 def emit_llm_response(
@@ -258,7 +267,9 @@ def emit_claim_verdict(
     if source_count is not None:
         bits.append(f"sources={source_count}")
     detail = " ".join(bits) + "\n" + truncate_text(claim_text, 400)
-    emit(sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, "claim_verdict", detail=detail)
+    emit(
+        sid, ProgressPhase.STEP_SUBSTEP, role, _step_index(role), 5, "claim_verdict", detail=detail
+    )
 
 
 def emit_tool_call(
@@ -362,10 +373,8 @@ def emit(
         running = None
     target_loop = Bus.get_loop(session_id)
     if running is None and target_loop is not None:
-        try:
+        with suppress(RuntimeError):
             target_loop.call_soon_threadsafe(queue.put_nowait, event)
-        except RuntimeError:
-            pass
         return
     queue.put_nowait(event)
 

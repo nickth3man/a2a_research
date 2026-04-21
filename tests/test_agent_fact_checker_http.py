@@ -13,55 +13,11 @@ from a2a_research.a2a.client import extract_data_payloads
 from a2a_research.a2a.registry import AgentRegistry
 from a2a_research.agents.langgraph.fact_checker import main as fact_checker_main
 from a2a_research.agents.langgraph.fact_checker import verify_route as fc_verify
-from a2a_research.agents.smolagents.reader import main as reader_main
-from a2a_research.agents.smolagents.searcher import main as searcher_main
 from tests.http_harness import build_sdk_client, make_multi_app_client, send_and_get_result
-
-
-class _FakeJSONAgent:
-    def __init__(self, payload: dict[str, object]) -> None:
-        self._payload = payload
-
-    def run(self, prompt: str) -> str:
-        return json.dumps(self._payload)
 
 
 @pytest.mark.asyncio
 async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        searcher_main,
-        "build_agent",
-        lambda: _FakeJSONAgent(
-            {
-                "queries_used": ["JWST launch"],
-                "hits": [
-                    {
-                        "url": "https://nasa.example/jwst",
-                        "title": "NASA JWST",
-                        "snippet": "launch",
-                        "source": "tavily",
-                        "score": 0.9,
-                    }
-                ],
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        reader_main,
-        "build_agent",
-        lambda: _FakeJSONAgent(
-            {
-                "pages": [
-                    {
-                        "url": "https://nasa.example/jwst",
-                        "title": "NASA JWST",
-                        "markdown": "# NASA\n\nJWST launched December 25, 2021.",
-                        "word_count": 6,
-                    }
-                ]
-            }
-        ),
-    )
     model = MagicMock()
     model.ainvoke = AsyncMock(
         return_value=MagicMock(
@@ -84,8 +40,6 @@ async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(fc_verify, "get_llm", lambda: model)
 
     apps = {
-        "http://localhost:10002": searcher_main.build_http_app(),
-        "http://localhost:10003": reader_main.build_http_app(),
         "http://localhost:10004": fact_checker_main.build_http_app(),
     }
     shared_client = make_multi_app_client(apps)
@@ -100,8 +54,6 @@ async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> No
         client_module,
         "get_registry",
         lambda: AgentRegistry(
-            searcher_url="http://localhost:10002",
-            reader_url="http://localhost:10003",
             fact_checker_url="http://localhost:10004",
         ),
     )
@@ -112,7 +64,17 @@ async def test_fact_checker_http_contract(monkeypatch: pytest.MonkeyPatch) -> No
         payload={
             "query": "When did JWST launch?",
             "claims": [{"id": "c0", "text": "JWST launched in December 2021."}],
-            "seed_queries": ["JWST launch"],
+            "evidence": [
+                {
+                    "url": "https://nasa.example/jwst",
+                    "title": "NASA JWST",
+                    "markdown": "# NASA\n\nJWST launched December 25, 2021.",
+                    "word_count": 6,
+                }
+            ],
+            "sources": [
+                {"url": "https://nasa.example/jwst", "title": "NASA JWST", "excerpt": "JWST launched"}
+            ],
         },
     )
     assert isinstance(result, Task)

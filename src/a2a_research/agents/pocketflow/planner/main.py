@@ -51,12 +51,14 @@ class PlannerExecutor(AgentExecutor):
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
+
             emit_handoff(
                 direction="received",
                 role=AgentRole.PLANNER,
-                peer_role=handoff_from,
+                peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(str(payload)),
+                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
+                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
                 session_id=session_id,
             )
         emit(session_id, ProgressPhase.STEP_STARTED, AgentRole.PLANNER, 0, 5, "planner_started")

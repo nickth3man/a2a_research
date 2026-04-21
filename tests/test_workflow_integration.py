@@ -193,7 +193,7 @@ async def test_progress_events_emitted(monkeypatch: pytest.MonkeyPatch) -> None:
         AgentRole.SYNTHESIZER,
     }
     assert any(
-        event.substep_label.startswith("round_") and event.phase == ProgressPhase.STEP_SUBSTEP
+        event.substep_label == "verify" and event.phase == ProgressPhase.STEP_SUBSTEP
         for event in events
     )
     await shared_client.aclose()

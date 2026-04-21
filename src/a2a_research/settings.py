@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from dotenv import dotenv_values
 from pydantic import Field, model_validator
@@ -34,7 +35,6 @@ class LLMSettings(BaseSettings):
     """OpenRouter configuration used by every LLM integration."""
 
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         env_prefix="LLM_",
         extra="ignore",
@@ -86,6 +86,10 @@ _EXPECTED_DOTENV_KEYS = {
 _PASSTHROUGH_PREFIXES = ("MESOP_",)
 
 
+def _build_llm_settings() -> LLMSettings:
+    return LLMSettings(_env_file=str(_ENV_FILE))  # type: ignore[call-arg]  # ty: ignore[unknown-argument]
+
+
 def _validate_dotenv_keys() -> None:
     """Warn about unknown keys in .env without failing (supports shared environments)."""
     raw_values = dotenv_values(_ENV_FILE)
@@ -119,10 +123,12 @@ class AppSettings(BaseSettings):
     """Top-level application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=str(_ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    def __init__(self, **data: Any) -> None:
+        super().__init__(_env_file=str(_ENV_FILE), **data)
 
     log_level: str = Field(
         default="DEBUG",
@@ -185,7 +191,7 @@ class AppSettings(BaseSettings):
         default="http://localhost:10005", description="Synthesizer HTTP A2A URL."
     )
 
-    llm: LLMSettings = Field(default_factory=LLMSettings)
+    llm: LLMSettings = Field(default_factory=_build_llm_settings)
 
     @model_validator(mode="after")
     def validate_dotenv_contract(self) -> AppSettings:

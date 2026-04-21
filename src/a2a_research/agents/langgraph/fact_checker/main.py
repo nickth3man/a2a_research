@@ -1,7 +1,7 @@
 """A2A AgentExecutor for the FactChecker role.
 
-Consumes ``{query, claims, seed_queries}`` and emits ``{verified_claims, sources}``.
-Runs the LangGraph loop using a module-level :class:`A2AClient` (shared registry).
+Consumes ``{query, claims, evidence, sources}`` and emits ``{verified_claims, sources}``.
+Runs a single verification pass over the provided evidence.
 """
 
 from __future__ import annotations
@@ -26,19 +26,18 @@ from a2a.types import (
 from a2a.utils import new_agent_text_message
 from pydantic import ValidationError
 
-from a2a_research.a2a import A2AClient
 from a2a_research.a2a.request_task import initial_task_or_new
 from a2a_research.agents.langgraph.fact_checker.card import FACT_CHECKER_CARD
-from a2a_research.agents.langgraph.fact_checker.graph import build_fact_check_graph
+from a2a_research.agents.langgraph.fact_checker.verify_route import verify_claims
 from a2a_research.app_logging import get_logger
-from a2a_research.models import AgentRole, Claim, WebSource
+from a2a_research.models import AgentRole, Claim, Verdict, WebSource
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.settings import settings
+from a2a_research.tools import PageContent
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
 
-    from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult, FactCheckState
+    from a2a_research.agents.langgraph.fact_checker.state import FactCheckRunResult
 
 logger = get_logger(__name__)
 __all__ = ["FactCheckerExecutor", "build_http_app", "run_fact_check"]
@@ -47,57 +46,59 @@ __all__ = ["FactCheckerExecutor", "build_http_app", "run_fact_check"]
 async def run_fact_check(
     query: str,
     claims: list[Claim],
-    seed_queries: list[str],
+    evidence: list[PageContent],
+    sources: list[WebSource],
     *,
     session_id: str = "",
-    client: A2AClient | None = None,
-    max_rounds: int | None = None,
 ) -> FactCheckRunResult:
-    """Execute the FactChecker graph end-to-end; return ``{verified_claims, sources}``."""
-    active_client = client or A2AClient()
-    graph = build_fact_check_graph(active_client)
-    initial_state: FactCheckState = {
-        "session_id": session_id,
-        "_client": active_client,
-        "query": query,
-        "claims": list(claims),
-        "evidence": [],
-        "hits": [],
-        "sources": [],
-        "errors": [],
-        "round": 0,
-        "max_rounds": int(max_rounds or settings.research_max_rounds),
-        "pending_queries": list(seed_queries) if seed_queries else [query],
-        "pending_urls": [],
-        "search_exhausted": False,
-    }
-    final_state: dict[str, Any] = await graph.ainvoke(initial_state)
-    # Deduplicate sources by URL, preserving first-seen order.
-    unique_sources: dict[str, WebSource] = {}
-    for source in final_state.get("sources") or []:
-        unique_sources.setdefault(source.url, source)
-    # Deduplicate errors while preserving order.
-    seen_errors: set[str] = set()
-    errors: list[str] = []
-    for err in final_state.get("errors") or []:
-        if err not in seen_errors:
-            seen_errors.add(err)
-            errors.append(err)
+    """Verify claims against provided evidence; return ``{verified_claims, sources}``."""
+    if not evidence:
+        reason = "No web evidence was provided for verification."
+        logger.warning("FactChecker verify short-circuit reason=%s", reason)
+        degraded = [
+            c.model_copy(
+                update={
+                    "verdict": Verdict.INSUFFICIENT_EVIDENCE,
+                    "confidence": 0.0,
+                    "sources": [],
+                    "evidence_snippets": [reason],
+                }
+            )
+            for c in claims
+        ]
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.FACT_CHECKER,
+            3,
+            5,
+            "exhausted",
+            detail=reason,
+        )
+        return {
+            "verified_claims": degraded,
+            "sources": sources,
+            "errors": [reason],
+            "search_exhausted": True,
+            "rounds": 0,
+        }
+
+    verified = await verify_claims(query, claims, evidence, session_id=session_id)
     emit(
         session_id,
         ProgressPhase.STEP_SUBSTEP,
         AgentRole.FACT_CHECKER,
         3,
         5,
-        "exhausted" if final_state.get("search_exhausted") else "converged",
-        detail=f"rounds={int(final_state.get('round') or 0)} errors={len(errors)}",
+        "completed",
+        detail=f"claims={len(verified)}",
     )
     return {
-        "verified_claims": list(final_state.get("claims") or []),
-        "sources": list(unique_sources.values()),
-        "errors": errors,
-        "search_exhausted": bool(final_state.get("search_exhausted")),
-        "rounds": int(final_state.get("round") or 0),
+        "verified_claims": verified,
+        "sources": sources,
+        "errors": [],
+        "search_exhausted": False,
+        "rounds": 1,
     }
 
 
@@ -111,17 +112,20 @@ class FactCheckerExecutor(AgentExecutor):
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
+
             emit_handoff(
                 direction="received",
                 role=AgentRole.FACT_CHECKER,
-                peer_role=handoff_from,
+                peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(str(payload)),
+                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
+                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
                 session_id=session_id,
             )
         query = str(payload.get("query") or "")
         claims = _coerce_claims(payload.get("claims") or [])
-        seed_queries = _coerce_str_list(payload.get("seed_queries") or [])
+        evidence = _coerce_pages(payload.get("evidence") or [])
+        sources = _coerce_sources(payload.get("sources") or [])
         emit(
             session_id,
             ProgressPhase.STEP_STARTED,
@@ -135,26 +139,17 @@ class FactCheckerExecutor(AgentExecutor):
             result: FactCheckRunResult = await run_fact_check(
                 query,
                 claims,
-                seed_queries,
+                evidence,
+                sources,
                 session_id=session_id,
             )
             error_text: str | None = None
-            exhausted = bool(result["search_exhausted"])
-            errors_list = list(result["errors"])
-            if exhausted and not result["sources"]:
-                status = TaskState.failed
-                error_text = "FactChecker could not gather web evidence — " + (
-                    " | ".join(errors_list)
-                    if errors_list
-                    else "no hits and no provider-level errors reported."
-                )
-            else:
-                status = TaskState.completed
+            status = TaskState.completed
         except Exception as exc:
             logger.exception("FactChecker crashed task_id=%s", task.id)
             result = {
                 "verified_claims": claims,
-                "sources": [],
+                "sources": sources,
                 "errors": [f"FactChecker crashed: {exc}"],
                 "search_exhausted": True,
                 "rounds": 0,
@@ -248,12 +243,32 @@ def _coerce_claims(raw: Any) -> list[Claim]:
     return claims
 
 
-def _coerce_str_list(raw: Any) -> list[str]:
-    if isinstance(raw, str):
-        return [raw] if raw.strip() else []
-    if isinstance(raw, list):
-        return [str(item).strip() for item in raw if str(item).strip()]
-    return []
+def _coerce_pages(raw: Any) -> list[PageContent]:
+    pages: list[PageContent] = []
+    for item in raw or []:
+        if isinstance(item, PageContent):
+            pages.append(item)
+            continue
+        if isinstance(item, dict):
+            try:
+                pages.append(PageContent.model_validate(item))
+            except ValidationError:
+                continue
+    return pages
+
+
+def _coerce_sources(raw: Any) -> list[WebSource]:
+    sources: list[WebSource] = []
+    for item in raw or []:
+        if isinstance(item, WebSource):
+            sources.append(item)
+            continue
+        if isinstance(item, dict):
+            try:
+                sources.append(WebSource.model_validate(item))
+            except ValidationError:
+                continue
+    return sources
 
 
 def build_http_app() -> Any:

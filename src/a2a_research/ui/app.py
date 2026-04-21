@@ -16,7 +16,6 @@ import os
 import sys
 from collections.abc import AsyncGenerator, Callable
 from contextlib import suppress
-
 from typing import Any, cast
 
 import mesop as me
@@ -146,7 +145,8 @@ def main_page() -> None:
                     progress_step_label=state.progress_step_label,
                     progress_substep_label=state.current_substep,
                     activity_counts={
-                        role: len(lines) for role, lines in getattr(state, "activity_by_role", {}).items()
+                        role: len(lines)
+                        for role, lines in getattr(state, "activity_by_role", {}).items()
                     },
                 )
                 CardLoading(
@@ -156,7 +156,7 @@ def main_page() -> None:
                     activity_by_role=getattr(state, "activity_by_role", {}),
                     retry_counts=getattr(state, "retry_counts", {}),
                     error_counts=getattr(state, "error_counts", {}),
-                    show_verbose_prompts=1 if getattr(state, "show_verbose_prompts", True) else 0,
+                    show_verbose_prompts=bool(getattr(state, "show_verbose_prompts", True)),
                     on_toggle_verbose=_on_toggle_verbose,
                 )
             else:
@@ -273,7 +273,7 @@ def _role_label(role: object) -> str:
 
 
 def _format_progress_text(event: ProgressEvent) -> str:
-    label = event.substep_label.replace("_", " ")
+    label = event.substep_label.replace("_", " ").replace(":", ": ")
     parts = [label]
     if event.substep_total and event.substep_total > 1:
         parts.append(f"[{event.substep_index}/{event.substep_total}]")
@@ -309,6 +309,8 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         _append_activity(state, role_label, "·", display)
         if event.substep_label == "rate_limit":
             state.retry_counts[role_label] = state.retry_counts.get(role_label, 0) + 1
+        if event.substep_label == "tool_call" and "status=error" in event.detail.lower():
+            state.error_counts[role_label] = state.error_counts.get(role_label, 0) + 1
         return
 
     if event.phase == ProgressPhase.STEP_COMPLETED:
@@ -513,9 +515,9 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     yield
 
 
-def _on_toggle_verbose(e: me.CheckboxChangeEvent) -> None:
+def _on_toggle_verbose(e: me.ClickEvent) -> None:
     state: AppState = me.state(AppState)
-    state.show_verbose_prompts = e.checked
+    state.show_verbose_prompts = not state.show_verbose_prompts
 
 
 async def _on_retry(e: me.ClickEvent) -> AsyncGenerator[None, None]:

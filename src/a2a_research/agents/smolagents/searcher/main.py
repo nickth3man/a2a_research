@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -46,7 +47,14 @@ from a2a_research.agents.smolagents.searcher.card import SEARCHER_CARD
 from a2a_research.app_logging import get_logger, log_event
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
-from a2a_research.progress import ProgressPhase, emit
+from a2a_research.progress import (
+    ProgressPhase,
+    emit,
+    emit_llm_response,
+    emit_prompt,
+    using_session,
+)
+from a2a_research.settings import settings as _app_settings
 from a2a_research.tools import WebHit, web_search
 
 if TYPE_CHECKING:
@@ -74,70 +82,66 @@ async def search_queries(queries: list[str], *, session_id: str = "") -> Searche
         + "\n\nReturn JSON only with keys queries_used and hits."
     )
 
-    from a2a_research.progress import emit_llm_response, emit_prompt, using_session
-    from a2a_research.settings import settings as _app_settings
-    from time import perf_counter
-
-    emit_prompt(
-        AgentRole.SEARCHER,
-        "react_loop",
-        prompt,
-        model=_app_settings.llm.model,
-        session_id=session_id,
-    )
-    agent = build_agent()
-    runner = cast("Any", agent.run)
-    started = perf_counter()
     with using_session(session_id):
-        raw_output = await asyncio.to_thread(runner, prompt)
-    emit_llm_response(
-        AgentRole.SEARCHER,
-        "react_loop",
-        str(raw_output),
-        elapsed_ms=(perf_counter() - started) * 1000,
-        model=_app_settings.llm.model,
-        session_id=session_id,
-    )
-    data = parse_json_safely(str(raw_output))
-    by_url: dict[str, WebHit] = {}
-    errors: list[str] = []
-    seen_errors: set[str] = set()
-    successful_providers: set[str] = set()
-
-    raw_hits_any = data.get("hits")
-    raw_hits: list[object] = raw_hits_any if isinstance(raw_hits_any, list) else []
-    for raw_hit in raw_hits:
-        if not isinstance(raw_hit, dict):
-            continue
-        hit = WebHit.model_validate(raw_hit)
-        by_url.setdefault(hit.url, hit)
-        successful_providers.add(hit.source)
-
-    raw_errors_any = data.get("errors")
-    raw_errors: list[object] = raw_errors_any if isinstance(raw_errors_any, list) else []
-    for err in raw_errors:
-        if isinstance(err, str) and err not in seen_errors:
-            seen_errors.add(err)
-            errors.append(err)
-
-    queries_used_raw = data.get("queries_used") or queries
-    queries_used = (
-        [item.strip() for item in queries_used_raw if isinstance(item, str) and item.strip()]
-        if isinstance(queries_used_raw, list)
-        else queries
-    )
-    if not by_url and not errors:
-        fallback_results = await asyncio.gather(
-            *[web_search(query) for query in queries],
-            return_exceptions=False,
+        emit_prompt(
+            AgentRole.SEARCHER,
+            "react_loop",
+            prompt,
+            model=_app_settings.llm.model,
+            session_id=session_id,
         )
-        for result in fallback_results:
-            for hit in result.hits:
-                by_url.setdefault(hit.url, hit)
-            errors.extend(err for err in result.errors if err not in errors)
-            successful_providers.update(result.providers_successful)
+        agent = build_agent()
+        runner = cast("Any", agent.run)
+        started = perf_counter()
+        raw_output = await asyncio.to_thread(runner, prompt)
+        emit_llm_response(
+            AgentRole.SEARCHER,
+            "react_loop",
+            str(raw_output),
+            elapsed_ms=(perf_counter() - started) * 1000,
+            model=_app_settings.llm.model,
+            session_id=session_id,
+        )
+        data = parse_json_safely(str(raw_output))
+        by_url: dict[str, WebHit] = {}
+        errors: list[str] = []
+        seen_errors: set[str] = set()
+        successful_providers: set[str] = set()
+
+        raw_hits_any = data.get("hits")
+        raw_hits: list[object] = raw_hits_any if isinstance(raw_hits_any, list) else []
+        for raw_hit in raw_hits:
+            if not isinstance(raw_hit, dict):
+                continue
+            hit = WebHit.model_validate(raw_hit)
+            by_url.setdefault(hit.url, hit)
+            successful_providers.add(hit.source)
+
+        raw_errors_any = data.get("errors")
+        raw_errors: list[object] = raw_errors_any if isinstance(raw_errors_any, list) else []
+        for err in raw_errors:
+            if isinstance(err, str) and err not in seen_errors:
+                seen_errors.add(err)
+                errors.append(err)
+
+        queries_used_raw = data.get("queries_used") or queries
+        queries_used = (
+            [item.strip() for item in queries_used_raw if isinstance(item, str) and item.strip()]
+            if isinstance(queries_used_raw, list)
+            else queries
+        )
         if not by_url and not errors:
-            errors.append("Searcher agent returned no usable hits.")
+            fallback_results = await asyncio.gather(
+                *[web_search(query) for query in queries],
+                return_exceptions=False,
+            )
+            for result in fallback_results:
+                for hit in result.hits:
+                    by_url.setdefault(hit.url, hit)
+                errors.extend(err for err in result.errors if err not in errors)
+                successful_providers.update(result.providers_successful)
+            if not by_url and not errors:
+                errors.append("Searcher agent returned no usable hits.")
 
     for index, query in enumerate(queries_used, start=1):
         emit(
@@ -202,12 +206,14 @@ class SearcherExecutor(AgentExecutor):
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
+
             emit_handoff(
                 direction="received",
                 role=AgentRole.SEARCHER,
-                peer_role=handoff_from,
+                peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(str(payload)),
+                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
+                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
                 session_id=session_id,
             )
         queries = _coerce_str_list(payload.get("queries"))

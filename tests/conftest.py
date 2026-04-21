@@ -3,6 +3,15 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load repo ``.env`` first so real keys win over the placeholders below. Pytest
+# imports this module before ``a2a_research.settings``; without this,
+# ``setdefault`` would pin test placeholders and override ``.env`` for Pydantic.
+_ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+load_dotenv(_ENV_FILE)
 
 # :mod:`a2a_research.settings` loads a singleton on import; credentials must exist first.
 os.environ.setdefault("LLM_API_KEY", "test-llm-key-placeholder")

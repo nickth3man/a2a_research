@@ -85,7 +85,7 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "src/a2a_research/ui/**" = ["T20"]
 "src/a2a_research/workflow/__main__.py" = ["T20"]
-"tests/**" = ["T20", "TCH002"]
+"tests/**" = ["T20", "TCH001", "TCH002"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -116,7 +116,7 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
-addopts = "-n auto --cov=src/a2a_research --cov-report=term-missing"
+addopts = "-n auto --dist loadgroup --cov=src/a2a_research --cov-report=term-missing"
 markers = [
     "integration: calls real network APIs; set TAVILY_LIVE=1 / BRAVE_LIVE=1 for live search tests",
 ]

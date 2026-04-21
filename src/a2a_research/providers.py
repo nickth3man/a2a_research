@@ -168,7 +168,9 @@ class OpenRouterChatModel:
         usage = getattr(response, "usage", None)
         prompt_tokens = getattr(usage, "prompt_tokens", None) if usage else None
         completion_tokens = getattr(usage, "completion_tokens", None) if usage else None
-        finish_reason = getattr(response.choices[0], "finish_reason", "") if response.choices else ""
+        finish_reason = (
+            getattr(response.choices[0], "finish_reason", "") if response.choices else ""
+        )
         return ChatResponse(
             content=content,
             prompt_tokens=prompt_tokens,

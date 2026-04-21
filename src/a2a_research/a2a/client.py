@@ -113,6 +113,13 @@ def extract_data_payload_or_warn(task_or_message: Task | Message) -> dict[str, A
     return merged
 
 
+def _payload_preview(payload: dict[str, Any] | None) -> tuple[list[str], int, str]:
+    if not payload:
+        return [], 0, ""
+    rendered = json.dumps(payload, default=str, indent=2, sort_keys=True)
+    return sorted(payload.keys()), len(rendered.encode("utf-8")), rendered
+
+
 class A2AClient:
     """Thin async client that dispatches to HTTP-backed A2A services."""
 
@@ -157,16 +164,19 @@ class A2AClient:
         send_payload = dict(payload) if payload is not None else None
         if from_role is not None and send_payload is not None:
             send_payload["handoff_from"] = str(from_role.value)
-        message = build_message(text=text, data=send_payload, task_id=task_id, context_id=context_id)
+        message = build_message(
+            text=text, data=send_payload, task_id=task_id, context_id=context_id
+        )
         session_id = send_payload.get("session_id") if send_payload else None
         if session_id and from_role is not None:
+            payload_keys, payload_bytes, payload_preview = _payload_preview(send_payload)
             emit_handoff(
                 direction="sent",
                 role=from_role,
                 peer_role=role,
-                payload_keys=sorted(send_payload.keys()),
-                payload_bytes=len(str(send_payload)),
-                payload_preview=json.dumps(send_payload, default=str)[:400],
+                payload_keys=payload_keys,
+                payload_bytes=payload_bytes,
+                payload_preview=payload_preview,
                 session_id=str(session_id),
             )
         request = SendMessageRequest(
@@ -229,12 +239,12 @@ class A2AClient:
             msg = f"Agent '{role.value}' returned an A2A error: {response.root.error.message}"
             raise RuntimeError(msg)
         result = response.root.result
-        task_state: str | None = None
-        task_id_out: str | None = None
+        response_task_state: str | None = None
+        response_task_id: str | None = None
         if isinstance(result, Task):
             st = getattr(getattr(result, "status", None), "state", None)
-            task_state = str(st) if st is not None else None
-            task_id_out = str(result.id) if getattr(result, "id", None) else None
+            response_task_state = str(st) if st is not None else None
+            response_task_id = str(result.id) if getattr(result, "id", None) else None
         log_event(
             logger,
             logging.INFO,
@@ -242,8 +252,8 @@ class A2AClient:
             role=role.value,
             url=url,
             result_type=type(result).__name__,
-            task_state=task_state,
-            task_id=task_id_out,
+            task_state=response_task_state,
+            task_id=response_task_id,
         )
         return result
 

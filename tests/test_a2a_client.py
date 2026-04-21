@@ -126,7 +126,9 @@ async def test_build_message_includes_text_and_data() -> None:
 
 
 @pytest.mark.asyncio
-async def test_client_send_includes_handoff_from_when_from_role_provided(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_client_send_includes_handoff_from_when_from_role_provided(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import httpx
 
     from a2a_research.a2a import client as client_module

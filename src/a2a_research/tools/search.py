@@ -54,7 +54,17 @@ async def _brave_throttle() -> None:
     now = asyncio.get_event_loop().time()
     gap = now - _brave_last_call_ts
     if gap < _BRAVE_MIN_INTERVAL_SEC:
-        await asyncio.sleep(_BRAVE_MIN_INTERVAL_SEC - gap)
+        delay = _BRAVE_MIN_INTERVAL_SEC - gap
+        emit_rate_limit(
+            AgentRole.SEARCHER,
+            provider="brave",
+            attempt=0,
+            max_attempts=_BRAVE_MAX_RETRIES,
+            delay_sec=delay,
+            reason="client throttle",
+            session_id=current_session_id(),
+        )
+        await asyncio.sleep(delay)
     _brave_last_call_ts = asyncio.get_event_loop().time()
 
 
@@ -65,7 +75,7 @@ def _parse_retry_after(headers: httpx.Headers, attempt: int) -> float:
             return max(0.0, float(raw))
         except ValueError:
             pass
-    return min(2.0 ** attempt, 8.0)
+    return min(2.0**attempt, 8.0)
 
 
 class WebHit(BaseModel):

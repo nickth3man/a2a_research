@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from time import perf_counter
 from typing import TYPE_CHECKING, Any, cast
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -35,7 +36,14 @@ from a2a_research.agents.smolagents.reader.card import READER_CARD
 from a2a_research.app_logging import get_logger, log_event
 from a2a_research.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
-from a2a_research.progress import ProgressPhase, emit
+from a2a_research.progress import (
+    ProgressPhase,
+    emit,
+    emit_llm_response,
+    emit_prompt,
+    using_session,
+)
+from a2a_research.settings import settings as _app_settings
 from a2a_research.tools import PageContent, fetch_many
 
 if TYPE_CHECKING:
@@ -56,12 +64,14 @@ class ReaderExecutor(AgentExecutor):
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
+
             emit_handoff(
                 direction="received",
                 role=AgentRole.READER,
-                peer_role=handoff_from,
+                peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(str(payload)),
+                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
+                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
                 session_id=session_id,
             )
         urls = _coerce_str_list(payload.get("urls") or payload.get("url"))
@@ -183,9 +193,6 @@ async def read_urls(
         + "\n".join(f"- {url}" for url in urls)
         + f"\n\nmax_chars={max_chars}. Return JSON only with a pages array."
     )
-    from a2a_research.progress import emit_llm_response, emit_prompt, using_session
-    from a2a_research.settings import settings as _app_settings
-    from time import perf_counter
 
     emit_prompt(
         AgentRole.READER,

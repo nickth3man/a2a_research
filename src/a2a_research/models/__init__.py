@@ -148,11 +148,7 @@ class AgentResult(BaseModel):
 
 
 def default_roles() -> list[AgentRole]:
-    """Pipeline order: Planner → FactChecker (team loop) → Synthesizer.
-
-    Searcher + Reader run inside the FactChecker loop, not at the top level,
-    but they are included here so the UI timeline can display their status.
-    """
+    """Pipeline order: Planner → Searcher → Reader → FactChecker → Synthesizer."""
     return [
         AgentRole.PLANNER,
         AgentRole.SEARCHER,

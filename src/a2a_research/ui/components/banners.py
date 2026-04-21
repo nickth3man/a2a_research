@@ -71,17 +71,18 @@ def _error_banner_message(error: str, *, max_length: int = 200) -> str:
     return prefix + error[:max_length] + "\u2026"
 
 
-def CardLoading(
+def CardLoading(  # noqa: N802
     progress_step_label: str,
     session: ResearchSession,
     running_substeps: list[str],
     activity_by_role: dict[str, list[str]] | None = None,
     retry_counts: dict[str, int] | None = None,
     error_counts: dict[str, int] | None = None,
-    show_verbose_prompts: int = 1,
+    show_verbose_prompts: bool = True,
     on_toggle_verbose: Callable[[Any], Any] | None = None,
 ) -> None:
     """Per-agent live activity feed rendered while the pipeline runs."""
+    activity = activity_by_role or {}
     with me.box(style=LOADING_CARD_STYLE):
         with me.box(
             style=me.Style(
@@ -109,7 +110,7 @@ def CardLoading(
             )
             if on_toggle_verbose is not None:
                 me.button(
-                    "Verbose: ON" if show_verbose_prompts else "Verbose: OFF",
+                    "Hide verbose details" if show_verbose_prompts else "Show verbose details",
                     on_click=on_toggle_verbose,
                     type="flat",
                 )
@@ -118,18 +119,18 @@ def CardLoading(
             label = _role_label(role)
             agent = session.agent_results.get(role)
             status = agent.status if agent else AgentStatus.PENDING
-            lines = activity_by_role.get(label, [])
+            lines = activity.get(label, [])
             _AgentActivityPanel(
                 label=label,
                 status=status,
                 lines=lines,
                 retry_count=(retry_counts or {}).get(label, 0),
                 error_count=(error_counts or {}).get(label, 0),
-                show_verbose_prompts=show_verbose_prompts,
+                show_verbose_prompts=bool(show_verbose_prompts),
             )
 
 
-def _AgentActivityPanel(
+def _AgentActivityPanel(  # noqa: N802
     label: str,
     status: AgentStatus,
     lines: list[str],
@@ -192,6 +193,7 @@ def _AgentActivityPanel(
                 style=me.Style(font_size="12px", color="#94a3b8", font_style="italic"),
             )
             return
+
         # Render most-recent-first, capped to a scrollable window.
         with me.box(
             style=me.Style(
@@ -206,13 +208,24 @@ def _AgentActivityPanel(
             )
         ):
             for line in reversed(lines):
-                if " — " in line and len(line) > 250:
+                is_verbose = _is_verbose_line(line)
+                if " — " in line and (is_verbose or len(line) > 250):
                     parts = line.split(" — ", 1)
                     summary = parts[0]
                     body = parts[1]
-                    is_warning = "rate_limit" in line.lower() or "claim_verdict" in line.lower()
+                    is_warning = (
+                        "rate limit" in line.lower()
+                        or "claim verdict" in line.lower()
+                        or "status=error" in line.lower()
+                    )
                     color = "#d97706" if is_warning else "#1e293b"
                     if not show_verbose_prompts:
+                        if is_verbose:
+                            me.text(
+                                summary + " — hidden",
+                                style=me.Style(margin=me.Margin(bottom=2), color="#64748b"),
+                            )
+                            continue
                         me.text(
                             summary,
                             style=me.Style(margin=me.Margin(bottom=2), color=color),
@@ -228,3 +241,16 @@ def _AgentActivityPanel(
                     me.html(html_content)
                 else:
                     me.text(line, style=me.Style(margin=me.Margin(bottom=2)))
+
+
+def _is_verbose_line(line: str) -> bool:
+    lowered = line.lower()
+    return any(
+        token in lowered
+        for token in (
+            "prompt sent",
+            "llm response",
+            "handoff sent",
+            "handoff received",
+        )
+    )

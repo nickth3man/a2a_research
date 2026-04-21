@@ -30,6 +30,7 @@ from a2a_research.models import (
 )
 from a2a_research.progress import Bus, ProgressPhase, ProgressQueue, emit
 from a2a_research.settings import settings
+from a2a_research.tools import PageContent, WebHit
 
 logger = get_logger(__name__)
 
@@ -140,29 +141,119 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         session.id, AgentRole.PLANNER, ProgressPhase.STEP_COMPLETED, "planner_completed"
     )
 
-    # Searcher/Reader are not top-level coordinator HTTP calls; FactChecker's LangGraph invokes
-    # them. Session + progress events still mark them RUNNING so the UI matches reality.
     _set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
+    _emit_role_event(
+        session.id, AgentRole.SEARCHER, ProgressPhase.STEP_STARTED, "searcher_started"
+    )
+    search_task = await client.send(
+        AgentRole.SEARCHER,
+        payload={"queries": seed_queries, "session_id": session.id},
+        from_role=AgentRole.PLANNER,
+    )
+    search_data = _payload(search_task)
+    search_failed = _task_failed(search_task)
+    raw_hits = search_data.get("hits") or []
+    hits = [_coerce_web_hit(h) for h in raw_hits]
+    hits = [h for h in hits if h is not None]
+    search_errors = [str(e) for e in (search_data.get("errors") or []) if isinstance(e, str)]
+
+    if search_failed or not hits:
+        reason = " | ".join(search_errors) or "web search produced no results."
+        _set_status(session, AgentRole.SEARCHER, AgentStatus.FAILED, f"Search failed: {reason}")
+        _set_status(session, AgentRole.READER, AgentStatus.FAILED, "Skipped: search failed.")
+        _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: no evidence.")
+        _set_status(
+            session,
+            AgentRole.SYNTHESIZER,
+            AgentStatus.FAILED,
+            "Skipped: no verified evidence to synthesize.",
+        )
+        _emit_role_event(
+            session.id, AgentRole.SEARCHER, ProgressPhase.STEP_FAILED, "searcher_failed"
+        )
+        session.error = "Research pipeline aborted: " + reason
+        session.final_report = _error_report(query, reason, search_errors)
+        return
+
+    urls = [h.url for h in hits[:6]]
+    _set_status(
+        session,
+        AgentRole.SEARCHER,
+        AgentStatus.COMPLETED,
+        f"{len(hits)} hit(s), {len(urls)} URL(s) selected.",
+    )
+    _emit_role_event(
+        session.id, AgentRole.SEARCHER, ProgressPhase.STEP_COMPLETED, "searcher_completed"
+    )
+
     _set_status(session, AgentRole.READER, AgentStatus.RUNNING, "Reading pages…")
-    _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.RUNNING, "Verifying claims…")
-    _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_STARTED, "searcher_started")
     _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_STARTED, "reader_started")
+    read_task = await client.send(
+        AgentRole.READER,
+        payload={
+            "urls": urls,
+            "session_id": session.id,
+            "claims": [c.model_dump(mode="json") for c in claims],
+        },
+        from_role=AgentRole.SEARCHER,
+    )
+    read_data = _payload(read_task)
+    read_failed = _task_failed(read_task)
+    raw_pages = read_data.get("pages") or []
+    pages = [_coerce_page_content(p) for p in raw_pages]
+    pages = [p for p in pages if p is not None]
+    successful_pages = [p for p in pages if not p.error and p.markdown]
+    sources: list[WebSource] = [
+        WebSource(
+            url=p.url,
+            title=p.title or p.url,
+            excerpt=(p.markdown[:280] if p.markdown else ""),
+        )
+        for p in successful_pages
+    ]
+
+    if read_failed or not successful_pages:
+        reason = "All URLs failed to extract."
+        _set_status(session, AgentRole.READER, AgentStatus.FAILED, reason)
+        _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.FAILED, "Skipped: no evidence.")
+        _set_status(
+            session,
+            AgentRole.SYNTHESIZER,
+            AgentStatus.FAILED,
+            "Skipped: no verified evidence to synthesize.",
+        )
+        _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_FAILED, "reader_failed")
+        session.error = "Research pipeline aborted: " + reason
+        session.final_report = _error_report(query, reason, [])
+        return
+
+    _set_status(
+        session,
+        AgentRole.READER,
+        AgentStatus.COMPLETED,
+        f"{len(successful_pages)} page(s) extracted.",
+    )
+    _emit_role_event(
+        session.id, AgentRole.READER, ProgressPhase.STEP_COMPLETED, "reader_completed"
+    )
+
+    _set_status(session, AgentRole.FACT_CHECKER, AgentStatus.RUNNING, "Verifying claims…")
     _emit_role_event(
         session.id,
         AgentRole.FACT_CHECKER,
         ProgressPhase.STEP_STARTED,
         "fact_checker_started",
     )
-
     fc_task = await client.send(
         AgentRole.FACT_CHECKER,
         payload={
             "session_id": session.id,
             "query": query,
             "claims": [c.model_dump(mode="json") for c in claims],
-            "seed_queries": seed_queries,
+            "evidence": [p.model_dump(mode="json") for p in successful_pages],
+            "sources": [s.model_dump(mode="json") for s in sources],
         },
-        from_role=AgentRole.PLANNER,
+        from_role=AgentRole.READER,
     )
     fc_data = _payload(fc_task)
     verified: list[Claim] = [
@@ -170,78 +261,41 @@ async def _drive(session: ResearchSession, client: A2AClient, query: str) -> Non
         for c in (_coerce_claim(item) for item in (fc_data.get("verified_claims") or []))
         if c is not None
     ]
-    sources: list[WebSource] = [
-        s
-        for s in (_coerce_source(item) for item in (fc_data.get("sources") or []))
-        if s is not None
-    ]
-    rounds = int(fc_data.get("rounds") or 0)
-    fc_errors = [str(e) for e in (fc_data.get("errors") or []) if isinstance(e, str)]
-    fc_search_exhausted = bool(fc_data.get("search_exhausted"))
     fc_failed = _task_failed(fc_task)
 
     session.claims = verified or claims
     session.sources = sources
 
-    if fc_failed or fc_search_exhausted:
+    if fc_failed:
         _emit_role_event(
             session.id,
             AgentRole.FACT_CHECKER,
             ProgressPhase.STEP_FAILED,
             "fact_checker_failed",
         )
-        _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_FAILED, "searcher_failed")
-        _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_FAILED, "reader_failed")
-        reason = " | ".join(fc_errors) or "web search produced no evidence (no errors reported)."
-        _set_status(
-            session,
-            AgentRole.SEARCHER,
-            AgentStatus.FAILED,
-            f"Search could not complete: {reason}",
-        )
-        _set_status(
-            session,
-            AgentRole.READER,
-            AgentStatus.FAILED,
-            "Skipped: no URLs to read because search did not return results.",
-        )
         _set_status(
             session,
             AgentRole.FACT_CHECKER,
             AgentStatus.FAILED,
-            f"Unable to verify claims: {reason}",
+            "Failed to verify claims.",
         )
         _set_status(
             session,
             AgentRole.SYNTHESIZER,
             AgentStatus.FAILED,
-            "Skipped: Synthesizer refuses to write a report without verified web evidence.",
+            "Skipped: verification failed.",
         )
-        session.error = "Research pipeline aborted before synthesis: " + reason
+        session.error = "FactChecker failed to verify claims."
         session.report = None
-        session.final_report = _error_report(query, reason, fc_errors)
+        session.final_report = _error_report(query, "FactChecker failed.", [])
         return
 
     _set_status(
         session,
-        AgentRole.SEARCHER,
-        AgentStatus.COMPLETED,
-        f"{len(sources)} source(s) gathered.",
-    )
-    _set_status(
-        session,
-        AgentRole.READER,
-        AgentStatus.COMPLETED,
-        f"{len(sources)} page(s) extracted.",
-    )
-    _set_status(
-        session,
         AgentRole.FACT_CHECKER,
         AgentStatus.COMPLETED,
-        f"Converged after {rounds} round(s).",
+        f"Verified {len(verified)} claim(s).",
     )
-    _emit_role_event(session.id, AgentRole.SEARCHER, ProgressPhase.STEP_COMPLETED, "searcher_completed")
-    _emit_role_event(session.id, AgentRole.READER, ProgressPhase.STEP_COMPLETED, "reader_completed")
     _emit_role_event(
         session.id,
         AgentRole.FACT_CHECKER,
@@ -389,18 +443,6 @@ def _coerce_claim(raw: Any) -> Claim | None:
     return None
 
 
-def _coerce_source(raw: Any) -> WebSource | None:
-    if isinstance(raw, WebSource):
-        return raw
-    if isinstance(raw, dict):
-        try:
-            return WebSource.model_validate(raw)
-        except ValidationError as exc:
-            logger.warning("Failed to coerce source from payload: %s", exc)
-            return None
-    return None
-
-
 def _coerce_report(raw: Any) -> ReportOutput | None:
     if isinstance(raw, ReportOutput):
         return raw
@@ -409,5 +451,29 @@ def _coerce_report(raw: Any) -> ReportOutput | None:
             return ReportOutput.model_validate(raw)
         except ValidationError as exc:
             logger.warning("Failed to coerce report from payload: %s", exc)
+            return None
+    return None
+
+
+def _coerce_web_hit(raw: Any) -> WebHit | None:
+    if isinstance(raw, WebHit):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return WebHit.model_validate(raw)
+        except ValidationError as exc:
+            logger.warning("Failed to coerce WebHit from payload: %s", exc)
+            return None
+    return None
+
+
+def _coerce_page_content(raw: Any) -> PageContent | None:
+    if isinstance(raw, PageContent):
+        return raw
+    if isinstance(raw, dict):
+        try:
+            return PageContent.model_validate(raw)
+        except ValidationError as exc:
+            logger.warning("Failed to coerce PageContent from payload: %s", exc)
             return None
     return None

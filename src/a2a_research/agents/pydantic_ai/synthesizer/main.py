@@ -95,18 +95,27 @@ async def synthesize(
     result = await agent.run(prompt)
     report = sanitize_report_output(result.output, sources, claims)
     try:
-        preview = result.output.model_dump_json() if hasattr(result.output, "model_dump_json") else str(result.output)
-    except Exception:  # noqa: BLE001
+        preview = (
+            result.output.model_dump_json()
+            if hasattr(result.output, "model_dump_json")
+            else str(result.output)
+        )
+    except Exception:
         preview = str(result.output)
 
     prompt_tokens = None
     completion_tokens = None
     finish_reason = ""
-    if hasattr(result, "usage") and result.usage:
-        usage = result.usage()
+    usage_getter = getattr(result, "usage", None)
+    if callable(usage_getter):
+        usage = usage_getter()
         if usage:
-            prompt_tokens = getattr(usage, "request_tokens", None) or getattr(usage, "prompt_tokens", None)
-            completion_tokens = getattr(usage, "response_tokens", None) or getattr(usage, "completion_tokens", None)
+            prompt_tokens = getattr(usage, "request_tokens", None) or getattr(
+                usage, "prompt_tokens", None
+            )
+            completion_tokens = getattr(usage, "response_tokens", None) or getattr(
+                usage, "completion_tokens", None
+            )
 
     emit_llm_response(
         AgentRole.SYNTHESIZER,
@@ -132,12 +141,14 @@ class SynthesizerExecutor(AgentExecutor):
         handoff_from = payload.get("handoff_from")
         if session_id and handoff_from:
             from a2a_research.progress import emit_handoff
+
             emit_handoff(
                 direction="received",
                 role=AgentRole.SYNTHESIZER,
-                peer_role=handoff_from,
+                peer_role=str(handoff_from),
                 payload_keys=sorted(payload.keys()),
-                payload_bytes=len(str(payload)),
+                payload_bytes=len(json.dumps(payload, default=str).encode("utf-8")),
+                payload_preview=json.dumps(payload, default=str, indent=2, sort_keys=True),
                 session_id=session_id,
             )
         query = str(payload.get("query") or "")

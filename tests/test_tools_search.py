@@ -24,7 +24,11 @@ async def test_web_search_merges_providers(monkeypatch: pytest.MonkeyPatch) -> N
 
     async def fake_brave(q: str, n: int) -> tuple[list[WebHit], str | None]:
         return (
-            [WebHit(url="https://c.example", title="B:c", snippet="b", source="brave", score=0.95)],
+            [
+                WebHit(
+                    url="https://c.example", title="B:c", snippet="b", source="brave", score=0.95
+                )
+            ],
             None,
         )
 
@@ -58,13 +62,21 @@ async def test_web_search_merge_same_url_tavily_and_brave_snippets(
 ) -> None:
     async def fake_tavily(q: str, n: int) -> tuple[list[WebHit], str | None]:
         return (
-            [WebHit(url="https://x.example", title="T", snippet="alpha", source="tavily", score=0.5)],
+            [
+                WebHit(
+                    url="https://x.example", title="T", snippet="alpha", source="tavily", score=0.5
+                )
+            ],
             None,
         )
 
     async def fake_brave(q: str, n: int) -> tuple[list[WebHit], str | None]:
         return (
-            [WebHit(url="https://x.example", title="B", snippet="beta", source="brave", score=0.99)],
+            [
+                WebHit(
+                    url="https://x.example", title="B", snippet="beta", source="brave", score=0.99
+                )
+            ],
             None,
         )
 

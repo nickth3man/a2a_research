@@ -31,7 +31,9 @@ def _smolagents_step_callback(role: AgentRole) -> Any:
             args = getattr(call, "arguments", None)
             if args is None:
                 args = getattr(call, "args", None)
-            observation = getattr(step, "observations", None) or getattr(step, "tool_call_output", "")
+            observation = getattr(step, "observations", None) or getattr(
+                step, "tool_call_output", ""
+            )
             error = getattr(step, "error", None)
             emit_tool_call(
                 role,
@@ -40,6 +42,7 @@ def _smolagents_step_callback(role: AgentRole) -> Any:
                 result_preview=str(observation)[:400] if observation else "",
                 status=("error: " + str(error)) if error else "ok",
             )
+
     return _callback
 
 
