@@ -727,7 +727,8 @@ class ResearchSession(BaseModel):
         return self.agent_results.get(role, AgentResult(role=role))
 
     def ensure_agent_results(self) -> None:
-        for role in self.roles:
+        roles = self.roles if self.roles else default_roles()
+        for role in roles:
             self.agent_results.setdefault(role, AgentResult(role=role))
 
 
