@@ -1,4 +1,6 @@
-"""Resolve the in-flight :class:`Task` for an A2A ``AgentExecutor.execute`` callback."""
+"""Resolve the in-flight :class:`Task` for an A2A
+``AgentExecutor.execute`` callback.
+"""
 
 from __future__ import annotations
 

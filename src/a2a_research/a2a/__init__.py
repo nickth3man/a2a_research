@@ -2,9 +2,12 @@
 
 Public surface:
 - :func:`get_registry` — lazily builds the role→URL registry.
-- :class:`A2AClient` — sends a :class:`Message` to an HTTP A2A service and returns the final Task.
-- :func:`build_message`, :func:`extract_data_payloads`, :func:`extract_text` — helpers.
-- :data:`AGENT_CARDS` — per-role :class:`AgentCard` for server advertisement and UI labels.
+- :class:`A2AClient` — sends a :class:`Message` to an HTTP A2A service and
+  returns the final Task.
+- :func:`build_message`, :func:`extract_data_payloads`,
+  :func:`extract_text` — helpers.
+- :data:`AGENT_CARDS` — per-role :class:`AgentCard` for server advertisement
+  and UI labels.
 """
 
 from __future__ import annotations
