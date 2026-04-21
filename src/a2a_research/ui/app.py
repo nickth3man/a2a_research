@@ -28,12 +28,16 @@ if sys.platform == "win32":
 
     _original_send_file_compressed = _sfs.send_file_compressed
 
-    def _patched_send_file_compressed(path: str, disable_gzip_cache: bool) -> Any:
+    def _patched_send_file_compressed(
+        path: str, disable_gzip_cache: bool
+    ) -> Any:
         if not os.path.exists(path):
             return _Response("Not found", status=404)
         return _original_send_file_compressed(path, disable_gzip_cache)
 
-    _send_file_compressed_patch: Callable[[str, bool], Any] = _patched_send_file_compressed
+    _send_file_compressed_patch: Callable[[str, bool], Any] = (
+        _patched_send_file_compressed
+    )
     cast("Any", _sfs).send_file_compressed = _send_file_compressed_patch
 
 from a2a_research.app_logging import (
@@ -61,8 +65,17 @@ from a2a_research.ui.components import (
     PanelReport,
     PanelSources,
 )
-from a2a_research.ui.session_state import get_session_error, has_progress, has_results
-from a2a_research.ui.tokens import EXAMPLE_QUERIES, PAGE_FONT_FAMILY, PAGE_MAX_WIDTH, PAGE_PADDING
+from a2a_research.ui.session_state import (
+    get_session_error,
+    has_progress,
+    has_results,
+)
+from a2a_research.ui.tokens import (
+    EXAMPLE_QUERIES,
+    PAGE_FONT_FAMILY,
+    PAGE_MAX_WIDTH,
+    PAGE_PADDING,
+)
 
 setup_logging()
 # Mesop loads this module with a filesystem-derived ``__name__`` on Windows; use a
@@ -74,15 +87,21 @@ log_event(logger, logging.INFO, "ui.app.imported")
 @me.stateclass
 class AppState:
     query_text: str = ""
-    session: ResearchSession = dataclasses.field(default_factory=ResearchSession)
+    session: ResearchSession = dataclasses.field(
+        default_factory=ResearchSession
+    )
     loading: bool = False
     current_substep: str = ""
     progress_step_label: str = ""
-    progress_running_substeps: list[str] = dataclasses.field(default_factory=list)
+    progress_running_substeps: list[str] = dataclasses.field(
+        default_factory=list
+    )
     # Per-role activity feed: role label → list of "HH:MM:SS  text" lines, appended
     # on every progress event. Drives the live per-agent activity panel that
     # replaced the coarse percentage bar.
-    activity_by_role: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    activity_by_role: dict[str, list[str]] = dataclasses.field(
+        default_factory=dict
+    )
     show_verbose_prompts: bool = True
     retry_counts: dict[str, int] = dataclasses.field(default_factory=dict)
     error_counts: dict[str, int] = dataclasses.field(default_factory=dict)
@@ -96,7 +115,9 @@ def _state_snapshot(state: AppState) -> dict[str, object]:
         "progress_step_label": state.progress_step_label,
         "current_substep": state.current_substep,
         "running_substeps": list(state.progress_running_substeps),
-        "activity_counts": {role: len(lines) for role, lines in activity_by_role.items()},
+        "activity_counts": {
+            role: len(lines) for role, lines in activity_by_role.items()
+        },
         "session": {
             "id": state.session.id,
             "query": state.session.query,
@@ -114,15 +135,28 @@ def _state_snapshot(state: AppState) -> dict[str, object]:
 @me.page(path="/", title="A2A Research \u2014 Multi-Agent Research System")
 def main_page() -> None:
     state: AppState = me.state(AppState)
-    log_event(logger, logging.INFO, "ui.main_page.render.start", state=_state_snapshot(state))
+    log_event(
+        logger,
+        logging.INFO,
+        "ui.main_page.render.start",
+        state=_state_snapshot(state),
+    )
 
     try:
         with me.box(style=_page_shell_style(state.loading)):
-            log_event(logger, logging.DEBUG, "ui.component.render", component="PageHeader")
+            log_event(
+                logger,
+                logging.DEBUG,
+                "ui.component.render",
+                component="PageHeader",
+            )
             PageHeader()
             if not has_results(state.session):
                 log_event(
-                    logger, logging.DEBUG, "ui.component.render", component="PageInstructions"
+                    logger,
+                    logging.DEBUG,
+                    "ui.component.render",
+                    component="PageInstructions",
                 )
                 PageInstructions()
 
@@ -146,7 +180,9 @@ def main_page() -> None:
                     progress_substep_label=state.current_substep,
                     activity_counts={
                         role: len(lines)
-                        for role, lines in getattr(state, "activity_by_role", {}).items()
+                        for role, lines in getattr(
+                            state, "activity_by_role", {}
+                        ).items()
                     },
                 )
                 CardLoading(
@@ -156,7 +192,9 @@ def main_page() -> None:
                     activity_by_role=getattr(state, "activity_by_role", {}),
                     retry_counts=getattr(state, "retry_counts", {}),
                     error_counts=getattr(state, "error_counts", {}),
-                    show_verbose_prompts=bool(getattr(state, "show_verbose_prompts", True)),
+                    show_verbose_prompts=bool(
+                        getattr(state, "show_verbose_prompts", True)
+                    ),
                     on_toggle_verbose=_on_toggle_verbose,
                 )
             else:
@@ -180,7 +218,10 @@ def main_page() -> None:
                     CardTimeline(state.session)
                 elif not session_error:
                     log_event(
-                        logger, logging.DEBUG, "ui.component.render", component="PageEmptyState"
+                        logger,
+                        logging.DEBUG,
+                        "ui.component.render",
+                        component="PageEmptyState",
                     )
                     PageEmptyState()
 
@@ -253,7 +294,9 @@ def _initialize_progress_state(state: AppState) -> None:
     state.error_counts = {}
 
 
-def _append_activity(state: AppState, role_label: str, icon: str, text: str) -> None:
+def _append_activity(
+    state: AppState, role_label: str, icon: str, text: str
+) -> None:
     from datetime import datetime
 
     ts = datetime.now().strftime("%H:%M:%S")
@@ -308,9 +351,16 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
         state.progress_step_label = f"{role_label}…"
         _append_activity(state, role_label, "·", display)
         if event.substep_label == "rate_limit":
-            state.retry_counts[role_label] = state.retry_counts.get(role_label, 0) + 1
-        if event.substep_label == "tool_call" and "status=error" in event.detail.lower():
-            state.error_counts[role_label] = state.error_counts.get(role_label, 0) + 1
+            state.retry_counts[role_label] = (
+                state.retry_counts.get(role_label, 0) + 1
+            )
+        if (
+            event.substep_label == "tool_call"
+            and "status=error" in event.detail.lower()
+        ):
+            state.error_counts[role_label] = (
+                state.error_counts.get(role_label, 0) + 1
+            )
         return
 
     if event.phase == ProgressPhase.STEP_COMPLETED:
@@ -318,7 +368,9 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
             update={"status": AgentStatus.COMPLETED, "message": display}
         )
         state.progress_running_substeps = [
-            item for item in state.progress_running_substeps if item != role_label
+            item
+            for item in state.progress_running_substeps
+            if item != role_label
         ]
         state.progress_step_label = f"{role_label} completed"
         state.current_substep = ""
@@ -330,12 +382,16 @@ def _apply_progress_event(state: AppState, event: ProgressEvent) -> None:
             update={"status": AgentStatus.FAILED, "message": display}
         )
         state.progress_running_substeps = [
-            item for item in state.progress_running_substeps if item != role_label
+            item
+            for item in state.progress_running_substeps
+            if item != role_label
         ]
         state.progress_step_label = f"{role_label} failed"
         state.current_substep = display
         _append_activity(state, role_label, "✗", f"failed — {display}")
-        state.error_counts[role_label] = state.error_counts.get(role_label, 0) + 1
+        state.error_counts[role_label] = (
+            state.error_counts.get(role_label, 0) + 1
+        )
 
 
 def _render_results(session: ResearchSession) -> None:
@@ -411,7 +467,10 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
             error="Enter a research query before running the pipeline.",
         )
         log_event(
-            logger, logging.WARNING, "ui.submit.blocked.empty_query", state=_state_snapshot(state)
+            logger,
+            logging.WARNING,
+            "ui.submit.blocked.empty_query",
+            state=_state_snapshot(state),
         )
         yield
         return
@@ -447,7 +506,9 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
         wf_task = asyncio.create_task(
             run_research_async(query_text, progress_queue=progress_queue)
         )
-        async for event in drain_progress_while_running(progress_queue, wf_task):
+        async for event in drain_progress_while_running(
+            progress_queue, wf_task
+        ):
             _apply_progress_event(state, event)
             yield
 
@@ -474,7 +535,9 @@ async def _on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
                 },
             )
     except asyncio.CancelledError:
-        state.session.error = "Live update stream was interrupted. Please retry."
+        state.session.error = (
+            "Live update stream was interrupted. Please retry."
+        )
         log_event(
             logger,
             logging.WARNING,

@@ -78,7 +78,10 @@ def CardQueryInput(  # noqa: N802
                 )
             with me.box(
                 style=me.Style(
-                    display="flex", gap=8, flex_wrap="wrap", margin=me.Margin(bottom=12)
+                    display="flex",
+                    gap=8,
+                    flex_wrap="wrap",
+                    margin=me.Margin(bottom=12),
                 )
             ):
                 for example_query, handler in (

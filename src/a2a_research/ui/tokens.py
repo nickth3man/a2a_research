@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import mesop as me
 
-from a2a_research.ui.theme import STATUS_LABELS, status_color, verdict_bg, verdict_color
+from a2a_research.ui.theme import (
+    STATUS_LABELS,
+    status_color,
+    verdict_bg,
+    verdict_color,
+)
 
 # Re-export theme functions so UI code can import from one place.
 __all__ = [
@@ -118,7 +123,9 @@ HEADER_BORDER_WIDTH = 2
 HEADER_SUBTITLE_COLOR = "#374151"
 INSTRUCTIONS_BG = "#eff6ff"
 INSTRUCTIONS_BORDER = "#bfdbfe"
-STEP_CARD_BORDER = "#dbeafe"  # lighter blue for individual instruction step cards
+STEP_CARD_BORDER = (
+    "#dbeafe"  # lighter blue for individual instruction step cards
+)
 EMPTY_STATE_BG = "#f9fafb"
 EMPTY_STATE_BORDER = "#d1d5db"
 EXAMPLE_QUERY_COLOR = "#1d4ed8"
@@ -224,7 +231,9 @@ LOADING_CARD_STYLE = me.Style(
 HEADER_STYLE = me.Style(
     border=me.Border(
         left=me.BorderSide(width=4, color=HEADER_ACCENT_COLOR),
-        bottom=me.BorderSide(width=HEADER_BORDER_WIDTH, color=HEADER_BORDER_COLOR),
+        bottom=me.BorderSide(
+            width=HEADER_BORDER_WIDTH, color=HEADER_BORDER_COLOR
+        ),
     ),
     padding=me.Padding(left=16, bottom=16),
     margin=me.Margin(bottom=24),

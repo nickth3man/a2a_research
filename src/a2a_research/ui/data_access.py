@@ -6,7 +6,12 @@ Decouples Mesop components from the new 5-agent pipeline shape.
 from __future__ import annotations
 
 from a2a_research.a2a.cards import AGENT_CARDS
-from a2a_research.models import AgentRole, Claim, ResearchSession, default_roles
+from a2a_research.models import (
+    AgentRole,
+    Claim,
+    ResearchSession,
+    default_roles,
+)
 
 
 def get_all_citations(session: ResearchSession) -> list[str]:

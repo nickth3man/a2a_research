@@ -27,7 +27,12 @@ def PageHeader() -> None:  # noqa: N802
     """Render the page header with title and subtitle."""
     with me.box(style=HEADER_STYLE):
         with me.box(
-            style=me.Style(display="flex", align_items="center", gap=10, flex_wrap="nowrap")
+            style=me.Style(
+                display="flex",
+                align_items="center",
+                gap=10,
+                flex_wrap="nowrap",
+            )
         ):
             me.text(
                 "A2A Research System",
@@ -44,8 +49,12 @@ def PageHeader() -> None:  # noqa: N802
                     border_radius=10,
                     border=me.Border(
                         top=me.BorderSide(width=1, color=INSTRUCTIONS_BORDER),
-                        right=me.BorderSide(width=1, color=INSTRUCTIONS_BORDER),
-                        bottom=me.BorderSide(width=1, color=INSTRUCTIONS_BORDER),
+                        right=me.BorderSide(
+                            width=1, color=INSTRUCTIONS_BORDER
+                        ),
+                        bottom=me.BorderSide(
+                            width=1, color=INSTRUCTIONS_BORDER
+                        ),
                         left=me.BorderSide(width=1, color=INSTRUCTIONS_BORDER),
                     ),
                     flex_shrink=0,
@@ -68,16 +77,26 @@ def PageInstructions() -> None:  # noqa: N802
         me.text(
             "How it works",
             style=me.Style(
-                font_size=FONT_SIZE_BODY, font_weight="bold", margin=me.Margin(bottom=12)
+                font_size=FONT_SIZE_BODY,
+                font_weight="bold",
+                margin=me.Margin(bottom=12),
             ),
         )
         with me.box(style=me.Style(display="flex", gap=8, flex_wrap="wrap")):
-            _instruction_step("1", "Enter a query", "Start a research session.")
             _instruction_step(
-                "2", "Sources retrieved", "Pull relevant documents from the local corpus."
+                "1", "Enter a query", "Start a research session."
             )
-            _instruction_step("3", "Agents analyze", "Research, verify, and refine claims.")
-            _instruction_step("4", "Report renders", "Review sources, claims, and summary.")
+            _instruction_step(
+                "2",
+                "Sources retrieved",
+                "Pull relevant documents from the local corpus.",
+            )
+            _instruction_step(
+                "3", "Agents analyze", "Research, verify, and refine claims."
+            )
+            _instruction_step(
+                "4", "Report renders", "Review sources, claims, and summary."
+            )
 
 
 @me.component
@@ -105,7 +124,11 @@ def PageEmptyState() -> None:  # noqa: N802
             )
         me.text(
             "Ready to research",
-            style=me.Style(font_size="24px", font_weight="bold", margin=me.Margin(bottom=8)),
+            style=me.Style(
+                font_size="24px",
+                font_weight="bold",
+                margin=me.Margin(bottom=8),
+            ),
         )
         me.text(
             "Ask about topics in the local corpus. The pipeline retrieves relevant sources, verifies claims, and writes a structured report.",
@@ -161,10 +184,15 @@ def _instruction_step(number: str, title: str, description: str) -> None:
         ):
             me.text(number)
         with me.box(style=me.Style(text_align="left")):
-            me.text(title, style=me.Style(font_size=FONT_SIZE_BODY, font_weight="bold"))
+            me.text(
+                title,
+                style=me.Style(font_size=FONT_SIZE_BODY, font_weight="bold"),
+            )
             me.text(
                 description,
                 style=me.Style(
-                    font_size=FONT_SIZE_SMALL, color=TEXT_MUTED, margin=me.Margin(top=4)
+                    font_size=FONT_SIZE_SMALL,
+                    color=TEXT_MUTED,
+                    margin=me.Margin(top=4),
                 ),
             )

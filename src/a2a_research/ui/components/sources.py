@@ -55,4 +55,7 @@ def PanelSources(session: ResearchSession) -> None:  # noqa: N802
                         text_align="center",
                     ),
                 )
-                me.text(formatted_citation, style=me.Style(font_size="13px", flex=1))
+                me.text(
+                    formatted_citation,
+                    style=me.Style(font_size="13px", flex=1),
+                )

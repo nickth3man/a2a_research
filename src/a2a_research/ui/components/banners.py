@@ -106,11 +106,15 @@ def CardLoading(  # noqa: N802
                 pass
             me.text(
                 progress_step_label or "Pipeline starting",
-                style=me.Style(font_weight="bold", font_size="13px", color="#92400e"),
+                style=me.Style(
+                    font_weight="bold", font_size="13px", color="#92400e"
+                ),
             )
             if on_toggle_verbose is not None:
                 me.button(
-                    "Hide verbose details" if show_verbose_prompts else "Show verbose details",
+                    "Hide verbose details"
+                    if show_verbose_prompts
+                    else "Show verbose details",
                     on_click=on_toggle_verbose,
                     type="flat",
                 )
@@ -156,14 +160,23 @@ def _AgentActivityPanel(  # noqa: N802
                 margin=me.Margin(bottom=6),
             )
         ):
-            me.text(icon, style=me.Style(color=color, font_size="16px", font_weight="bold"))
+            me.text(
+                icon,
+                style=me.Style(
+                    color=color, font_size="16px", font_weight="bold"
+                ),
+            )
             me.text(
                 label,
-                style=me.Style(font_weight="bold", font_size="14px", color="#0f172a"),
+                style=me.Style(
+                    font_weight="bold", font_size="14px", color="#0f172a"
+                ),
             )
             me.text(
                 status.value,
-                style=me.Style(font_size="11px", color=color, text_transform="uppercase"),
+                style=me.Style(
+                    font_size="11px", color=color, text_transform="uppercase"
+                ),
             )
             if retry_count:
                 me.text(
@@ -190,7 +203,9 @@ def _AgentActivityPanel(  # noqa: N802
         if not lines:
             me.text(
                 "(no activity yet)",
-                style=me.Style(font_size="12px", color="#94a3b8", font_style="italic"),
+                style=me.Style(
+                    font_size="12px", color="#94a3b8", font_style="italic"
+                ),
             )
             return
 
@@ -223,12 +238,16 @@ def _AgentActivityPanel(  # noqa: N802
                         if is_verbose:
                             me.text(
                                 summary + " — hidden",
-                                style=me.Style(margin=me.Margin(bottom=2), color="#64748b"),
+                                style=me.Style(
+                                    margin=me.Margin(bottom=2), color="#64748b"
+                                ),
                             )
                             continue
                         me.text(
                             summary,
-                            style=me.Style(margin=me.Margin(bottom=2), color=color),
+                            style=me.Style(
+                                margin=me.Margin(bottom=2), color=color
+                            ),
                         )
                         continue
                     safe_body = html.escape(body[:4096])
