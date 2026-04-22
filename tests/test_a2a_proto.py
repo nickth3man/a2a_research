@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 from a2a.types import Message, Part, Role, Task, TaskState
 
-from a2a_research.a2a.proto import (
+from a2a_research.backend.core.a2a.proto import (
     ROLE_AGENT,
     ROLE_USER,
     _serialize_for_proto,

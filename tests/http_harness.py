@@ -10,7 +10,7 @@ from a2a.client import Client as SDKClient
 from a2a.client import ClientConfig, create_client
 from a2a.types import Message, SendMessageRequest, StreamResponse, Task
 
-from a2a_research.a2a.client import build_message
+from a2a_research.backend.core.a2a.client import build_message
 
 
 class MultiAppTransport(httpx.AsyncBaseTransport):

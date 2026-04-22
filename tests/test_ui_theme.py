@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import AgentStatus
+from a2a_research.backend.core.models import AgentStatus
 from a2a_research.ui.theme import status_color, verdict_bg, verdict_color
 
 

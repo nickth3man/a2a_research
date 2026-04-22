@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentRole,
     Claim,
     ResearchSession,

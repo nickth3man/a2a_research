@@ -5,7 +5,11 @@ from typing import Any
 
 import mesop as me
 
-from a2a_research.models import AgentRole, AgentStatus, ResearchSession
+from a2a_research.backend.core.models import (
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 from a2a_research.ui.components.activity import AgentActivityPanel
 from a2a_research.ui.style_presets import (
     ERROR_BANNER_STYLE,

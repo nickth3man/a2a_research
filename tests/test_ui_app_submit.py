@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
     AgentStatus,
@@ -42,7 +42,7 @@ async def test_on_submit_success_updates_session() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_async",
+            "a2a_research.backend.workflow.run_research_async",
             new_callable=AsyncMock,
             return_value=done,
         ),
@@ -62,7 +62,7 @@ async def test_on_submit_exception_sets_error() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_async",
+            "a2a_research.backend.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=RuntimeError("LLM down"),
         ),
@@ -81,7 +81,7 @@ async def test_on_submit_cancelled_sets_recoverable_error() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_async",
+            "a2a_research.backend.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=asyncio.CancelledError(),
         ),
@@ -104,7 +104,7 @@ async def test_on_submit_success_yields_twice() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_async",
+            "a2a_research.backend.workflow.run_research_async",
             new_callable=AsyncMock,
             return_value=done,
         ),
@@ -126,7 +126,7 @@ async def test_on_submit_skips_when_already_loading() -> None:
     with (
         patch.object(app_mod.me, "state", return_value=st),
         patch(
-            "a2a_research.workflow.run_research_async",
+            "a2a_research.backend.workflow.run_research_async",
             new_callable=AsyncMock,
             side_effect=mock_async,
         ),

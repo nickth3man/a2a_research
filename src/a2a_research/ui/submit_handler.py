@@ -7,15 +7,15 @@ from contextlib import suppress
 
 import mesop as me
 
-from a2a_research.logging.app_logging import (
+from a2a_research.backend.core.logging.app_logging import (
     get_logger,
     log_event,
 )
-from a2a_research.logging.exception_logging import (
+from a2a_research.backend.core.logging.exception_logging import (
     install_asyncio_exception_logging,
 )
-from a2a_research.models import ResearchSession
-from a2a_research.progress import (
+from a2a_research.backend.core.models import ResearchSession
+from a2a_research.backend.core.progress import (
     ProgressQueue,
     drain_progress_while_running,
 )
@@ -77,7 +77,7 @@ async def on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
     )
     yield
 
-    from a2a_research.workflow import run_research_async
+    from a2a_research.backend.workflow import run_research_async
 
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:

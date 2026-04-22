@@ -14,8 +14,8 @@ import os
 
 import pytest
 
-from a2a_research.tools import search as search_module
-from a2a_research.tools.search import WebHit, web_search
+from a2a_research.backend.tools import search as search_module
+from a2a_research.backend.tools.search import WebHit, web_search
 
 pytestmark = pytest.mark.xdist_group("live_search_providers")
 

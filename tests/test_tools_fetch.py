@@ -6,8 +6,12 @@ from typing import Any
 
 import pytest
 
-from a2a_research.tools import fetch as fetch_module
-from a2a_research.tools.fetch import PageContent, fetch_and_extract, fetch_many
+from a2a_research.backend.tools import fetch as fetch_module
+from a2a_research.backend.tools.fetch import (
+    PageContent,
+    fetch_and_extract,
+    fetch_many,
+)
 
 
 @pytest.mark.asyncio

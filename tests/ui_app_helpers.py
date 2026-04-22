@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from a2a_research.models import ResearchSession
+from a2a_research.backend.core.models import ResearchSession
 
 
 async def _drain_on_submit(

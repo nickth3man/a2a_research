@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from a2a_research.tools.search import WebHit
+from a2a_research.backend.tools.search import WebHit
 
 _HAS_KEY = bool(os.environ.get("BRAVE_API_KEY"))
 _SKIP_REASON = (

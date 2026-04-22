@@ -9,14 +9,14 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from a2a.types import Task
 
-from a2a_research.a2a.client import extract_data_payloads
-from a2a_research.a2a.registry import AgentRegistry
-from a2a_research.agents.langgraph.fact_checker import (
+from a2a_research.backend.agents.langgraph.fact_checker import (
     main as fact_checker_main,
 )
-from a2a_research.agents.langgraph.fact_checker import (
+from a2a_research.backend.agents.langgraph.fact_checker import (
     verify_route as fc_verify,
 )
+from a2a_research.backend.core.a2a.client import extract_data_payloads
+from a2a_research.backend.core.a2a.registry import AgentRegistry
 from tests.http_harness import (
     build_sdk_client,
     make_multi_app_client,
@@ -54,7 +54,7 @@ async def test_fact_checker_http_contract(
     }
     shared_client = make_multi_app_client(apps)
 
-    from a2a_research.a2a import client as client_module
+    from a2a_research.backend.core.a2a import client as client_module
 
     def _client_factory(*args: object, **kwargs: object) -> Any:
         return shared_client

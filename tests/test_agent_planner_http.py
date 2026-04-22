@@ -9,14 +9,14 @@ import httpx
 import pytest
 from a2a.types import Task
 
-from a2a_research.a2a.client import extract_data_payloads
-from a2a_research.agents.pocketflow.planner import (
+from a2a_research.backend.agents.pocketflow.planner import (
     nodes as planner_nodes,
 )
-from a2a_research.agents.pocketflow.planner import (
+from a2a_research.backend.agents.pocketflow.planner import (
     nodes_base as planner_nodes_base,
 )
-from a2a_research.agents.pocketflow.planner.main import build_http_app
+from a2a_research.backend.agents.pocketflow.planner.main import build_http_app
+from a2a_research.backend.core.a2a.client import extract_data_payloads
 from tests.http_harness import build_sdk_client, send_and_get_result
 
 

@@ -8,9 +8,13 @@ import httpx
 import pytest
 from a2a.types import Task
 
-from a2a_research.a2a.client import extract_data_payloads
-from a2a_research.agents.smolagents.searcher import core as searcher_core
-from a2a_research.agents.smolagents.searcher import main as searcher_main
+from a2a_research.backend.agents.smolagents.searcher import (
+    core as searcher_core,
+)
+from a2a_research.backend.agents.smolagents.searcher import (
+    main as searcher_main,
+)
+from a2a_research.backend.core.a2a.client import extract_data_payloads
 from tests.http_harness import build_sdk_client, send_and_get_result
 
 

@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 from a2a.types import Task
 
-from a2a_research.a2a.proto import make_message, new_task
-from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.backend.core.a2a.proto import make_message, new_task
+from a2a_research.backend.core.a2a.request_task import initial_task_or_new
 
 
 def _make_context(

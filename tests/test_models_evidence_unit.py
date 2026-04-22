@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     CredibilitySignals,
     EvidenceUnit,
     Passage,

@@ -9,7 +9,7 @@ import dataclasses
 
 import mesop as me
 
-from a2a_research.models import ResearchSession
+from a2a_research.backend.core.models import ResearchSession
 
 
 @me.stateclass

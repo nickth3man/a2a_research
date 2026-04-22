@@ -5,13 +5,13 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentRole,
     BudgetConsumption,
     NoveltyTracker,
     WorkflowBudget,
 )
-from a2a_research.workflow.workflow_engine import (
+from a2a_research.backend.workflow.workflow_engine import (
     _PER_STAGE_TIMEOUTS,
     _budget_from_settings,
     _stage_timeout,

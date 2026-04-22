@@ -8,8 +8,12 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-import a2a_research.settings as settings_module
-from a2a_research.settings import AppSettings, LLMSettings, WorkflowConfig
+import a2a_research.backend.core.settings as settings_module
+from a2a_research.backend.core.settings import (
+    AppSettings,
+    LLMSettings,
+    WorkflowConfig,
+)
 
 
 class TestAppSettings:
@@ -19,7 +23,7 @@ class TestAppSettings:
         env_file = tmp_path / ".env"
         env_file.write_text("BAD_KEY=value\n")
 
-        with patch("a2a_research.settings._ENV_FILE", env_file):
+        with patch("a2a_research.backend.core.settings._ENV_FILE", env_file):
             settings = AppSettings()
 
         assert "Unknown keys in .env: BAD_KEY" in caplog.text
@@ -29,18 +33,29 @@ class TestAppSettings:
         env_file = Path(__file__).resolve().parents[3] / ".env"
         if not env_file.exists():
             with (
-                patch("a2a_research.settings._ENV_FILE", env_file),
-                patch("a2a_research.settings.dotenv_values", return_value={}),
+                patch(
+                    "a2a_research.backend.core.settings._ENV_FILE", env_file
+                ),
+                patch(
+                    "a2a_research.backend.core.settings.dotenv_values",
+                    return_value={},
+                ),
             ):
                 settings = AppSettings()
         else:
-            with patch("a2a_research.settings.dotenv_values", return_value={}):
+            with patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ):
                 settings = AppSettings()
         assert isinstance(settings.llm, LLMSettings)
 
     def test_llm_settings_defaults(self) -> None:
         with (
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict("os.environ", {}, clear=True),
         ):
             llm = LLMSettings()
@@ -54,7 +69,7 @@ class TestAppSettings:
         env_file = tmp_path / ".env"
         env_file.write_text("LLM_PROVIDER=openrouter\nLLM_API_KEY=secret\n")
 
-        with patch("a2a_research.settings._ENV_FILE", env_file):
+        with patch("a2a_research.backend.core.settings._ENV_FILE", env_file):
             settings_module._validate_dotenv_keys()
 
         assert "Unknown keys in .env" not in caplog.text
@@ -63,8 +78,11 @@ class TestAppSettings:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.settings._ENV_FILE", empty_env),
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict(
                 "os.environ",
                 {
@@ -87,8 +105,11 @@ class TestAppSettings:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.settings._ENV_FILE", empty_env),
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict(
                 "os.environ",
                 {"LLM_API_KEY": "", "TAVILY_API_KEY": "x"},
@@ -98,8 +119,11 @@ class TestAppSettings:
         ):
             AppSettings()
         with (
-            patch("a2a_research.settings._ENV_FILE", empty_env),
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict(
                 "os.environ",
                 {"LLM_API_KEY": "x", "TAVILY_API_KEY": ""},
@@ -109,8 +133,11 @@ class TestAppSettings:
         ):
             AppSettings()
         with (
-            patch("a2a_research.settings._ENV_FILE", empty_env),
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict(
                 "os.environ",
                 {
@@ -128,8 +155,11 @@ class TestAppSettings:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.settings._ENV_FILE", empty_env),
-            patch("a2a_research.settings.dotenv_values", return_value={}),
+            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings.dotenv_values",
+                return_value={},
+            ),
             patch.dict(
                 "os.environ",
                 {

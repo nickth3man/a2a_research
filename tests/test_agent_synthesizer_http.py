@@ -6,9 +6,11 @@ import httpx
 import pytest
 from a2a.types import Task
 
-from a2a_research.a2a.client import extract_data_payloads
-from a2a_research.agents.pydantic_ai.synthesizer import main as synth_main
-from a2a_research.models import ReportOutput
+from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+    main as synth_main,
+)
+from a2a_research.backend.core.a2a.client import extract_data_payloads
+from a2a_research.backend.core.models import ReportOutput
 from tests.http_harness import build_sdk_client, send_and_get_result
 
 

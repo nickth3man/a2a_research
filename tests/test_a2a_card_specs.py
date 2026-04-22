@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.a2a.card_specs import CARD_SPECS
-from a2a_research.models import AgentRole
+from a2a_research.backend.core.a2a.card_specs import CARD_SPECS
+from a2a_research.backend.core.models import AgentRole
 
 ALL_ROLES = list(AgentRole)
 REQUIRED_FIELDS = {
@@ -35,9 +35,7 @@ class TestCardSpecsStructure:
     def test_required_fields_present(self, role: AgentRole) -> None:
         spec = CARD_SPECS[role]
         missing = REQUIRED_FIELDS - spec.keys()
-        assert missing == set(), (
-            f"Role {role} missing fields: {missing}"
-        )
+        assert missing == set(), f"Role {role} missing fields: {missing}"
 
     @pytest.mark.parametrize("role", list(CARD_SPECS.keys()))
     def test_string_fields_non_empty(self, role: AgentRole) -> None:
@@ -47,24 +45,16 @@ class TestCardSpecsStructure:
             assert isinstance(val, str), (
                 f"Role {role}: field '{field}' is not a str"
             )
-            assert val.strip(), (
-                f"Role {role}: field '{field}' is empty"
-            )
+            assert val.strip(), f"Role {role}: field '{field}' is empty"
 
     @pytest.mark.parametrize("role", list(CARD_SPECS.keys()))
-    def test_tags_is_non_empty_list_of_strings(
-        self, role: AgentRole
-    ) -> None:
+    def test_tags_is_non_empty_list_of_strings(self, role: AgentRole) -> None:
         spec = CARD_SPECS[role]
         tags = spec["tags"]
-        assert isinstance(tags, list), (
-            f"Role {role}: 'tags' is not a list"
-        )
+        assert isinstance(tags, list), f"Role {role}: 'tags' is not a list"
         assert len(tags) > 0, f"Role {role}: 'tags' is empty"
         for t in tags:
-            assert isinstance(t, str), (
-                f"Role {role}: tag {t!r} is not a str"
-            )
+            assert isinstance(t, str), f"Role {role}: tag {t!r} is not a str"
 
 
 class TestCardSpecsValues:
@@ -92,8 +82,7 @@ class TestCardSpecsValues:
 
     def test_adversary_skill_id(self) -> None:
         assert (
-            CARD_SPECS[AgentRole.ADVERSARY]["skill_id"]
-            == "adversarial_verify"
+            CARD_SPECS[AgentRole.ADVERSARY]["skill_id"] == "adversarial_verify"
         )
 
     def test_planner_name(self) -> None:

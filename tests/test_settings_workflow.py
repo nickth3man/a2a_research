@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.settings import WorkflowConfig
+from a2a_research.backend.core.settings import WorkflowConfig
 
 
 class TestWorkflowConfig:

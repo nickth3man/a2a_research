@@ -6,7 +6,7 @@ import os
 
 import pytest
 
-from a2a_research.tools.search import web_search
+from a2a_research.backend.tools.search import web_search
 
 pytestmark = pytest.mark.xdist_group("live_search_providers")
 
@@ -108,8 +108,8 @@ async def test_web_search_providers_metadata() -> None:
 )
 @pytest.mark.asyncio
 async def test_tavily_snippet_relevance() -> None:
-    from a2a_research.tools import search as search_module
-    from a2a_research.tools.search import WebHit
+    from a2a_research.backend.tools import search as search_module
+    from a2a_research.backend.tools.search import WebHit
 
     def _hit_text(hit: WebHit) -> str:
         return f"{hit.url} {hit.title} {hit.snippet}".lower()

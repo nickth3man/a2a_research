@@ -5,8 +5,8 @@ Decouples Mesop components from the v2 pipeline shape.
 
 from __future__ import annotations
 
-from a2a_research.a2a.cards import AGENT_CARDS
-from a2a_research.models import (
+from a2a_research.backend.core.a2a.cards import AGENT_CARDS
+from a2a_research.backend.core.models import (
     AgentRole,
     Claim,
     ResearchSession,

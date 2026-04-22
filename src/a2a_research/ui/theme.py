@@ -7,7 +7,7 @@ readable and tests can import colours without pulling in Mesop.
 
 from __future__ import annotations
 
-from a2a_research.models import AgentStatus
+from a2a_research.backend.core.models import AgentStatus
 
 STATUS_LABELS: dict[AgentStatus, str] = {
     AgentStatus.PENDING: "Waiting",

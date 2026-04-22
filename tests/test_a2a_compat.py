@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from a2a.types import AgentCard, AgentSkill
 
-from a2a_research.a2a.compat import make_agent_card, make_skill
+from a2a_research.backend.core.a2a.compat import make_agent_card, make_skill
 
 
 class TestMakeSkill:
@@ -34,9 +34,7 @@ class TestMakeSkill:
         assert skill.description == "a description"
 
     def test_tags_default_to_empty(self) -> None:
-        skill = make_skill(
-            skill_id="s", name="n", description="d"
-        )
+        skill = make_skill(skill_id="s", name="n", description="d")
         assert skill.tags == []
 
     def test_tags_provided(self) -> None:
@@ -49,9 +47,7 @@ class TestMakeSkill:
         assert skill.tags == ["a", "b"]
 
     def test_examples_default_to_empty(self) -> None:
-        skill = make_skill(
-            skill_id="s", name="n", description="d"
-        )
+        skill = make_skill(skill_id="s", name="n", description="d")
         assert skill.examples == []
 
     def test_examples_provided(self) -> None:
@@ -102,16 +98,12 @@ class TestMakeAgentCard:
 
     def test_url_in_supported_interfaces(self) -> None:
         url = "http://localhost:12345"
-        card = make_agent_card(
-            name="A", description="b", url=url
-        )
+        card = make_agent_card(name="A", description="b", url=url)
         urls = [iface.url for iface in card.supported_interfaces]
         assert url in urls
 
     def test_streaming_default_false(self) -> None:
-        card = make_agent_card(
-            name="A", description="b", url="http://x"
-        )
+        card = make_agent_card(name="A", description="b", url="http://x")
         assert card.capabilities.streaming is False
 
     def test_streaming_true(self) -> None:
@@ -124,9 +116,7 @@ class TestMakeAgentCard:
         assert card.capabilities.streaming is True
 
     def test_version_default(self) -> None:
-        card = make_agent_card(
-            name="A", description="b", url="http://x"
-        )
+        card = make_agent_card(name="A", description="b", url="http://x")
         assert card.version == "1.0.0"
 
     def test_version_custom(self) -> None:
@@ -172,13 +162,9 @@ class TestMakeAgentCard:
         assert card.skills[0].id == "sk"
 
     def test_empty_skills_by_default(self) -> None:
-        card = make_agent_card(
-            name="A", description="b", url="http://x"
-        )
+        card = make_agent_card(name="A", description="b", url="http://x")
         assert card.skills == []
 
     def test_push_notifications_default_false(self) -> None:
-        card = make_agent_card(
-            name="A", description="b", url="http://x"
-        )
+        card = make_agent_card(name="A", description="b", url="http://x")
         assert card.capabilities.push_notifications is False

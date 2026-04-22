@@ -21,9 +21,7 @@ from extract_prompts_v2 import (  # noqa: E402
 class TestExtractPromptsV1:
     """Tests for the regex-based extract_prompts (v1)."""
 
-    def test_no_change_when_no_triple_quoted(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_change_when_no_triple_quoted(self, tmp_path: Path) -> None:
         py_file = tmp_path / "test_file.py"
         content = "x = 'short string'\ny = 42\n"
         py_file.write_text(content, encoding="utf-8")
@@ -41,9 +39,7 @@ class TestExtractPromptsV1:
         result = extract_prompts_v1(py_file)
         assert result == 0
 
-    def test_extracts_long_triple_quoted_to_txt(
-        self, tmp_path: Path
-    ) -> None:
+    def test_extracts_long_triple_quoted_to_txt(self, tmp_path: Path) -> None:
         py_file = tmp_path / "test_file.py"
         long_content = "A" * 200
         content = f'my_prompt = """\n{long_content}\n"""\n'
@@ -70,9 +66,7 @@ class TestExtractPromptsV1:
         txt_content = txt_file.read_text(encoding="utf-8")
         assert '"""' not in txt_content
 
-    def test_returns_count_of_extractions(
-        self, tmp_path: Path
-    ) -> None:
+    def test_returns_count_of_extractions(self, tmp_path: Path) -> None:
         py_file = tmp_path / "test_file.py"
         long = "X" * 150
         content = f'a = """\n{long}\n"""\nb = """\n{long}\n"""\n'
@@ -81,9 +75,7 @@ class TestExtractPromptsV1:
         # Both should be extracted
         assert result >= 1
 
-    def test_file_unchanged_when_no_extractions(
-        self, tmp_path: Path
-    ) -> None:
+    def test_file_unchanged_when_no_extractions(self, tmp_path: Path) -> None:
         py_file = tmp_path / "test_file.py"
         content = "x = 1\n"
         py_file.write_text(content, encoding="utf-8")
@@ -94,9 +86,7 @@ class TestExtractPromptsV1:
 class TestExtractPromptsV2:
     """Tests for the AST-based extract_prompts (v2)."""
 
-    def test_no_extractions_for_short_strings(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_extractions_for_short_strings(self, tmp_path: Path) -> None:
         py_file = tmp_path / "module.py"
         content = "x = 'hello'\ny = 'world'\n"
         py_file.write_text(content, encoding="utf-8")
@@ -126,9 +116,7 @@ class TestExtractPromptsV2:
         txt_file = tmp_path / "module_PROMPT.txt"
         assert txt_file.exists()
 
-    def test_txt_file_contains_original_content(
-        self, tmp_path: Path
-    ) -> None:
+    def test_txt_file_contains_original_content(self, tmp_path: Path) -> None:
         py_file = tmp_path / "module.py"
         inner = "Important line\n" + "Details " * 15
         content = f'MY_VAR = """\n{inner}\n"""\n'
@@ -138,9 +126,7 @@ class TestExtractPromptsV2:
         txt_content = txt_file.read_text(encoding="utf-8")
         assert "Important line" in txt_content
 
-    def test_path_import_added_when_missing(
-        self, tmp_path: Path
-    ) -> None:
+    def test_path_import_added_when_missing(self, tmp_path: Path) -> None:
         py_file = tmp_path / "module.py"
         inner = "A" * 50 + "\n" + "B" * 60
         content = f'MY_PROMPT = """\n{inner}\n"""\n'
@@ -161,9 +147,7 @@ class TestExtractPromptsV2:
         # Should not duplicate the import
         assert new_content.count("from pathlib import Path") == 1
 
-    def test_py_file_references_txt_file(
-        self, tmp_path: Path
-    ) -> None:
+    def test_py_file_references_txt_file(self, tmp_path: Path) -> None:
         py_file = tmp_path / "module.py"
         inner = "A" * 50 + "\n" + "B" * 60
         content = f'MY_VAR = """\n{inner}\n"""\n'
@@ -173,9 +157,7 @@ class TestExtractPromptsV2:
         assert "module_MY_VAR.txt" in new_py
         assert "read_text" in new_py
 
-    def test_returns_count_of_extractions(
-        self, tmp_path: Path
-    ) -> None:
+    def test_returns_count_of_extractions(self, tmp_path: Path) -> None:
         py_file = tmp_path / "module.py"
         inner = "A" * 50 + "\n" + "B" * 60
         content = f'VAR1 = """\n{inner}\n"""\n'
@@ -193,18 +175,13 @@ class TestExtractPromptsV2:
         result = extract_prompts_v2(py_file)
         assert result == 0
 
-    def test_ignores_non_name_targets(
-        self, tmp_path: Path
-    ) -> None:
+    def test_ignores_non_name_targets(self, tmp_path: Path) -> None:
         """List element or attribute assignments are not extracted."""
         py_file = tmp_path / "module.py"
         inner = "A" * 50 + "\n" + "B" * 60
         # An augmented assign target (not ast.Name) — uses regular assign
         # but with subscript target which has len(targets)==1 but not Name
-        content = (
-            "d = {}\n"
-            f'd["key"] = """\n{inner}\n"""\n'
-        )
+        content = f'd = {{}}\nd["key"] = """\n{inner}\n"""\n'
         py_file.write_text(content, encoding="utf-8")
         result = extract_prompts_v2(py_file)
         # Subscript targets are not ast.Name, so should not be extracted

@@ -2,7 +2,7 @@
 
 import mesop as me
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
     AgentStatus,
