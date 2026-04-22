@@ -7,12 +7,13 @@ can fan-out over many URLs in parallel without blocking the event loop.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger, log_event
 
 logger = get_logger(__name__)
 
@@ -71,16 +72,41 @@ def _fetch_sync(url: str, max_chars: int) -> PageContent:
 
 
 async def fetch_and_extract(url: str, max_chars: int = 8000) -> PageContent:
-    """Fetch ``url`` and return extracted markdown, or a PageContent with error set."""
+    """Fetch ``url`` and return extracted markdown, or a PageContent with"""
+    """error set."""
     page = await asyncio.to_thread(_fetch_sync, url, max_chars)
     if page.error:
-        logger.warning("fetch_and_extract url=%s error=%s", url, page.error)
+        logger.debug("fetch_and_extract url=%s error=%s", url, page.error)
     else:
         logger.info("fetch_and_extract url=%s words=%s", url, page.word_count)
     return page
 
 
-async def fetch_many(urls: list[str], max_chars: int = 8000) -> list[PageContent]:
+async def fetch_many(
+    urls: list[str], max_chars: int = 8000
+) -> list[PageContent]:
     """Fetch several URLs in parallel via ``asyncio.gather``."""
+    log_event(
+        logger,
+        logging.INFO,
+        "fetch.batch_start",
+        url_count=len(urls),
+        urls=urls,
+        max_chars=max_chars,
+        transport="trafilatura.fetch_url",
+    )
     tasks = [fetch_and_extract(url, max_chars) for url in urls]
-    return list(await asyncio.gather(*tasks, return_exceptions=False))
+    pages = list(await asyncio.gather(*tasks, return_exceptions=False))
+    log_event(
+        logger,
+        logging.INFO,
+        "fetch.batch_done",
+        url_count=len(urls),
+        ok_count=sum(1 for p in pages if not p.error),
+        failed_count=sum(1 for p in pages if p.error),
+        results=[
+            {"url": p.url, "ok": not bool(p.error), "error": p.error}
+            for p in pages
+        ],
+    )
+    return pages

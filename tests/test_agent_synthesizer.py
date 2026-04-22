@@ -7,10 +7,21 @@ from typing import Any
 
 import pytest
 
-from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads, extract_text
+from a2a_research.a2a import (
+    A2AClient,
+    AgentRegistry,
+    extract_data_payloads,
+    extract_text,
+)
 from a2a_research.agents.pydantic_ai.synthesizer import SynthesizerExecutor
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
-from a2a_research.models import AgentRole, Claim, ReportOutput, Verdict, WebSource
+from a2a_research.models import (
+    AgentRole,
+    Claim,
+    ReportOutput,
+    Verdict,
+    WebSource,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -52,7 +63,11 @@ async def test_synthesizer_emits_report_and_markdown_artifacts(
                     sources=["https://x.example"],
                 ).model_dump()
             ],
-            "sources": [WebSource(url="https://x.example", title="X").model_dump(mode="json")],
+            "sources": [
+                WebSource(url="https://x.example", title="X").model_dump(
+                    mode="json"
+                )
+            ],
         },
     )
 
@@ -65,7 +80,9 @@ async def test_synthesizer_emits_report_and_markdown_artifacts(
 
 
 @pytest.mark.asyncio
-async def test_synthesizer_failure_emits_stub_report(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_synthesizer_failure_emits_stub_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     class _Boom:
         async def run(self, prompt: str) -> Any:
             raise RuntimeError("llm down")

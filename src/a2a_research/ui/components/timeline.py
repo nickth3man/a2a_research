@@ -2,7 +2,12 @@
 
 import mesop as me
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 from a2a_research.ui.data_access import get_agent_label, get_all_roles
 from a2a_research.ui.primitives import card_box
 from a2a_research.ui.tokens import (
@@ -25,7 +30,11 @@ from a2a_research.ui.tokens import (
 def CardTimeline(session: ResearchSession) -> None:  # noqa: N802
     """Display the agent pipeline timeline with status for each agent."""
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_SM):
-        me.text("Agent Pipeline", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
+        me.text(
+            "Agent Pipeline",
+            type="subtitle-1",
+            style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM),
+        )
         for role in get_all_roles(session):
             _render_agent_row(role, session.get_agent(role))
 
@@ -70,9 +79,15 @@ def _render_agent_row(role: AgentRole, result: AgentResult) -> None:
             margin=me.Margin(bottom=6),
         )
     ):
-        me.text(status_icon, style=me.Style(color=color, font_size="16px", width=20))
+        me.text(
+            status_icon,
+            style=me.Style(color=color, font_size="16px", width=20),
+        )
         with me.box(style=me.Style(flex=1)):
-            me.text(label, style=me.Style(font_weight="bold", font_size=FONT_SIZE_BODY))
+            me.text(
+                label,
+                style=me.Style(font_weight="bold", font_size=FONT_SIZE_BODY),
+            )
             if result.message:
                 me.text(
                     result.message,

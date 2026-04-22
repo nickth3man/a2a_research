@@ -1,4 +1,4 @@
-"""AgentCard re-export for the FactChecker role."""
+"""Static AgentCard for the FactChecker HTTP service."""
 
 from __future__ import annotations
 

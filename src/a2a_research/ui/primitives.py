@@ -1,4 +1,6 @@
-"""Shared Mesop layout primitives (card shells, badges) built from design tokens."""
+"""Shared Mesop layout primitives (card shells, badges) built from design
+tokens.
+"""
 
 from __future__ import annotations
 
@@ -22,7 +24,9 @@ if TYPE_CHECKING:
 
 
 @contextmanager
-def card_box(*, margin_bottom: int, padding: me.Padding | None = None) -> Iterator[None]:
+def card_box(
+    *, margin_bottom: int, padding: me.Padding | None = None
+) -> Iterator[None]:
     """Standard white card: outer margin wrapper + inner elevated surface."""
     pad = padding if padding is not None else CARD_PADDING
     with (
@@ -41,8 +45,12 @@ def card_box(*, margin_bottom: int, padding: me.Padding | None = None) -> Iterat
 
 
 def get_query_input_card_style() -> me.Style:
-    """Single-box card used for the query form (margin included on same node)."""
-    from a2a_research.ui.tokens import CARD_PADDING_LARGE, QUERY_CARD_MARGIN_BOTTOM
+    """Single-box card used for the query form (margin included on same
+    node)."""
+    from a2a_research.ui.tokens import (
+        CARD_PADDING_LARGE,
+        QUERY_CARD_MARGIN_BOTTOM,
+    )
 
     return me.Style(
         background=CARD_BACKGROUND,

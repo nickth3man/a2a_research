@@ -1,8 +1,13 @@
-"""Per-agent checklist with optional sub-step lines for the active step."""
+"""Per-agent checklist with secondary sub-step lines for the active step."""
 
 import mesop as me
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 from a2a_research.ui.data_access import get_agent_label, get_all_roles
 from a2a_research.ui.tokens import (
     FONT_SIZE_SMALL,
@@ -19,7 +24,8 @@ def StepChecklist(  # noqa: N802
     granularity: int,
     running_substeps: list[str],
 ) -> None:
-    """Icons and status for each agent; indented sub-steps when granularity \u2265 2."""
+    """Icons and status for each agent; indented sub-steps when
+    granularity \u2265 2."""
     for role in get_all_roles(session):
         result = session.get_agent(role)
         _render_checklist_row(role, result, granularity, running_substeps)
@@ -50,11 +56,17 @@ def _render_checklist_row(
             padding=me.Padding(left=4),
         )
     ):
-        with me.box(style=me.Style(display="flex", align_items="baseline", gap=8)):
-            me.text(icon, style=me.Style(color=color, font_size="14px", width=18))
+        with me.box(
+            style=me.Style(display="flex", align_items="baseline", gap=8)
+        ):
+            me.text(
+                icon, style=me.Style(color=color, font_size="14px", width=18)
+            )
             me.text(
                 label,
-                style=me.Style(font_weight="bold", font_size=FONT_SIZE_SMALL, flex=1),
+                style=me.Style(
+                    font_weight="bold", font_size=FONT_SIZE_SMALL, flex=1
+                ),
             )
             me.text(
                 STATUS_LABELS[result.status],
@@ -66,7 +78,11 @@ def _render_checklist_row(
                     border_radius=10,
                 ),
             )
-        if granularity >= 2 and result.status == AgentStatus.RUNNING and running_substeps:
+        if (
+            granularity >= 2
+            and result.status == AgentStatus.RUNNING
+            and running_substeps
+        ):
             for line in running_substeps:
                 me.text(
                     f"  \u2022 {line}",

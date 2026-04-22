@@ -20,8 +20,14 @@ from a2a_research.ui.tokens import (
 @me.component
 def PanelReport(session: ResearchSession) -> None:  # noqa: N802
     """Display the final research report in a markdown panel."""
-    with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_MD, padding=CARD_PADDING_LARGE):
-        me.text("Final Report", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM))
+    with card_box(
+        margin_bottom=SECTION_MARGIN_BOTTOM_MD, padding=CARD_PADDING_LARGE
+    ):
+        me.text(
+            "Final Report",
+            type="subtitle-1",
+            style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM),
+        )
         if not session.final_report:
             me.text(
                 "Report not ready \u2014 complete the pipeline first.",
@@ -31,7 +37,9 @@ def PanelReport(session: ResearchSession) -> None:  # noqa: N802
         me.text(
             "Tip: select the report below and use Ctrl+C / Cmd+C to copy it.",
             style=me.Style(
-                color=TEXT_MUTED, font_size=FONT_SIZE_SMALL, margin=me.Margin(bottom=12)
+                color=TEXT_MUTED,
+                font_size=FONT_SIZE_SMALL,
+                margin=me.Margin(bottom=12),
             ),
         )
         me.markdown(

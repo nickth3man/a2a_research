@@ -1,177 +1,110 @@
-"""A2A AgentExecutor for the Searcher role.
-
-Consumes ``{queries: list[str]}`` and returns a Task with a DataArtifact of
-``{queries_used, hits, errors, providers_successful}``.
-
-Error handling:
-- If every provider fails for every query (no hits + at least one error): emit
-  ``TaskState.failed`` with the provider-level failure reasons so the
-  FactChecker can see exactly why the web was unavailable.
-- If some providers succeed (even with zero results): emit ``completed`` and
-  attach any partial errors so downstream can log / annotate them.
-
-The Searcher is also wired as a smolagents :class:`ToolCallingAgent` (see
-``.agent``) for the standalone demo, but the pipeline path calls
-:func:`a2a_research.tools.web_search` directly in parallel for predictable
-latency and straightforward error accounting.
-"""
+"""A2A AgentExecutor for the Searcher role."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.types import (
-    Artifact,
-    DataPart,
-    Part,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-    TextPart,
-)
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
 from a2a_research.a2a.request_task import initial_task_or_new
-from a2a_research.app_logging import get_logger
-from a2a_research.tools import WebHit, web_search
+from a2a_research.agents.smolagents.searcher.card import SEARCHER_CARD
+from a2a_research.agents.smolagents.searcher.core import (
+    SearcherBatchResult,
+    search_queries,
+)
+from a2a_research.agents.smolagents.searcher.payload import (
+    _coerce_str_list,
+    _extract_payload,
+)
+from a2a_research.agents.smolagents.searcher.result import (
+    enqueue_search_result,
+)
+from a2a_research.logging.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
 
 logger = get_logger(__name__)
 
-__all__ = ["SearcherExecutor", "search_queries"]
-
-
-async def search_queries(queries: list[str]) -> tuple[list[WebHit], list[str], list[str]]:
-    """Run :func:`web_search` across ``queries`` in parallel.
-
-    Returns ``(hits, errors, providers_successful)`` where hits are deduped by
-    URL, errors is the deduplicated union of per-provider failure reasons, and
-    providers_successful is the union of providers that ran without error for
-    at least one query.
-    """
-    if not queries:
-        return [], [], []
-    results = await asyncio.gather(*[web_search(q) for q in queries], return_exceptions=False)
-    by_url: dict[str, WebHit] = {}
-    errors: list[str] = []
-    seen_errors: set[str] = set()
-    successful_providers: set[str] = set()
-    for sr in results:
-        for hit in sr.hits:
-            by_url.setdefault(hit.url, hit)
-        for err in sr.errors:
-            if err not in seen_errors:
-                seen_errors.add(err)
-                errors.append(err)
-        successful_providers.update(sr.providers_successful)
-    hits = sorted(by_url.values(), key=lambda h: (-h.score, h.source, h.url))
-    logger.info(
-        "Searcher searched queries=%s merged_hits=%s errors=%s successful_providers=%s",
-        len(queries),
-        len(hits),
-        len(errors),
-        sorted(successful_providers),
-    )
-    return hits, errors, sorted(successful_providers)
-
-
-def _derive_status(
-    queries: list[str],
-    hits: list[WebHit],
-    errors: list[str],
-    successful_providers: list[str],
-) -> tuple[TaskState, str | None]:
-    if not queries:
-        return TaskState.completed, None
-    # All providers errored for every query → the web layer is unavailable.
-    if not successful_providers and errors:
-        return TaskState.failed, ("All web-search providers failed: " + " | ".join(errors))
-    # Providers ran but the query simply had no matches: still a valid outcome.
-    return TaskState.completed, None
+__all__ = [
+    "SearcherBatchResult",
+    "SearcherExecutor",
+    "build_http_app",
+    "search_queries",
+]
 
 
 class SearcherExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
         payload = _extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+
+            emit_handoff(
+                direction="received",
+                role=AgentRole.SEARCHER,
+                peer_role=str(handoff_from),
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(
+                    json.dumps(payload, default=str).encode("utf-8")
+                ),
+                payload_preview=json.dumps(
+                    payload, default=str, indent=2, sort_keys=True
+                ),
+                session_id=session_id,
+            )
         queries = _coerce_str_list(payload.get("queries"))
-        if not queries and isinstance(payload.get("query"), str):
-            queries = [payload["query"]]
+        query_raw = payload.get("query")
+        if not queries and isinstance(query_raw, str):
+            queries = [query_raw]
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.SEARCHER,
+            1,
+            5,
+            "searcher_started",
+        )
 
         try:
-            hits, errors, successful_providers = await search_queries(queries)
+            batch = await search_queries(queries, session_id=session_id)
         except Exception as exc:
             logger.exception("Searcher crashed task_id=%s", task.id)
-            hits, errors, successful_providers = [], [f"Searcher crashed: {exc}"], []
-
-        status, error_text = _derive_status(queries, hits, errors, successful_providers)
-
-        artifact = Artifact(
-            artifact_id="search-hits",
-            name="search-hits",
-            parts=[
-                Part(
-                    root=DataPart(
-                        data={
-                            "queries_used": queries,
-                            "hits": [h.model_dump(mode="json") for h in hits],
-                            "errors": errors,
-                            "providers_successful": successful_providers,
-                        }
-                    )
-                )
-            ],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
+            batch = SearcherBatchResult(
+                hits=[],
+                errors=[f"Searcher crashed: {exc}"],
+                providers_successful=[],
             )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(state=status),
-                final=True,
-                metadata={"error": error_text} if error_text else None,
-            )
+
+        await enqueue_search_result(
+            task, event_queue, queries, batch, session_id
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
-def _extract_payload(context: RequestContext) -> dict[str, Any]:
-    if context.message is None:
-        return {}
-    for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            return dict(root.data)
-        if isinstance(root, TextPart):
-            try:
-                data = json.loads(root.text)
-            except (ValueError, TypeError):
-                continue
-            if isinstance(data, dict):
-                return data
-    return {}
-
-
-def _coerce_str_list(raw: Any) -> list[str]:
-    if isinstance(raw, str):
-        return [raw] if raw.strip() else []
-    if isinstance(raw, list):
-        return [str(item).strip() for item in raw if str(item).strip()]
-    return []
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=SearcherExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=SEARCHER_CARD,
+    )
+    return build_starlette_http_app(
+        agent_card=SEARCHER_CARD, http_handler=handler
+    )

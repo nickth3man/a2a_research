@@ -1,12 +1,16 @@
-"""Shared helpers for FactChecker LangGraph nodes (prompt building, parsing, task metadata)."""
+"""Shared helpers for FactChecker LangGraph nodes (prompt building, parsing,
+task metadata)."""
 
 from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any
 
-from a2a_research.json_utils import parse_json_safely
+from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import Claim, Verdict
+from a2a_research.utils.json_utils import parse_json_safely
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from a2a_research.tools import PageContent
@@ -28,15 +32,20 @@ def task_failed(task: Any) -> bool:
 
 def task_error_metadata(task: Any) -> str | None:
     status = getattr(task, "status", None)
-    metadata = getattr(status, "metadata", None) if status is not None else None
-    if isinstance(metadata, dict):
-        value = metadata.get("error")
-        if isinstance(value, str) and value.strip():
-            return value.strip()
+    message = getattr(status, "message", None) if status is not None else None
+    parts = getattr(message, "parts", None)
+    if parts is not None:
+        for part in parts:
+            root = getattr(part, "root", part)
+            text = getattr(root, "text", None)
+            if isinstance(text, str) and text.strip():
+                return text.strip()
     return None
 
 
-def build_verify_prompt(query: str, claims: list[Claim], evidence: list[PageContent]) -> str:
+def build_verify_prompt(
+    query: str, claims: list[Claim], evidence: list[PageContent]
+) -> str:
     claim_block = json.dumps(
         [
             {
@@ -63,16 +72,21 @@ def build_verify_prompt(query: str, claims: list[Claim], evidence: list[PageCont
     )
 
 
-def parse_verifier(raw: str, *, fallback: list[Claim]) -> tuple[list[Claim], list[str]]:
+def parse_verifier(
+    raw: str, *, fallback: list[Claim]
+) -> tuple[list[Claim], list[str]]:
     data = parse_json_safely(raw)
     if not isinstance(data, dict):
+        logger.warning("Verifier fallback path used for raw=%r", raw[:200])
         return fallback, []
     verified: list[Claim] = []
     for i, item in enumerate(data.get("verified_claims") or []):
         if not isinstance(item, dict):
             continue
         try:
-            verdict = Verdict(str(item.get("verdict") or "NEEDS_MORE_EVIDENCE"))
+            verdict = Verdict(
+                str(item.get("verdict") or "NEEDS_MORE_EVIDENCE")
+            )
         except ValueError:
             verdict = Verdict.NEEDS_MORE_EVIDENCE
         verified.append(
@@ -82,10 +96,16 @@ def parse_verifier(raw: str, *, fallback: list[Claim]) -> tuple[list[Claim], lis
                 verdict=verdict,
                 confidence=clamp_conf(item.get("confidence")),
                 sources=[str(s) for s in (item.get("sources") or []) if s],
-                evidence_snippets=[str(s) for s in (item.get("evidence_snippets") or []) if s],
+                evidence_snippets=[
+                    str(s) for s in (item.get("evidence_snippets") or []) if s
+                ],
             )
         )
     if not verified:
+        logger.warning(
+            "Verifier produced no valid claims; fallback path used for raw=%r",
+            raw[:200],
+        )
         verified = fallback
     follow = [
         str(q).strip()

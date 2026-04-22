@@ -1,4 +1,4 @@
-"""AgentCard re-export for the Searcher role."""
+"""Static AgentCard for the Searcher HTTP service."""
 
 from __future__ import annotations
 

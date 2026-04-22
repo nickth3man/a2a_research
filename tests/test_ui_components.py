@@ -12,7 +12,9 @@ from a2a_research.models import (
 )
 
 
-def test_agent_timeline_card_renders_rows(stub_mesop_component_runtime: None) -> None:
+def test_agent_timeline_card_renders_rows(
+    stub_mesop_component_runtime: None,
+) -> None:
     from a2a_research.ui.components import CardTimeline
 
     session = ResearchSession(query="q")
@@ -50,7 +52,9 @@ def test_claims_panel_with_claim(stub_mesop_component_runtime: None) -> None:
     PanelClaims(session)
 
 
-def test_sources_panel_empty_and_with_citations(stub_mesop_component_runtime: None) -> None:
+def test_sources_panel_empty_and_with_citations(
+    stub_mesop_component_runtime: None,
+) -> None:
     from a2a_research.ui.components import PanelSources
 
     PanelSources(ResearchSession(query="q"))
@@ -63,7 +67,9 @@ def test_sources_panel_empty_and_with_citations(stub_mesop_component_runtime: No
     PanelSources(session)
 
 
-def test_report_panel_empty_and_markdown(stub_mesop_component_runtime: None) -> None:
+def test_report_panel_empty_and_markdown(
+    stub_mesop_component_runtime: None,
+) -> None:
     from a2a_research.ui.components import PanelReport
 
     PanelReport(ResearchSession(query="q"))
@@ -76,7 +82,9 @@ def test_error_banner_truncates(stub_mesop_component_runtime: None) -> None:
     BannerError("x" * 500)
 
 
-def test_error_banner_short_message_no_ellipsis(stub_mesop_component_runtime: None) -> None:
+def test_error_banner_short_message_no_ellipsis(
+    stub_mesop_component_runtime: None,
+) -> None:
     from a2a_research.ui.components.banners import _error_banner_message
 
     assert _error_banner_message("short") == "Pipeline error: short"
@@ -88,16 +96,16 @@ def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
     from a2a_research.ui.components import CardLoading
 
     CardLoading(
-        progress_pct=0.4,
         progress_step_label="Step 2 of 4",
-        progress_substep_label="Calling LLM…",
         session=ResearchSession(query="Q"),
-        granularity=2,
         running_substeps=["Calling LLM…"],
+        activity_by_role={},
     )
 
 
-def test_report_panel_renders_without_html_iframe(stub_mesop_component_runtime: None) -> None:
+def test_report_panel_renders_without_html_iframe(
+    stub_mesop_component_runtime: None,
+) -> None:
     from unittest.mock import patch
 
     from a2a_research.ui.components import PanelReport

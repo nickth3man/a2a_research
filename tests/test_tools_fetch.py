@@ -11,7 +11,9 @@ from a2a_research.tools.fetch import PageContent, fetch_and_extract, fetch_many
 
 
 @pytest.mark.asyncio
-async def test_fetch_and_extract_happy(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_fetch_and_extract_happy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_fetch_sync(url: str, max_chars: int) -> PageContent:
         return PageContent(
             url=url,
@@ -29,7 +31,9 @@ async def test_fetch_and_extract_happy(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_fetch_and_extract_propagates_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_fetch_and_extract_propagates_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def fake_fetch_sync(url: str, max_chars: int) -> PageContent:
         return PageContent(url=url, error="fetch failed: boom")
 
@@ -42,7 +46,9 @@ async def test_fetch_and_extract_propagates_error(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.asyncio
 async def test_fetch_many_parallel(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_fetch_sync(url: str, max_chars: int) -> PageContent:
-        return PageContent(url=url, title=url, markdown=f"content of {url}", word_count=3)
+        return PageContent(
+            url=url, title=url, markdown=f"content of {url}", word_count=3
+        )
 
     monkeypatch.setattr(fetch_module, "_fetch_sync", fake_fetch_sync)
     pages = await fetch_many(["https://1.example", "https://2.example"])

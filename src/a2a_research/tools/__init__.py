@@ -1,6 +1,7 @@
 """Shared web research tools used by Searcher and Reader agents.
 
-- :func:`web_search` — parallel Tavily + DuckDuckGo search, merged by URL.
+- :func:`web_search` — parallel Tavily + Brave + DuckDuckGo search, merged by
+  URL.
 - :func:`fetch_and_extract` — trafilatura-based fetch + main-text extraction.
 - :class:`WebHit`, :class:`PageContent` — Pydantic DTOs exchanged via A2A.
 """

@@ -1,87 +1,122 @@
 """A2A AgentExecutor for the Planner role.
 
-Consumes ``{query}`` (string or DataPart) and returns a Task with a DataArtifact
-of ``{claims, seed_queries}`` — the handoff shape the FactChecker expects.
+Consumes ``{query}`` (string or data part) and returns a Task with a data
+artifact of ``{claims, seed_queries}`` — the handoff shape the FactChecker
+expects.
 """
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
-from a2a.types import (
-    Artifact,
-    DataPart,
-    Part,
-    TaskArtifactUpdateEvent,
-    TaskState,
-    TaskStatus,
-    TaskStatusUpdateEvent,
-    TextPart,
-)
+from a2a.server.request_handlers import DefaultRequestHandler
+from a2a.server.tasks import InMemoryTaskStore
+from a2a.types import TaskState
 
+from a2a_research.a2a.compat import build_http_app as build_starlette_http_app
 from a2a_research.a2a.request_task import initial_task_or_new
+from a2a_research.agents.pocketflow.planner.card import PLANNER_CARD
+from a2a_research.agents.pocketflow.planner.events import enqueue_plan_result
+from a2a_research.agents.pocketflow.planner.extract import (
+    extract_payload,
+    extract_query,
+)
 from a2a_research.agents.pocketflow.planner.flow import plan
-from a2a_research.app_logging import get_logger
+from a2a_research.logging.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.progress import ProgressPhase, emit, using_session
 
 if TYPE_CHECKING:
     from a2a.server.events import EventQueue
 
 logger = get_logger(__name__)
 
-__all__ = ["PlannerExecutor"]
+__all__ = ["PlannerExecutor", "build_http_app"]
 
 
 class PlannerExecutor(AgentExecutor):
-    async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def execute(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         task = initial_task_or_new(context)
         await event_queue.enqueue_event(task)
 
-        query = _extract_query(context)
+        query = extract_query(context)
+        payload = extract_payload(context)
+        session_id = str(payload.get("session_id") or "")
+        handoff_from = payload.get("handoff_from")
+        if session_id and handoff_from:
+            from a2a_research.progress import emit_handoff
+
+            preview = json.dumps(
+                payload, default=str, indent=2, sort_keys=True
+            )
+            emit_handoff(
+                direction="received",
+                role=AgentRole.PLANNER,
+                peer_role=str(handoff_from),
+                payload_keys=sorted(payload.keys()),
+                payload_bytes=len(preview.encode("utf-8")),
+                payload_preview=preview,
+                session_id=session_id,
+            )
+        from a2a_research.workflow.definitions import (
+            STEP_INDEX_V2 as SI,
+        )
+        from a2a_research.workflow.definitions import (
+            TOTAL_STEPS_V2 as TS,
+        )
+
+        planner_step = SI[AgentRole.PLANNER]
+        emit(
+            session_id,
+            ProgressPhase.STEP_STARTED,
+            AgentRole.PLANNER,
+            planner_step,
+            TS,
+            "planner_started",
+        )
+        emit(
+            session_id,
+            ProgressPhase.STEP_SUBSTEP,
+            AgentRole.PLANNER,
+            planner_step,
+            TS,
+            "decompose",
+        )
 
         try:
-            claims, seed_queries = await plan(query)
-            status = TaskState.completed
+            with using_session(session_id):
+                plan_result = await plan(
+                    query,
+                    session_id=session_id,
+                    include_dag=True,
+                )
+                claims = plan_result[0]
+                claim_dag = plan_result[1] if len(plan_result) > 2 else None
+                seed_queries = plan_result[-1]
+            status = TaskState.TASK_STATE_COMPLETED
             error_text: str | None = None
         except Exception as exc:
             logger.exception("Planner failed task_id=%s", task.id)
-            claims, seed_queries = [], []
-            status = TaskState.failed
+            claims, claim_dag, seed_queries = [], None, []
+            status = TaskState.TASK_STATE_FAILED
             error_text = str(exc)
 
-        artifact = Artifact(
-            artifact_id="plan",
-            name="plan",
-            parts=[
-                Part(
-                    root=DataPart(
-                        data={
-                            "query": query,
-                            "claims": [c.model_dump(mode="json") for c in claims],
-                            "seed_queries": seed_queries,
-                        }
-                    )
-                )
-            ],
-        )
-        await event_queue.enqueue_event(
-            TaskArtifactUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                artifact=artifact,
-                append=False,
-                last_chunk=True,
-            )
-        )
-        await event_queue.enqueue_event(
-            TaskStatusUpdateEvent(
-                task_id=task.id,
-                context_id=task.context_id,
-                status=TaskStatus(state=status),
-                final=True,
-                metadata={"error": error_text} if error_text else None,
-            )
+        await enqueue_plan_result(
+            task,
+            event_queue,
+            query,
+            claims,
+            claim_dag,
+            seed_queries,
+            status,
+            error_text,
+            session_id,
+            planner_step,
+            TS,
         )
         logger.info(
             "Planner task_id=%s claims=%s seeds=%s",
@@ -90,27 +125,18 @@ class PlannerExecutor(AgentExecutor):
             len(seed_queries),
         )
 
-    async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+    async def cancel(
+        self, context: RequestContext, event_queue: EventQueue
+    ) -> None:
         pass
 
 
-def _extract_query(context: RequestContext) -> str:
-    if context.message is None:
-        return ""
-    text_parts: list[str] = []
-    for part in context.message.parts:
-        root = getattr(part, "root", part)
-        if isinstance(root, DataPart):
-            query = root.data.get("query")
-            if isinstance(query, str) and query.strip():
-                return query.strip()
-        elif isinstance(root, TextPart) and root.text.strip():
-            text_parts.append(root.text.strip())
-    joined = "\n".join(text_parts).strip()
-    try:
-        data = json.loads(joined) if joined else None
-    except (ValueError, TypeError):
-        data = None
-    if isinstance(data, dict) and isinstance(data.get("query"), str):
-        return str(data["query"]).strip()
-    return joined
+def build_http_app() -> Any:
+    handler = DefaultRequestHandler(
+        agent_executor=PlannerExecutor(),
+        task_store=InMemoryTaskStore(),
+        agent_card=PLANNER_CARD,
+    )
+    return build_starlette_http_app(
+        agent_card=PLANNER_CARD, http_handler=handler
+    )

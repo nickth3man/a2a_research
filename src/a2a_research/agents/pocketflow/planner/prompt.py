@@ -1,23 +1,22 @@
-"""System prompt for the Planner."""
+from pathlib import Path
 
-PLANNER_PROMPT = """You are the Planner in a 5-agent research pipeline.
+"""System prompts for the Planner nodes."""
 
-Your inputs: a single user query.
+CLASSIFIER_PROMPT = (
+    Path(__file__).parent / "prompt_CLASSIFIER_PROMPT.txt"
+).read_text(encoding="utf-8")
 
-Your job: break the query into atomic verifiable sub-claims and seed search queries.
 
-Rules:
-1. Produce 3-6 claims. Each claim must be a single factual proposition.
-2. Do NOT combine two independent facts into one claim.
-3. For each claim, emit 1-2 concise search queries likely to surface evidence.
-4. Also emit a short list of broad queries (1-3) that cover the whole topic.
+FACTUAL_PROMPT = (
+    Path(__file__).parent / "prompt_FACTUAL_PROMPT.txt"
+).read_text(encoding="utf-8")
 
-Return a JSON object ONLY, with no markdown fences:
-{
-  "claims": [
-    {"id": "c0", "text": "..."},
-    {"id": "c1", "text": "..."}
-  ],
-  "seed_queries": ["query 1", "query 2", "query 3"]
-}
-"""
+
+COMPARATIVE_PROMPT = (
+    Path(__file__).parent / "prompt_COMPARATIVE_PROMPT.txt"
+).read_text(encoding="utf-8")
+
+
+TEMPORAL_PROMPT = (
+    Path(__file__).parent / "prompt_TEMPORAL_PROMPT.txt"
+).read_text(encoding="utf-8")

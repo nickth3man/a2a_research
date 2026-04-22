@@ -4,211 +4,113 @@ Single source of truth for:
 
 - agents/     (per-agent I/O and session mutation)
 - workflow/   (top-level orchestrator state)
-- a2a/        (in-process A2A registry + client)
-- ui/         (Mesop ``@stateclass`` fields — keep nested models concrete for Mesop serialization)
+- a2a/        (A2A client payloads, cards, and task helpers)
+- ui/         (Mesop ``@stateclass`` fields — keep nested models
+               concrete for Mesop serialization)
 """
 
 from __future__ import annotations
 
-import uuid
-from datetime import UTC, datetime
-from enum import StrEnum
-from typing import Any
-
-from pydantic import BaseModel, Field, field_validator
-
-from a2a_research.models.artifact import (
-    Artifact as Artifact,
+from a2a_research.models.claims import (
+    Claim,
+    ClaimDAG,
+    ClaimDependency,
+    ClaimFollowUp,
+    FreshnessWindow,
+    ReplanReason,
 )
-from a2a_research.models.artifact import (
-    ArtifactKind as ArtifactKind,
+from a2a_research.models.enums import (
+    AgentCapability,
+    AgentRole,
+    AgentStatus,
+    ProvenanceEdgeType,
+    ReplanReasonCode,
+    TaskStatus,
+    Verdict,
 )
-from a2a_research.models.artifact import (
-    DataArtifact as DataArtifact,
+from a2a_research.models.evidence import (
+    CredibilitySignals,
+    EvidenceUnit,
+    IndependenceGraph,
+    Passage,
 )
-from a2a_research.models.artifact import (
-    StreamArtifact as StreamArtifact,
+from a2a_research.models.fact_checker import FactCheckerOutput
+from a2a_research.models.provenance import (
+    ProvenanceEdge,
+    ProvenanceNode,
+    ProvenanceTree,
 )
-from a2a_research.models.artifact import (
-    TextArtifact as TextArtifact,
+from a2a_research.models.reports import (
+    Citation,
+    ReportOutput,
+    ReportSection,
+    WebSource,
 )
-from a2a_research.models.artifact import (
-    wrap_in_artifact as wrap_in_artifact,
+from a2a_research.models.session import (
+    AgentResult,
+    ResearchSession,
+    default_roles,
+    workflow_v2_roles,
 )
-from a2a_research.models.policy import (
-    PolicyEffect as PolicyEffect,
+from a2a_research.models.verification import (
+    ClaimState,
+    ClaimVerification,
+    VerificationRevision,
 )
-from a2a_research.models.policy import (
-    WorkflowPolicy as WorkflowPolicy,
+from a2a_research.models.workflow import (
+    AgentDefinition,
+    BudgetConsumption,
+    CircuitBreakerConfig,
+    NoveltyTracker,
+    RetryPolicy,
+    WorkflowBudget,
 )
 
 __all__ = [
+    # Enums
+    "AgentCapability",
+    # Workflow
+    "AgentDefinition",
+    # Session / Agents
     "AgentResult",
     "AgentRole",
     "AgentStatus",
-    "Artifact",
-    "ArtifactKind",
+    "BudgetConsumption",
+    "CircuitBreakerConfig",
+    # Reports
     "Citation",
+    # Claims
     "Claim",
-    "DataArtifact",
-    "PolicyEffect",
+    "ClaimDAG",
+    "ClaimDependency",
+    "ClaimFollowUp",
+    "ClaimState",
+    "ClaimVerification",
+    # Evidence
+    "CredibilitySignals",
+    "EvidenceUnit",
+    # FactChecker
+    "FactCheckerOutput",
+    "FreshnessWindow",
+    "IndependenceGraph",
+    "NoveltyTracker",
+    "Passage",
+    # Provenance
+    "ProvenanceEdge",
+    "ProvenanceEdgeType",
+    "ProvenanceNode",
+    "ProvenanceTree",
+    "ReplanReason",
+    "ReplanReasonCode",
     "ReportOutput",
     "ReportSection",
     "ResearchSession",
-    "StreamArtifact",
+    "RetryPolicy",
     "TaskStatus",
-    "TextArtifact",
     "Verdict",
+    "VerificationRevision",
     "WebSource",
-    "WorkflowPolicy",
+    "WorkflowBudget",
     "default_roles",
-    "wrap_in_artifact",
+    "workflow_v2_roles",
 ]
-
-# ─── Enums ────────────────────────────────────────────────────────────────────
-
-
-class Verdict(StrEnum):
-    SUPPORTED = "SUPPORTED"
-    REFUTED = "REFUTED"
-    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
-    NEEDS_MORE_EVIDENCE = "NEEDS_MORE_EVIDENCE"
-
-
-class AgentRole(StrEnum):
-    PLANNER = "planner"
-    SEARCHER = "searcher"
-    READER = "reader"
-    FACT_CHECKER = "fact_checker"
-    SYNTHESIZER = "synthesizer"
-
-
-class AgentStatus(StrEnum):
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-
-
-class TaskStatus(StrEnum):
-    SUBMITTED = "submitted"
-    WORKING = "working"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-# ─── Core Domain Objects ──────────────────────────────────────────────────────
-
-
-class Claim(BaseModel):
-    id: str = Field(default_factory=lambda: f"clm_{uuid.uuid4().hex[:8]}")
-    text: str
-    confidence: float = Field(ge=0.0, le=1.0, default=0.5)
-    verdict: Verdict = Verdict.NEEDS_MORE_EVIDENCE
-    sources: list[str] = Field(default_factory=list)
-    evidence_snippets: list[str] = Field(default_factory=list)
-
-    @field_validator("id", mode="before")
-    @classmethod
-    def _coerce_id_to_string(cls, value: Any) -> str:
-        if isinstance(value, str):
-            stripped = value.strip()
-            if stripped:
-                return stripped
-        elif value is not None:
-            normalized = str(value).strip()
-            if normalized:
-                return normalized
-        msg = "Claim id must be a non-empty string."
-        raise ValueError(msg)
-
-
-class WebSource(BaseModel):
-    """A web resource discovered during research (URL-level citation)."""
-
-    url: str
-    title: str = ""
-    excerpt: str = ""
-    accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-
-class Citation(BaseModel):
-    """Inline citation attached to a report section."""
-
-    url: str
-    title: str = ""
-    quote: str = ""
-
-
-class ReportSection(BaseModel):
-    heading: str
-    body: str
-    citations: list[Citation] = Field(default_factory=list)
-
-
-class ReportOutput(BaseModel):
-    """Structured final report produced by the Synthesizer."""
-
-    title: str
-    summary: str
-    sections: list[ReportSection] = Field(default_factory=list)
-    citations: list[Citation] = Field(default_factory=list)
-
-    def to_markdown(self) -> str:
-        """Render the report as markdown (used by UI report panel)."""
-        parts: list[str] = [f"# {self.title}", "", self.summary.strip(), ""]
-        for section in self.sections:
-            parts.append(f"## {section.heading}")
-            parts.append("")
-            parts.append(section.body.strip())
-            parts.append("")
-        if self.citations:
-            parts.append("## Sources")
-            parts.append("")
-            for i, c in enumerate(self.citations, 1):
-                label = c.title or c.url
-                parts.append(f"{i}. [{label}]({c.url})")
-        return "\n".join(parts).strip() + "\n"
-
-
-class AgentResult(BaseModel):
-    role: AgentRole
-    status: AgentStatus = AgentStatus.PENDING
-    message: str = ""
-    claims: list[Claim] = Field(default_factory=list)
-    raw_content: str = ""
-    citations: list[str] = Field(default_factory=list)
-
-
-def default_roles() -> list[AgentRole]:
-    """Pipeline order: Planner → FactChecker (team loop) → Synthesizer.
-
-    Searcher + Reader run inside the FactChecker loop, not at the top level,
-    but they are included here so the UI timeline can display their status.
-    """
-    return [
-        AgentRole.PLANNER,
-        AgentRole.SEARCHER,
-        AgentRole.READER,
-        AgentRole.FACT_CHECKER,
-        AgentRole.SYNTHESIZER,
-    ]
-
-
-class ResearchSession(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    query: str = ""
-    roles: list[AgentRole] = Field(default_factory=default_roles)
-    agent_results: dict[AgentRole, AgentResult] = Field(default_factory=dict)
-    sources: list[WebSource] = Field(default_factory=list)
-    claims: list[Claim] = Field(default_factory=list)
-    report: ReportOutput | None = None
-    final_report: str = ""
-    error: str | None = None
-
-    def get_agent(self, role: AgentRole) -> AgentResult:
-        return self.agent_results.get(role, AgentResult(role=role))
-
-    def ensure_agent_results(self) -> None:
-        for role in self.roles:
-            self.agent_results.setdefault(role, AgentResult(role=role))

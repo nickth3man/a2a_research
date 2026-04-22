@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+)
 from a2a_research.ui.session_state import has_results
 
 
@@ -73,8 +78,8 @@ def test_main_page_loading_does_not_render_timeline() -> None:
     )
     with (
         patch("a2a_research.ui.app.me.state", return_value=st),
-        patch("a2a_research.ui.app.CardLoading") as card_loading,
-        patch("a2a_research.ui.app.CardTimeline") as card_timeline,
+        patch("a2a_research.ui.page_content.CardLoading") as card_loading,
+        patch("a2a_research.ui.page_content.CardTimeline") as card_timeline,
     ):
         app_mod.main_page()
 

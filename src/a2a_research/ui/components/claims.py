@@ -28,11 +28,14 @@ def PanelClaims(session: ResearchSession) -> None:  # noqa: N802
     claims = get_verified_claims(session)
     with card_box(margin_bottom=SECTION_MARGIN_BOTTOM_MD):
         me.text(
-            "Verified Claims", type="subtitle-1", style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM)
+            "Verified Claims",
+            type="subtitle-1",
+            style=me.Style(margin=SUBTITLE_MARGIN_BOTTOM),
         )
         if not claims:
             me.text(
-                "No verified claims yet — run a query first.", style=me.Style(color=TEXT_MUTED)
+                "No verified claims yet — run a query first.",
+                style=me.Style(color=TEXT_MUTED),
             )
             return
         for claim in claims:
@@ -54,14 +57,20 @@ def _render_claim(claim: Claim) -> None:
             margin=me.Margin(bottom=8),
         )
     ):
-        with me.box(style=me.Style(display="flex", align_items="flex-start", gap=10)):
+        with me.box(
+            style=me.Style(display="flex", align_items="flex-start", gap=10)
+        ):
             me.text(
                 claim.text,
-                style=me.Style(flex=1, font_size=FONT_SIZE_BODY, line_height=1.5),
+                style=me.Style(
+                    flex=1, font_size=FONT_SIZE_BODY, line_height=1.5
+                ),
             )
             verdict_badge_text(badge, verdict_color_value)
 
-        with me.box(style=me.Style(display="flex", gap=16, margin=me.Margin(top=6))):
+        with me.box(
+            style=me.Style(display="flex", gap=16, margin=me.Margin(top=6))
+        ):
             me.text(
                 f"Confidence: {confidence_label}",
                 style=me.Style(font_size=FONT_SIZE_SMALL, color=TEXT_MUTED),
@@ -69,17 +78,30 @@ def _render_claim(claim: Claim) -> None:
             if claim.sources:
                 me.text(
                     f"Sources: {', '.join(claim.sources)}",
-                    style=me.Style(font_size=FONT_SIZE_SMALL, color=TEXT_MUTED),
+                    style=me.Style(
+                        font_size=FONT_SIZE_SMALL, color=TEXT_MUTED
+                    ),
                 )
 
         for snippet in claim.evidence_snippets:
             with me.box(
                 style=me.Style(
                     border=me.Border(
-                        top=me.BorderSide(width=3, color=f"{verdict_color_value}55"),
-                        right=me.BorderSide(width=BORDER_WIDTH, color=f"{verdict_color_value}55"),
-                        bottom=me.BorderSide(width=BORDER_WIDTH, color=f"{verdict_color_value}55"),
-                        left=me.BorderSide(width=BORDER_WIDTH, color=f"{verdict_color_value}55"),
+                        top=me.BorderSide(
+                            width=3, color=f"{verdict_color_value}55"
+                        ),
+                        right=me.BorderSide(
+                            width=BORDER_WIDTH,
+                            color=f"{verdict_color_value}55",
+                        ),
+                        bottom=me.BorderSide(
+                            width=BORDER_WIDTH,
+                            color=f"{verdict_color_value}55",
+                        ),
+                        left=me.BorderSide(
+                            width=BORDER_WIDTH,
+                            color=f"{verdict_color_value}55",
+                        ),
                     ),
                     padding=me.Padding(top=0, right=0, bottom=0, left=10),
                     margin=me.Margin(top=4),
@@ -87,5 +109,7 @@ def _render_claim(claim: Claim) -> None:
             ):
                 me.text(
                     snippet,
-                    style=me.Style(font_size=FONT_SIZE_SMALL, color=EVIDENCE_TEXT_COLOR),
+                    style=me.Style(
+                        font_size=FONT_SIZE_SMALL, color=EVIDENCE_TEXT_COLOR
+                    ),
                 )

@@ -5,8 +5,18 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.models import AgentResult, AgentRole, AgentStatus, ResearchSession
-from a2a_research.ui.session_state import get_session_error, has_progress, has_results
+from a2a_research.models import (
+    AgentResult,
+    AgentRole,
+    AgentStatus,
+    ResearchSession,
+    default_roles,
+)
+from a2a_research.ui.session_state import (
+    get_session_error,
+    has_progress,
+    has_results,
+)
 
 
 class TestHasResults:
@@ -72,7 +82,7 @@ class TestHasResults:
         assert has_results(s) is False
 
     def test_has_progress_tracks_seeded_pipeline_state(self) -> None:
-        s = ResearchSession(query="q")
+        s = ResearchSession(query="q", roles=default_roles())
         s.ensure_agent_results()
         assert has_progress(s) is True
 
@@ -98,7 +108,10 @@ class TestResearchSessionJsonRoundTrip:
         restored = ResearchSession.model_validate(dumped)
         assert restored.query == original.query
         assert restored.final_report == original.final_report
-        assert restored.agent_results[AgentRole.FACT_CHECKER].status == AgentStatus.COMPLETED
+        assert (
+            restored.agent_results[AgentRole.FACT_CHECKER].status
+            == AgentStatus.COMPLETED
+        )
 
     def test_model_validate_rejects_bad_shape(self) -> None:
         with pytest.raises(ValidationError):

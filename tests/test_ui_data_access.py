@@ -8,7 +8,7 @@ from a2a_research.models import (
     ResearchSession,
     Verdict,
     WebSource,
-    default_roles,
+    workflow_v2_roles,
 )
 from a2a_research.ui.data_access import (
     get_agent_label,
@@ -58,7 +58,9 @@ class TestGetAgentLabel:
         assert get_agent_label(AgentRole.FACT_CHECKER) == "FactChecker"
 
     def test_fallback_to_role_value(self) -> None:
-        with patch.dict("a2a_research.ui.data_access.AGENT_CARDS", {}, clear=True):
+        with patch.dict(
+            "a2a_research.ui.data_access.AGENT_CARDS", {}, clear=True
+        ):
             assert get_agent_label(AgentRole.SEARCHER) == "searcher"
 
 
@@ -68,16 +70,19 @@ class TestGetAllRoles:
         assert get_all_roles(session) == [AgentRole.SEARCHER]
 
     def test_fallback_when_session_none(self) -> None:
-        assert get_all_roles(None) == default_roles()
+        assert get_all_roles(None) == workflow_v2_roles()
 
     def test_fallback_when_session_empty_roles(self) -> None:
         session = ResearchSession(query="q", roles=[])
-        assert get_all_roles(session) == default_roles()
+        assert get_all_roles(session) == workflow_v2_roles()
 
 
 class TestFormatSourceDisplay:
     def test_formats_url_host_and_tail(self) -> None:
-        assert format_source_display("https://nasa.example/jwst") == "nasa.example/jwst"
+        assert (
+            format_source_display("https://nasa.example/jwst")
+            == "nasa.example/jwst"
+        )
 
     def test_host_only_when_root(self) -> None:
         assert format_source_display("https://example.com/") == "example.com"

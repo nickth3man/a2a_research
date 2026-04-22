@@ -9,17 +9,65 @@ import pytest
 
 from a2a_research.models import AgentRole
 from a2a_research.progress import (
+    Bus,
     ProgressEvent,
     ProgressPhase,
     create_progress_reporter,
     drain_progress_while_running,
+    emit,
 )
 
 
 @pytest.mark.asyncio
-async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> None:
+async def test_bus_register_get_unregister_lifecycle() -> None:
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    Bus.register("session-1", queue)
+    assert Bus.get("session-1") is queue
+    Bus.unregister("session-1")
+    assert Bus.get("session-1") is None
+
+
+@pytest.mark.asyncio
+async def test_emit_returns_silently_when_no_queue_registered() -> None:
+    emit(
+        "missing-session",
+        ProgressPhase.STEP_STARTED,
+        AgentRole.PLANNER,
+        0,
+        5,
+        "planner_started",
+    )
+
+
+@pytest.mark.asyncio
+async def test_emit_puts_event_on_registered_queue() -> None:
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    Bus.register("session-1", queue)
+
+    emit(
+        "session-1",
+        ProgressPhase.STEP_STARTED,
+        AgentRole.PLANNER,
+        0,
+        5,
+        "planner_started",
+    )
+
+    event = await asyncio.wait_for(queue.get(), timeout=0.5)
+    assert event is not None
+    assert event.session_id == "session-1"
+    assert event.role == AgentRole.PLANNER
+
+    Bus.unregister("session-1")
+
+
+@pytest.mark.asyncio
+async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> (
+    None
+):
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
+        session_id="session-1",
         phase=ProgressPhase.STEP_STARTED,
         role=AgentRole.PLANNER,
         step_index=0,
@@ -48,9 +96,12 @@ async def test_drain_progress_does_not_cancel_workflow_when_queue_wins() -> None
 
 
 @pytest.mark.asyncio
-async def test_drain_progress_drains_trailing_events_after_workflow_done() -> None:
+async def test_drain_progress_drains_trailing_events_after_workflow_done() -> (
+    None
+):
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     event = ProgressEvent(
+        session_id="session-1",
         phase=ProgressPhase.STEP_COMPLETED,
         role=AgentRole.PLANNER,
         step_index=0,
@@ -66,20 +117,21 @@ async def test_drain_progress_drains_trailing_events_after_workflow_done() -> No
     await queue.put(event)
     await queue.put(None)
 
-    events = [evt async for evt in drain_progress_while_running(queue, workflow_task)]
+    events = [
+        evt async for evt in drain_progress_while_running(queue, workflow_task)
+    ]
 
     assert events == [event]
 
 
 @pytest.mark.asyncio
 async def test_create_progress_reporter_schedules_put_on_target_loop() -> None:
-    """The reporter is invoked from worker threads; it must schedule ``queue.put_nowait``
-    on the owning event loop via ``call_soon_threadsafe`` so the consumer wakes up."""
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     reporter = create_progress_reporter(loop, queue)
 
     event = ProgressEvent(
+        session_id="session-1",
         phase=ProgressPhase.STEP_STARTED,
         role=AgentRole.PLANNER,
         step_index=0,
@@ -98,8 +150,6 @@ async def test_create_progress_reporter_schedules_put_on_target_loop() -> None:
 
 
 def test_create_progress_reporter_uses_call_soon_threadsafe() -> None:
-    """Explicitly verify thread-safety wiring so worker threads can report progress
-    without crossing the event loop directly."""
     from unittest.mock import MagicMock
 
     loop = MagicMock()

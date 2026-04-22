@@ -1,0 +1,47 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "serve-all",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.launcher"],
+      "port": 10001
+    },
+    {
+      "name": "planner",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.pocketflow.planner"],
+      "port": 10001
+    },
+    {
+      "name": "searcher",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.smolagents.searcher"],
+      "port": 10002
+    },
+    {
+      "name": "reader",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.smolagents.reader"],
+      "port": 10003
+    },
+    {
+      "name": "fact-checker",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.langgraph.fact_checker"],
+      "port": 10004
+    },
+    {
+      "name": "synthesizer",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.pydantic_ai.synthesizer"],
+      "port": 10005
+    },
+    {
+      "name": "mesop-ui",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "mesop", "src/a2a_research/ui/app.py"],
+      "port": 32123
+    }
+  ]
+}

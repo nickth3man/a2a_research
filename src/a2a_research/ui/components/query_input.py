@@ -5,10 +5,8 @@ from typing import Any, cast
 
 import mesop as me
 
-from a2a_research.ui.components.granularity_toggle import GranularityToggle
 from a2a_research.ui.primitives import get_query_input_card_style
 from a2a_research.ui.tokens import (
-    BORDER_COLOR,
     CHIP_BG,
     CHIP_BORDER,
     CHIP_RADIUS,
@@ -47,10 +45,6 @@ def CardQueryInput(  # noqa: N802
     *,
     query_text: str = "",
     submit_disabled: bool = False,
-    progress_granularity: int = 1,
-    on_granularity_agent: Callable[[Any], Any] | None = None,
-    on_granularity_substep: Callable[[Any], Any] | None = None,
-    on_granularity_detail: Callable[[Any], Any] | None = None,
     on_example_a: Callable[[Any], Any] | None = None,
     on_example_b: Callable[[Any], Any] | None = None,
     on_example_c: Callable[[Any], Any] | None = None,
@@ -84,7 +78,10 @@ def CardQueryInput(  # noqa: N802
                 )
             with me.box(
                 style=me.Style(
-                    display="flex", gap=8, flex_wrap="wrap", margin=me.Margin(bottom=12)
+                    display="flex",
+                    gap=8,
+                    flex_wrap="wrap",
+                    margin=me.Margin(bottom=12),
                 )
             ):
                 for example_query, handler in (
@@ -98,31 +95,6 @@ def CardQueryInput(  # noqa: N802
                         type="stroked",
                         style=_CHIP_STYLE,
                     )
-        if on_granularity_agent and on_granularity_substep and on_granularity_detail:
-            with me.box(
-                style=me.Style(
-                    margin=me.Margin(bottom=12),
-                    padding=me.Padding(bottom=12),
-                    border=me.Border(
-                        bottom=me.BorderSide(width=1, color=BORDER_COLOR),
-                    ),
-                )
-            ):
-                me.text(
-                    "Pipeline settings",
-                    style=me.Style(
-                        font_size=FONT_SIZE_SMALL,
-                        color=TEXT_MUTED,
-                        font_weight="bold",
-                        margin=me.Margin(bottom=8),
-                    ),
-                )
-                GranularityToggle(
-                    current=progress_granularity,
-                    on_agent_level=on_granularity_agent,
-                    on_substep_level=on_granularity_substep,
-                    on_detail_level=on_granularity_detail,
-                )
         me.textarea(
             label="Enter your research question\u2026",
             key="query",
@@ -142,11 +114,14 @@ def CardQueryInput(  # noqa: N802
                 padding=SUBMIT_BUTTON_PADDING,
             )
         ):
-            # Mesop's current button disabled code path still expects an int-backed
-            # CodeValue during serialization, even though the public API is typed as bool.
+            # Mesop's current button disabled code path still expects
+            # an int-backed CodeValue during serialization, even though
+            # the public API is typed as bool.
             button_style = (
                 me.Style(
-                    background="linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)",
+                    background=(
+                        "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)"
+                    ),
                     color="#fff",
                 )
                 if not submit_disabled

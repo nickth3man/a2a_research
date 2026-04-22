@@ -16,7 +16,7 @@ def ProgressBar(  # noqa: N802
     step_label: str,
     substep_label: str,
 ) -> None:
-    """Horizontal fill bar plus step title and optional sub-step line."""
+    """Horizontal fill bar plus step title and secondary sub-step line."""
     pct_clamped = max(0.0, min(1.0, float(pct)))
     fill_pct = round(pct_clamped * 100)
 
