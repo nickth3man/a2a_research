@@ -40,45 +40,83 @@ export interface ResearchCallbacks {
   onError(msg: string): void
 }
 
-export async function startResearch(query: string, cb: ResearchCallbacks): Promise<() => void> {
+export async function startResearch(query: string, cb: ResearchCallbacks): Promise<{ cleanup: () => void; session_id: string }> {
   let resp: Response
+  const ctrl = new AbortController()
+  const timeoutId = setTimeout(() => ctrl.abort(), 30000)
   try {
     resp = await fetch('/api/research', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query }),
+      signal: ctrl.signal,
     })
   } catch {
+    clearTimeout(timeoutId)
     cb.onError('Failed to connect to research API')
-    return () => {}
+    return { cleanup: () => {}, session_id: '' }
   }
+  clearTimeout(timeoutId)
 
   if (!resp.ok) {
     cb.onError(`HTTP ${resp.status}`)
-    return () => {}
+    return { cleanup: () => {}, session_id: '' }
   }
 
-  const { session_id } = await resp.json() as { session_id: string }
+  let session_id: string
+  try {
+    const data = await resp.json() as { session_id: string }
+    session_id = data.session_id
+  } catch {
+    cb.onError('Invalid response from research API')
+    return { cleanup: () => {}, session_id: '' }
+  }
   const es = new EventSource(`/api/research/${session_id}/stream`)
 
-  es.addEventListener('progress', (e) => {
-    cb.onProgress(JSON.parse((e as MessageEvent).data) as ProgressMsg)
-  })
-  es.addEventListener('result', (e) => {
-    cb.onResult(JSON.parse((e as MessageEvent).data) as ResultMsg)
+  const handleProgress = (e: MessageEvent) => {
+    try {
+      cb.onProgress(JSON.parse(e.data) as ProgressMsg)
+    } catch {
+      /* ignore malformed progress message */
+    }
+  }
+  const handleResult = (e: MessageEvent) => {
+    try {
+      cb.onResult(JSON.parse(e.data) as ResultMsg)
+    } catch {
+      cb.onError('Invalid result data')
+    }
     es.close()
-  })
-  es.addEventListener('error', (e) => {
-    const data = JSON.parse((e as MessageEvent).data) as { message: string }
-    cb.onError(data.message)
+  }
+  const handleError = (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data) as { message: string }
+      cb.onError(data.message)
+    } catch {
+      cb.onError('Unknown server error')
+    }
     es.close()
-  })
-  es.onerror = () => {
+  }
+  const handleGenericError = () => {
     cb.onError('Connection lost')
     es.close()
   }
 
-  return () => es.close()
+  es.addEventListener('progress', handleProgress)
+  es.addEventListener('result', handleResult)
+  es.addEventListener('error', handleError)
+  es.onerror = handleGenericError
+
+  return {
+    cleanup: () => {
+      es.removeEventListener('progress', handleProgress)
+      es.removeEventListener('result', handleResult)
+      es.removeEventListener('error', handleError)
+      es.onerror = null
+      es.close()
+    },
+    session_id,
+  }
 }
 
 export function normalizeRole(role: string | null): string | null {

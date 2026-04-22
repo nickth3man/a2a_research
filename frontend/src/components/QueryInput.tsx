@@ -32,9 +32,9 @@ export function QueryInput({ onSubmit, state }: QueryInputProps) {
         }}
       >
         <div style={{ display: 'flex', gap: 4 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d9d3c1' }} />
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#d9d3c1' }} />
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: '#d9d3c1' }} />
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: '#d9d3c1' }} />
+          <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />
         </div>
         <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', letterSpacing: '.12em' }}>
           a2a.research › query
@@ -63,6 +63,9 @@ export function QueryInput({ onSubmit, state }: QueryInputProps) {
             ❯
           </div>
           <textarea
+            id="research-query"
+            name="research-query"
+            aria-label="Research query"
             value={val}
             onChange={(e) => setVal(e.target.value)}
             onKeyDown={onKey}
@@ -70,6 +73,7 @@ export function QueryInput({ onSubmit, state }: QueryInputProps) {
             onBlur={() => setFocus(false)}
             placeholder="Ask a research question…"
             rows={3}
+            maxLength={2000}
             disabled={disabled}
             style={{
               width: '100%',

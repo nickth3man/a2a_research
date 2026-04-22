@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react'
-import { Masthead } from './components/Masthead'
 import { StateNav } from './components/StateNav'
 import { QueryInput } from './components/QueryInput'
 import { HowItWorks } from './components/HowItWorks'
@@ -20,18 +19,32 @@ function normalizeVerdict(v: string): Verdict {
 }
 
 export default function App() {
-  const [uiState, setUiState] = useState<UIState>(
-    () => (localStorage.getItem('a2a_ui_state') as UIState) || 'empty'
-  )
+  const [uiState, setUiState] = useState<UIState>(() => {
+    const saved = localStorage.getItem('a2a_ui_state')
+    const valid: UIState[] = ['empty', 'loading', 'results']
+    if (saved && valid.includes(saved as UIState)) {
+      if (saved === 'loading') return 'empty'
+      return saved as UIState
+    }
+    return 'empty'
+  })
   const [progress, setProgress] = useState(0)
   const [statuses, setStatuses] = useState<StatusMap>(initialStatuses)
   const [tickerLines, setTickerLines] = useState<string[]>([])
   const [report, setReport] = useState('')
   const [claims, setClaims] = useState<Claim[]>([])
   const [sources, setSources] = useState<Source[]>([])
+  const [error, setError] = useState<string | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
+  const mountedRef = useRef(true)
 
-  useEffect(() => () => { cleanupRef.current?.() }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cleanupRef.current?.()
+    }
+  }, [])
 
   const setAndSave = (s: UIState) => {
     setUiState(s)
@@ -47,10 +60,12 @@ export default function App() {
     setReport('')
     setClaims([])
     setSources([])
+    setError(null)
     setAndSave('loading')
 
-    const cleanup = await startResearch(query, {
+    const result = await startResearch(query, {
       onProgress(e) {
+        if (!mountedRef.current) return
         const role = normalizeRole(e.role)
         if (role) {
           setStatuses((prev) => {
@@ -64,6 +79,7 @@ export default function App() {
         if (e.detail) setTickerLines((prev) => [e.detail, ...prev].slice(0, 20))
       },
       onResult(e) {
+        if (!mountedRef.current) return
         setReport(e.report)
         setClaims(
           e.claims.map((c) => ({
@@ -82,20 +98,31 @@ export default function App() {
           })
         )
         setAndSave('results')
+        localStorage.removeItem('a2a_session_id')
       },
       onError(msg) {
-        console.error('Research error:', msg)
+        if (!mountedRef.current) return
+        setError(msg)
         setAndSave('empty')
+        localStorage.removeItem('a2a_session_id')
       },
     })
-    cleanupRef.current = cleanup
+    cleanupRef.current = result.cleanup
+    if (result.session_id) {
+      localStorage.setItem('a2a_session_id', result.session_id)
+    }
   }
 
   return (
     <>
-      <Masthead uiState={uiState} />
+      <main>
       <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 28px 60px' }}>
         <StateNav current={uiState} onChange={setAndSave} />
+        {error && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fff0f0', border: '1px solid #ffcdd2', borderRadius: 4, color: '#c62828', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
 
         {uiState === 'empty' && (
           <>
@@ -130,7 +157,8 @@ export default function App() {
             v0.42.0 · built with <em style={{ color: 'var(--accent)' }}>care</em>
           </span>
         </div>
-      </div>
+        </div>
+      </main>
     </>
   )
 }

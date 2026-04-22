@@ -28,7 +28,7 @@ __all__ = ["build_agent", "build_model", "reset_agent_cache"]
 
 
 def _smolagents_step_callback(role: AgentRole) -> Any:
-    def _callback(step: Any, _agent: Any | None = None) -> None:
+    def _callback(step: Any, agent: Any | None = None) -> None:
         tool_calls = getattr(step, "tool_calls", None) or []
         for call in tool_calls:
             name = (

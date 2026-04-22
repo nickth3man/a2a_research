@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Paper, Eyebrow } from './Primitives';
 import { useCountUp } from '../hooks/useCountUp';
 import { useTicker } from '../hooks/useTicker';
@@ -171,6 +172,7 @@ function PipelineFlow({ statuses }: { statuses: StatusMap }) {
 
 function LiveTicker({ tickerLines }: { tickerLines: string[] }) {
   const lines = useTicker(tickerLines.length ? tickerLines : TICKER_LINES, 900, true);
+  const [baseTime] = useState(() => Date.now());
   return (
     <Paper style={{ padding: 0, overflow: 'hidden' }}>
       <div
@@ -231,7 +233,7 @@ function LiveTicker({ tickerLines }: { tickerLines: string[] }) {
           >
             <span style={{ color: 'var(--accent-2)', opacity: 0.7 }}>▸</span>
             <span className="mono" style={{ color: 'rgba(232,227,214,0.4)', minWidth: 68 }}>
-              {new Date(Date.now() - i * 900).toLocaleTimeString('en-US', { hour12: false })}
+              {new Date(baseTime - i * 900).toLocaleTimeString('en-US', { hour12: false })}
             </span>
             <span>{line}</span>
           </div>

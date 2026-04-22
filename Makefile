@@ -69,22 +69,22 @@ frontend-lint: ## Lint frontend code
 	cd frontend && npm run lint
 
 serve-all: ## Start all agent HTTP services
-	uv run python -m a2a_research.entrypoints.launcher
+	uv run python -m a2a_research.backend.entrypoints.launcher
 
 serve-planner: ## Start Planner HTTP service
-	uv run python -m a2a_research.agents.pocketflow.planner
+	uv run python -m a2a_research.backend.agents.pocketflow.planner
 
 serve-searcher: ## Start Searcher HTTP service
-	uv run python -m a2a_research.agents.smolagents.searcher
+	uv run python -m a2a_research.backend.agents.smolagents.searcher
 
 serve-reader: ## Start Reader HTTP service
-	uv run python -m a2a_research.agents.smolagents.reader
+	uv run python -m a2a_research.backend.agents.smolagents.reader
 
 serve-fact-checker: ## Start FactChecker HTTP service
-	uv run python -m a2a_research.agents.langgraph.fact_checker
+	uv run python -m a2a_research.backend.agents.langgraph.fact_checker
 
 serve-synthesizer: ## Start Synthesizer HTTP service
-	uv run python -m a2a_research.agents.pydantic_ai.synthesizer
+	uv run python -m a2a_research.backend.agents.pydantic_ai.synthesizer
 
 htmlcov: ## Generate HTML coverage report
 	uv run pytest --cov=src/a2a_research --cov-report=html
