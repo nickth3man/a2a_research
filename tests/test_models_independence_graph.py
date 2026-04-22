@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     EvidenceUnit,
     IndependenceGraph,
     Passage,

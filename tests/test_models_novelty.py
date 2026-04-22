@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import NoveltyTracker
+from a2a_research.backend.core.models import NoveltyTracker
 
 
 class TestNoveltyTracker:

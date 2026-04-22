@@ -4,8 +4,8 @@ import logging
 
 import mesop as me
 
-from a2a_research.logging.app_logging import get_logger, log_event
-from a2a_research.models import ResearchSession
+from a2a_research.backend.core.logging.app_logging import get_logger, log_event
+from a2a_research.backend.core.models import ResearchSession
 from a2a_research.ui.tokens import EXAMPLE_QUERIES
 
 from .app_state import AppState

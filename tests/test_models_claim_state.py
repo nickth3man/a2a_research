@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     Claim,
     ClaimDAG,
     ClaimDependency,
@@ -136,7 +136,7 @@ class TestClaimState:
         assert cs.unresolved_or_stale_claim_ids == ["c1"]
 
     def test_freshness_windows(self):
-        from a2a_research.models import FreshnessWindow
+        from a2a_research.backend.core.models import FreshnessWindow
 
         c1 = Claim(
             id="c1", text="t", freshness=FreshnessWindow(max_age_days=7)

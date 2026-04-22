@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from urllib.parse import urlparse
 
-from a2a_research.models import Verdict
+from a2a_research.backend.core.models import Verdict
 
 
 def format_source_display(src: str) -> str:

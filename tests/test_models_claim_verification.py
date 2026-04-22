@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.models import ClaimVerification, Verdict
+from a2a_research.backend.core.models import ClaimVerification, Verdict
 
 
 class TestClaimVerification:

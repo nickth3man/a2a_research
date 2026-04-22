@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     Citation,
     Claim,
     ReportOutput,
@@ -10,7 +10,7 @@ from a2a_research.models import (
     Verdict,
     WebSource,
 )
-from a2a_research.utils.citation_sanitize import (
+from a2a_research.backend.core.utils.citation_sanitize import (
     allowed_urls_from_evidence,
     normalize_url,
     sanitize_report_output,

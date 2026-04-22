@@ -8,7 +8,7 @@ non-empty ``final_report`` exists.
 
 from __future__ import annotations
 
-from a2a_research.models import AgentStatus, ResearchSession
+from a2a_research.backend.core.models import AgentStatus, ResearchSession
 
 
 def has_results(session: ResearchSession) -> bool:

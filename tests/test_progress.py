@@ -7,8 +7,8 @@ from contextlib import suppress
 
 import pytest
 
-from a2a_research.models import AgentRole
-from a2a_research.progress import (
+from a2a_research.backend.core.models import AgentRole
+from a2a_research.backend.core.progress import (
     Bus,
     ProgressEvent,
     ProgressPhase,

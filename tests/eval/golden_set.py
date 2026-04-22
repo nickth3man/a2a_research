@@ -60,7 +60,6 @@ class EvalQuery(BaseModel):
     )
 
 
-
 from tests.eval.golden_set_data import GOLDEN_SET  # noqa: E402
 
 

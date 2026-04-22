@@ -6,14 +6,14 @@ import json
 
 from a2a.types import Artifact, Task
 
-from a2a_research.a2a.client_helpers import (
+from a2a_research.backend.core.a2a.client_helpers import (
     _payload_preview,
     build_message,
     extract_data_payload_or_warn,
     extract_data_payloads,
     extract_text,
 )
-from a2a_research.a2a.proto import (
+from a2a_research.backend.core.a2a.proto import (
     make_data_part,
     make_message,
     make_text_part,
@@ -55,10 +55,12 @@ class TestExtractDataPayloads:
         assert payloads == [{"x": 1}]
 
     def test_task_with_multiple_data_parts(self) -> None:
-        task = _make_task_with_artifact([
-            make_data_part({"a": 1}),
-            make_data_part({"b": 2}),
-        ])
+        task = _make_task_with_artifact(
+            [
+                make_data_part({"a": 1}),
+                make_data_part({"b": 2}),
+            ]
+        )
         payloads = extract_data_payloads(task)
         assert {"a": 1} in payloads
         assert {"b": 2} in payloads
@@ -90,10 +92,12 @@ class TestExtractText:
         assert extract_text(task) == ""
 
     def test_multiple_text_parts_joined_by_newline(self) -> None:
-        task = _make_task_with_artifact([
-            make_text_part("line1"),
-            make_text_part("line2"),
-        ])
+        task = _make_task_with_artifact(
+            [
+                make_text_part("line1"),
+                make_text_part("line2"),
+            ]
+        )
         result = extract_text(task)
         assert "line1" in result
         assert "line2" in result

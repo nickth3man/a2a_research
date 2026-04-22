@@ -5,9 +5,13 @@ from __future__ import annotations
 import pytest
 from a2a.types import AgentCard
 
-from a2a_research.a2a.card_specs import CARD_SPECS
-from a2a_research.a2a.cards import AGENT_CARDS, build_cards, get_card
-from a2a_research.models import AgentRole
+from a2a_research.backend.core.a2a.card_specs import CARD_SPECS
+from a2a_research.backend.core.a2a.cards import (
+    AGENT_CARDS,
+    build_cards,
+    get_card,
+)
+from a2a_research.backend.core.models import AgentRole
 
 
 class TestBuildCards:
@@ -73,10 +77,7 @@ class TestBuildCards:
     def test_card_url_contains_localhost(self) -> None:
         cards = build_cards()
         for role in CARD_SPECS:
-            urls = [
-                iface.url
-                for iface in cards[role].supported_interfaces
-            ]
+            urls = [iface.url for iface in cards[role].supported_interfaces]
             assert any("localhost" in url for url in urls), (
                 f"Role {role}: no localhost URL found in {urls}"
             )

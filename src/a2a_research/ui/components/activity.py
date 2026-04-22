@@ -2,7 +2,7 @@
 
 import mesop as me
 
-from a2a_research.models import AgentStatus
+from a2a_research.backend.core.models import AgentStatus
 from a2a_research.ui.components.activity_render import render_activity_line
 from a2a_research.ui.tokens import (
     FONT_SIZE_TINY,

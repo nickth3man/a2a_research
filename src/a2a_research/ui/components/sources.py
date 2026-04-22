@@ -2,7 +2,7 @@
 
 import mesop as me
 
-from a2a_research.models import ResearchSession
+from a2a_research.backend.core.models import ResearchSession
 from a2a_research.ui.data_access import get_all_citations
 from a2a_research.ui.formatting import format_source_display
 from a2a_research.ui.primitives import card_box

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
     AgentStatus,

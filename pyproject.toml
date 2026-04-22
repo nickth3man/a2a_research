@@ -83,10 +83,10 @@ select = [
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"src/a2a_research/models/session.py" = ["TC001"]
-"src/a2a_research/models/verification.py" = ["TC001"]
+"src/a2a_research/backend/core/models/session.py" = ["TC001"]
+"src/a2a_research/backend/core/models/verification.py" = ["TC001"]
 "src/a2a_research/ui/**" = ["T20"]
-"src/a2a_research/workflow/__main__.py" = ["T20"]
+"src/a2a_research/backend/workflow/__main__.py" = ["T20"]
 "tests/**" = ["T20", "TCH001", "TCH002"]
 
 [tool.ruff.format]
@@ -142,11 +142,11 @@ warn_no_return = true
 follow_untyped_imports = true
 
 [[tool.mypy.overrides]]
-module = "a2a_research.a2a.proto"
+module = "a2a_research.backend.core.a2a.proto"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = "a2a_research.agents.stubs.*"
+module = "a2a_research.backend.agents.stubs.*"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
@@ -160,19 +160,19 @@ disallow_untyped_decorators = false
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = "a2a_research.agents.pocketflow.*"
+module = "a2a_research.backend.agents.pocketflow.*"
 disallow_untyped_defs = false
 disallow_untyped_calls = false
 warn_return_any = false
 disable_error_code = ["type-arg"]
 
 [[tool.mypy.overrides]]
-module = "a2a_research.agents.smolagents.*"
+module = "a2a_research.backend.agents.smolagents.*"
 disallow_untyped_calls = false
 disable_error_code = ["misc", "no-untyped-call"]
 
 [[tool.mypy.overrides]]
-module = "a2a_research.agents.langgraph.*"
+module = "a2a_research.backend.agents.langgraph.*"
 disallow_untyped_calls = false
 disable_error_code = ["union-attr"]
 

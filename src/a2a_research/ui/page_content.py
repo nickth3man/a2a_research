@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from a2a_research.logging.app_logging import get_logger, log_event
+from a2a_research.backend.core.logging.app_logging import get_logger, log_event
 from a2a_research.ui.components import (
     CardLoading,
     CardQueryInput,

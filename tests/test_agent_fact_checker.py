@@ -7,12 +7,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from a2a_research.agents.langgraph.fact_checker import run_fact_check
-from a2a_research.agents.langgraph.fact_checker import (
+from a2a_research.backend.agents.langgraph.fact_checker import run_fact_check
+from a2a_research.backend.agents.langgraph.fact_checker import (
     verify_route as fc_verify,
 )
-from a2a_research.models import Claim, Verdict
-from a2a_research.tools import PageContent
+from a2a_research.backend.core.models import Claim, Verdict
+from a2a_research.backend.tools import PageContent
 
 
 def _fake_llm(payload: dict[str, Any]) -> Any:
@@ -105,7 +105,7 @@ async def test_fact_checker_short_circuits_without_evidence(
 async def test_fact_checker_preserves_sources(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from a2a_research.models import WebSource
+    from a2a_research.backend.core.models import WebSource
 
     evidence = [
         PageContent(

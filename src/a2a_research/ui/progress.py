@@ -6,8 +6,8 @@ during the research pipeline execution.
 
 from datetime import datetime
 
-from a2a_research.models import AgentStatus
-from a2a_research.progress import ProgressEvent, ProgressPhase
+from a2a_research.backend.core.models import AgentStatus
+from a2a_research.backend.core.progress import ProgressEvent, ProgressPhase
 
 from .app_state import AppState
 

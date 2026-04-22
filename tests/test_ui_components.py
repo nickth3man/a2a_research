@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.models import (
+from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
     AgentStatus,
@@ -92,7 +92,7 @@ def test_error_banner_short_message_no_ellipsis(
 
 
 def test_loading_card_renders(stub_mesop_component_runtime: None) -> None:
-    from a2a_research.models import ResearchSession
+    from a2a_research.backend.core.models import ResearchSession
     from a2a_research.ui.components import CardLoading
 
     CardLoading(
