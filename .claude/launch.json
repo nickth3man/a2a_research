@@ -2,46 +2,53 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "serve-all",
+      "name": "Frontend (Vite)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "frontend",
+      "port": 5173
+    },
+    {
+      "name": "API Gateway (FastAPI)",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.launcher"],
+      "runtimeArgs": ["run", "uvicorn", "a2a_research.backend.entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
+      "port": 8000
+    },
+    {
+      "name": "Agents – All",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.entrypoints.launcher"],
       "port": 10001
     },
     {
-      "name": "planner",
+      "name": "Agent – Planner",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.pocketflow.planner"],
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.pocketflow.planner"],
       "port": 10001
     },
     {
-      "name": "searcher",
+      "name": "Agent – Searcher",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.smolagents.searcher"],
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.smolagents.searcher"],
       "port": 10002
     },
     {
-      "name": "reader",
+      "name": "Agent – Reader",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.smolagents.reader"],
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.smolagents.reader"],
       "port": 10003
     },
     {
-      "name": "fact-checker",
+      "name": "Agent – FactChecker",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.langgraph.fact_checker"],
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.langgraph.fact_checker"],
       "port": 10004
     },
     {
-      "name": "synthesizer",
+      "name": "Agent – Synthesizer",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.agents.pydantic_ai.synthesizer"],
+      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.pydantic_ai.synthesizer"],
       "port": 10005
-    },
-    {
-      "name": "mesop-ui",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "mesop", "src/a2a_research/ui/app.py"],
-      "port": 32123
     }
   ]
 }

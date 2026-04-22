@@ -20,8 +20,8 @@ dependencies = [
     "pydantic>=2.13.3",
     "pydantic-settings>=2.14.0",
     "rich>=15.0.0",
-    # UI
-    "mesop>=1.2.7",
+    # API gateway
+    "fastapi>=0.115.0",
     # LLM providers
     "openai>=2.32.0",
     "langgraph>=1.1.9",
@@ -85,7 +85,6 @@ ignore = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "src/a2a_research/backend/core/models/session.py" = ["TC001"]
 "src/a2a_research/backend/core/models/verification.py" = ["TC001"]
-"src/a2a_research/ui/**" = ["T20"]
 "src/a2a_research/backend/workflow/__main__.py" = ["T20"]
 "tests/**" = ["T20", "TCH001", "TCH002"]
 
@@ -152,12 +151,6 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = "pocketflow.*"
 ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "a2a_research.ui.*"
-disallow_untyped_defs = false
-disallow_untyped_decorators = false
-disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
 module = "a2a_research.backend.agents.pocketflow.*"

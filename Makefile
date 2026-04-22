@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev test test-live test-live-brave test-live-tavily all-live watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer
+.PHONY: help install dev test test-live test-live-brave test-live-tavily all-live watch lint format format-check typecheck typecheck-ty check all clean serve-api htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer frontend-install frontend-dev frontend-build frontend-lint
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -53,8 +53,20 @@ clean: ## Remove build artifacts and cache directories
 	python -c "import shutil; [shutil.rmtree(d, ignore_errors=True) for d in ['build', 'dist', '.mypy_cache', '.ruff_cache', '.pytest_cache', 'htmlcov']]"
 	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('*.egg-info') if p.is_dir()]"
 
-mesop: ## Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
-	export MESOP_STATE_SESSION_BACKEND=memory && uv run mesop src/a2a_research/ui/app.py
+serve-api: ## Start FastAPI SSE gateway on port 8000
+	uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload
+
+frontend-install: ## Install frontend dependencies
+	cd frontend && npm install
+
+frontend-dev: ## Start Vite dev server for the React frontend
+	cd frontend && npm run dev
+
+frontend-build: ## Build production frontend bundle
+	cd frontend && npm run build
+
+frontend-lint: ## Lint frontend code
+	cd frontend && npm run lint
 
 serve-all: ## Start all agent HTTP services
 	uv run python -m a2a_research.entrypoints.launcher

@@ -1,121 +1,136 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect, useRef } from 'react'
+import { Masthead } from './components/Masthead'
+import { StateNav } from './components/StateNav'
+import { QueryInput } from './components/QueryInput'
+import { HowItWorks } from './components/HowItWorks'
+import { EmptyState } from './components/EmptyState'
+import { LoadingState } from './components/LoadingState'
+import { ResultsState } from './components/ResultsState'
+import { startResearch, normalizeRole } from './services/api'
+import { AGENTS } from './mocks/data'
+import type { UIState, StatusMap, Claim, Source, Verdict } from './types'
 
-function App() {
-  const [count, setCount] = useState(0)
+function initialStatuses(): StatusMap {
+  return Object.fromEntries(AGENTS.map((a) => [a.key, 'pending' as const]))
+}
+
+function normalizeVerdict(v: string): Verdict {
+  if (v === 'SUPPORTED' || v === 'REFUTED') return v
+  return 'UNVERIFIABLE'
+}
+
+export default function App() {
+  const [uiState, setUiState] = useState<UIState>(
+    () => (localStorage.getItem('a2a_ui_state') as UIState) || 'empty'
+  )
+  const [progress, setProgress] = useState(0)
+  const [statuses, setStatuses] = useState<StatusMap>(initialStatuses)
+  const [tickerLines, setTickerLines] = useState<string[]>([])
+  const [report, setReport] = useState('')
+  const [claims, setClaims] = useState<Claim[]>([])
+  const [sources, setSources] = useState<Source[]>([])
+  const cleanupRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => () => { cleanupRef.current?.() }, [])
+
+  const setAndSave = (s: UIState) => {
+    setUiState(s)
+    localStorage.setItem('a2a_ui_state', s)
+  }
+
+  const handleSubmit = async (query: string) => {
+    cleanupRef.current?.()
+    cleanupRef.current = null
+    setProgress(0)
+    setStatuses(initialStatuses())
+    setTickerLines([])
+    setReport('')
+    setClaims([])
+    setSources([])
+    setAndSave('loading')
+
+    const cleanup = await startResearch(query, {
+      onProgress(e) {
+        const role = normalizeRole(e.role)
+        if (role) {
+          setStatuses((prev) => {
+            const next = { ...prev }
+            if (e.phase === 'step_started') next[role] = 'running'
+            else if (e.phase === 'step_completed' || e.phase === 'step_failed') next[role] = 'completed'
+            return next
+          })
+        }
+        setProgress(Math.round((e.step_index / e.total_steps) * 100))
+        if (e.detail) setTickerLines((prev) => [e.detail, ...prev].slice(0, 20))
+      },
+      onResult(e) {
+        setReport(e.report)
+        setClaims(
+          e.claims.map((c) => ({
+            text: c.text,
+            verdict: normalizeVerdict(c.verdict),
+            confidence: c.confidence,
+            sources: c.sources,
+            evidence: c.evidence ?? undefined,
+          }))
+        )
+        setSources(
+          e.sources.map((s) => {
+            let host = s.url
+            try { host = new URL(s.url).hostname } catch { /* keep url */ }
+            return { file: s.url, title: s.title || s.url, meta: host }
+          })
+        )
+        setAndSave('results')
+      },
+      onError(msg) {
+        console.error('Research error:', msg)
+        setAndSave('empty')
+      },
+    })
+    cleanupRef.current = cleanup
+  }
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+      <Masthead uiState={uiState} />
+      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '28px 28px 60px' }}>
+        <StateNav current={uiState} onChange={setAndSave} />
+
+        {uiState === 'empty' && (
+          <>
+            <HowItWorks />
+            <EmptyState />
+          </>
+        )}
+        {uiState === 'loading' && (
+          <LoadingState progress={progress} statuses={statuses} tickerLines={tickerLines} />
+        )}
+        {uiState === 'results' && (
+          <ResultsState report={report} claims={claims} sources={sources} />
+        )}
+
+        <QueryInput onSubmit={handleSubmit} state={uiState} />
+
+        <div
+          style={{
+            marginTop: 28,
+            paddingTop: 20,
+            borderTop: '1px solid var(--rule)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            fontSize: 10.5,
+            color: 'var(--muted)',
+          }}
         >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+          <span className="mono" style={{ letterSpacing: '.12em', textTransform: 'uppercase' }}>
+            A2A Research · fin.
+          </span>
+          <span className="mono" style={{ letterSpacing: '.12em' }}>
+            v0.42.0 · built with <em style={{ color: 'var(--accent)' }}>care</em>
+          </span>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+      </div>
     </>
   )
 }
-
-export default App

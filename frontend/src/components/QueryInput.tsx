@@ -4,7 +4,7 @@ import { EXAMPLES } from '../mocks/data';
 import type { UIState } from '../types';
 
 interface QueryInputProps {
-  onSubmit: () => void;
+  onSubmit: (query: string) => void;
   state: UIState;
 }
 
@@ -15,7 +15,7 @@ export function QueryInput({ onSubmit, state }: QueryInputProps) {
 
   const onKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      if (!disabled && val.trim()) onSubmit();
+      if (!disabled && val.trim()) onSubmit(val);
     }
   };
 
@@ -137,7 +137,7 @@ export function QueryInput({ onSubmit, state }: QueryInputProps) {
             <button
               className="btn-primary"
               onClick={() => {
-                if (!disabled && val.trim()) onSubmit();
+                if (!disabled && val.trim()) onSubmit(val);
               }}
               disabled={disabled || !val.trim()}
               style={{

@@ -1,73 +1,76 @@
-# React + TypeScript + Vite
+# Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + TypeScript + Vite frontend for the A2A research and verification pipeline.
 
-Currently, two official plugins are available:
+## Purpose
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+This directory contains the browser UI for the project. The app is built with React and Vite, and it is designed to work alongside the Python backend services that power the agent pipeline.
 
-## React Compiler
+During development, the Vite dev server proxies requests from `/api` to the backend at `http://localhost:8000`, so the frontend can talk to backend services without CORS setup in the browser.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Quick Start
 
-## Expanding the ESLint configuration
+From the `frontend/` directory:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Or with pnpm:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
+pnpm dev
 ```
+
+## Available Scripts
+
+Defined in `package.json`:
+
+- `npm run dev` / `pnpm dev` - Start the Vite development server
+- `npm run build` / `pnpm build` - Type-check and build the production bundle
+- `npm run preview` / `pnpm preview` - Preview the production build locally
+- `npm run lint` / `pnpm lint` - Run ESLint
+
+## Build and Development
+
+The app uses:
+
+- React 19
+- TypeScript
+- Vite
+- ESLint
+
+The production build runs TypeScript compilation first and then bundles with Vite.
+
+## Backend Integration
+
+The frontend is configured to proxy `/api` requests to:
+
+- `http://localhost:8000`
+
+This means frontend code can call backend endpoints with paths like `/api/...`, and Vite forwards those requests to the local backend service during development.
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Scripts and dependencies |
+| `vite.config.ts` | Vite configuration and `/api` proxy |
+| `index.html` | HTML entry point and app shell |
+| `src/main.tsx` | React bootstrap entry point |
+| `src/App.tsx` | Root application component |
+
+## Directory Layout
+
+```text
+frontend/
+├── public/    # Static assets served as-is
+└── src/       # React application source code
+```
+
+## Notes
+
+- `node_modules/` and `dist/` are generated or installed artifacts and are not part of the source layout.
+- The frontend is intended to be run together with the Python backend agent services for full functionality.

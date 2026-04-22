@@ -24,7 +24,7 @@ from .settings_llm import LLMSettings
 from .settings_validation import _validate_dotenv_keys as _vd
 from .settings_workflow import WorkflowConfig
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+_PROJECT_ROOT = Path(__file__).resolve().parents[5]
 _ENV_FILE = _PROJECT_ROOT / ".env"
 
 
