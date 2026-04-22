@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-__all__ = ["planner_failed_report", "abort_report"]
+__all__ = ["abort_report", "planner_failed_report"]
 
 
 def planner_failed_report(query: str) -> str:

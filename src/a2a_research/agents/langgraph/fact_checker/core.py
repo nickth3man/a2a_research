@@ -10,12 +10,12 @@ from a2a_research.agents.langgraph.fact_checker.verify_route import (
 from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, Verdict, WebSource
 from a2a_research.progress import ProgressPhase, emit
-from a2a_research.tools import PageContent
 
 if TYPE_CHECKING:
     from a2a_research.agents.langgraph.fact_checker.state import (
         FactCheckRunResult,
     )
+    from a2a_research.tools import PageContent
 
 logger = get_logger(__name__)
 

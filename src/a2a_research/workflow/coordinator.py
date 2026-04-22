@@ -14,17 +14,13 @@ from __future__ import annotations
 
 import asyncio
 from time import perf_counter
-from typing import TYPE_CHECKING
 
 from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import ResearchSession
-from a2a_research.progress import Bus
+from a2a_research.progress import Bus, ProgressQueue
 from a2a_research.settings import settings
 from a2a_research.workflow.coordinator_drive import drive
 from a2a_research.workflow.coordinator_helpers import mark_running_failed
-
-if TYPE_CHECKING:
-    from a2a_research.progress import ProgressQueue
 
 logger = get_logger(__name__)
 

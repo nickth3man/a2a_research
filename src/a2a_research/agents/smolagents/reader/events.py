@@ -22,12 +22,12 @@ if TYPE_CHECKING:
     from a2a.server.events import EventQueue
     from a2a.types import Task
 
-    from a2a_research.models import ExtractedPage
+    from a2a_research.tools import PageContent
 
 
 def emit_page_progress(
     session_id: str,
-    pages: list[ExtractedPage],
+    pages: list[PageContent],
     urls: list[str],
 ) -> None:
     """Emit a STEP_SUBSTEP progress event for each fetched page."""
@@ -48,7 +48,7 @@ def emit_page_progress(
 async def enqueue_reader_result(
     task: Task,
     event_queue: EventQueue,
-    pages: list[ExtractedPage],
+    pages: list[PageContent],
     urls: list[str],
     status: TaskState,
     error_text: str | None,
@@ -80,9 +80,7 @@ async def enqueue_reader_result(
             status=TaskStatus(
                 state=status,
                 message=(
-                    new_agent_text_message(error_text)
-                    if error_text
-                    else None
+                    new_agent_text_message(error_text) if error_text else None
                 ),
             ),
         )
@@ -110,7 +108,7 @@ def log_reader_completion(
     logger: logging.Logger,
     task: Task,
     urls: list[str],
-    pages: list[ExtractedPage],
+    pages: list[PageContent],
 ) -> None:
     """Log reader completion with summary."""
     log_event(

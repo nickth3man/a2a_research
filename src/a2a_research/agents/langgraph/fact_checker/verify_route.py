@@ -13,6 +13,7 @@ from a2a_research.agents.langgraph.fact_checker.node_support import (
     parse_verifier,
 )
 from a2a_research.agents.langgraph.fact_checker.prompt import VERIFY_PROMPT
+from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, Claim, Verdict
 from a2a_research.progress import (
@@ -22,7 +23,6 @@ from a2a_research.progress import (
     emit_llm_response,
     emit_prompt,
 )
-from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.settings import settings
 
 if TYPE_CHECKING:

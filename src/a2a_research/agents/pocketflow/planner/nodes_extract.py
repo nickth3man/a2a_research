@@ -12,6 +12,14 @@ from a2a_research.models import (
 )
 
 
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ("false", "0", "no", "", "none")
+    return bool(value)
+
+
 def _heuristic_strategy(query: str) -> str:
     lowered = query.lower()
     if any(
@@ -86,12 +94,12 @@ def _extract_freshness(
         except Exception:
             pass
     max_age_days = item.get("max_age_days")
-    if isinstance(max_age_days, int) or (
-        isinstance(max_age_days, str) and max_age_days.strip().isdigit()
-    ):
+    if (
+        isinstance(max_age_days, int) and not isinstance(max_age_days, bool)
+    ) or (isinstance(max_age_days, str) and max_age_days.strip().isdigit()):
         return FreshnessWindow(
             max_age_days=int(max_age_days),
-            strict=bool(item.get("strict_freshness", False)),
+            strict=_parse_bool(item.get("strict_freshness", False)),
             rationale=str(
                 item.get("freshness_rationale")
                 or "planner supplied max_age_days"

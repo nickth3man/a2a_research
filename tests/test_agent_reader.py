@@ -9,7 +9,6 @@ import pytest
 from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads
 from a2a_research.agents.smolagents.reader import ReaderExecutor
 from a2a_research.agents.smolagents.reader import core as reader_core
-from a2a_research.agents.smolagents.reader import main as reader_main
 from a2a_research.models import AgentRole
 
 

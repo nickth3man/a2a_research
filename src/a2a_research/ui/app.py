@@ -16,23 +16,24 @@ from a2a_research.logging.app_logging import (
     log_event,
     setup_logging,
 )
-from a2a_research.ui.app_state import AppState, state_snapshot
-from a2a_research.ui.components import PageHeader, PageInstructions
 from a2a_research.ui import patches  # noqa: F401 - side effects on import
-from a2a_research.ui.page_content import (
-    render_query_input_card,
-    render_session_body,
-)
-from a2a_research.ui.renderers import page_shell_style
-from a2a_research.ui.session_state import has_results
-from a2a_research.ui.submit_handler import on_submit
-from a2a_research.ui.query_handlers import on_query_input
+from a2a_research.ui.app_state import AppState, state_snapshot
 
 # Backward-compatible re-exports for tests that patch these names
 from a2a_research.ui.components import (  # noqa: F401
     CardLoading,
     CardTimeline,
+    PageHeader,
+    PageInstructions,
 )
+from a2a_research.ui.page_content import (
+    render_query_input_card,
+    render_session_body,
+)
+from a2a_research.ui.query_handlers import on_query_input
+from a2a_research.ui.renderers import page_shell_style
+from a2a_research.ui.session_state import has_results
+from a2a_research.ui.submit_handler import on_submit
 
 _on_submit = on_submit  # backward-compatible alias for tests
 _on_query_input = on_query_input  # backward-compatible alias for tests

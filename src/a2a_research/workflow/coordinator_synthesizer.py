@@ -20,11 +20,11 @@ if TYPE_CHECKING:
 
 
 async def run_synthesizer_step(
-    session: "ResearchSession",
-    client: "A2AClient",
+    session: ResearchSession,
+    client: A2AClient,
     query: str,
-    verified: list["Claim"],
-    sources: list["WebSource"],
+    verified: list[Claim],
+    sources: list[WebSource],
 ) -> bool:
     """Run synthesizer and return should_abort."""
     set_status(

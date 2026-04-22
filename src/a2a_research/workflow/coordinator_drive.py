@@ -25,7 +25,7 @@ __all__ = ["drive"]
 
 
 async def drive(
-    session: "ResearchSession", client: "A2AClient", query: str
+    session: ResearchSession, client: A2AClient, query: str
 ) -> None:
     claims, seed_queries, abort = await run_planner_step(
         session, client, query

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from time import perf_counter
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from a2a.types import TaskState
 
@@ -24,7 +24,9 @@ from a2a_research.progress import (
     using_session,
 )
 from a2a_research.settings import settings as _app_settings
-from a2a_research.tools import WebHit
+
+if TYPE_CHECKING:
+    from a2a_research.tools import WebHit
 
 logger = get_logger(__name__)
 

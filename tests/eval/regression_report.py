@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from tests.eval.golden_set import GOLDEN_SET, EvalQuery
-from tests.eval.scoring import score_run
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _mean(values: list[float]) -> float:
@@ -31,7 +29,7 @@ def _detect_regression(
     current: dict[str, float], baseline: dict[str, float]
 ) -> dict[str, Any]:
     """Compare current scores against baseline and flag regressions > 5%."""
-    THRESHOLD = 0.05
+    threshold = 0.05
     details: list[dict[str, Any]] = []
     regressed = False
 
@@ -39,7 +37,7 @@ def _detect_regression(
         if key not in baseline:
             continue
         diff = baseline[key] - current[key]
-        if diff > THRESHOLD:
+        if diff > threshold:
             regressed = True
             details.append(
                 {
@@ -47,7 +45,7 @@ def _detect_regression(
                     "baseline": baseline[key],
                     "current": current[key],
                     "diff": diff,
-                    "threshold": THRESHOLD,
+                    "threshold": threshold,
                 }
             )
 

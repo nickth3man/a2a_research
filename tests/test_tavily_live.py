@@ -155,4 +155,3 @@ async def test_tavily_popular_query() -> None:
     assert err is None, f"Tavily error: {err}"
     assert len(hits) >= 3, "Popular query should return multiple hits"
     assert all(h.source == "tavily" for h in hits)
-

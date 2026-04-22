@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from a2a.types import AgentCard, AgentSkill
 
 from a2a_research.a2a.compat import make_agent_card, make_skill

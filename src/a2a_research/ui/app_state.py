@@ -6,7 +6,6 @@ fields are skipped and break round-trips).
 """
 
 import dataclasses
-from typing import Any
 
 import mesop as me
 

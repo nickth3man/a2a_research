@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from a2a_research.models import (
     ProvenanceEdgeType,
     ProvenanceNode,
@@ -17,10 +19,9 @@ from a2a_research.workflow.provenance import (
     query_node_id,
 )
 
-from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from a2a_research.models import Claim, EvidenceUnit
+    from a2a_research.tools import WebHit
 
 __all__ = ["update_provenance"]
 
@@ -28,7 +29,7 @@ __all__ = ["update_provenance"]
 def update_provenance(
     provenance_tree: ProvenanceTree,
     to_process: list[Claim],
-    hits: list,
+    hits: list[WebHit],
     deduped_new: list[EvidenceUnit],
     claim_queries: list[str],
 ) -> None:

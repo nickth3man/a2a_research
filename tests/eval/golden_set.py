@@ -60,7 +60,8 @@ class EvalQuery(BaseModel):
     )
 
 
-from tests.eval.golden_set_data import GOLDEN_SET
+
+from tests.eval.golden_set_data import GOLDEN_SET  # noqa: E402
 
 
 def get_by_category(category: QueryCategory) -> list[EvalQuery]:

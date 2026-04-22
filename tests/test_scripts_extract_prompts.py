@@ -5,15 +5,17 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add scripts/ to sys.path so we can import from there
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from extract_prompts import extract_prompts as extract_prompts_v1
-from extract_prompts_v2 import extract_prompts as extract_prompts_v2
+from extract_prompts import (  # noqa: E402
+    extract_prompts as extract_prompts_v1,
+)
+from extract_prompts_v2 import (  # noqa: E402
+    extract_prompts as extract_prompts_v2,
+)
 
 
 class TestExtractPromptsV1:

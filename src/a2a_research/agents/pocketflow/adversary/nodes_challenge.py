@@ -7,17 +7,16 @@ from typing import Any, Literal
 from pocketflow import AsyncNode
 
 from a2a_research.agents.pocketflow.adversary.prompt import CHALLENGE_PROMPT
+from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.logging.app_logging import get_logger
-from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.models import (
     AgentRole,
     Claim,
-    ClaimVerification,
     IndependenceGraph,
 )
 from a2a_research.progress import emit_llm_response, emit_prompt
-from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.settings import settings
+from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.utils.timing import perf_counter
 from a2a_research.utils.validation import to_float
 

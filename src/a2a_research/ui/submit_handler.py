@@ -9,14 +9,16 @@ import mesop as me
 
 from a2a_research.logging.app_logging import (
     get_logger,
-    install_asyncio_exception_logging,
     log_event,
+)
+from a2a_research.logging.exception_logging import (
+    install_asyncio_exception_logging,
 )
 from a2a_research.models import ResearchSession
 from a2a_research.progress import (
+    ProgressQueue,
     drain_progress_while_running,
 )
-from a2a_research.ui.session_state import get_session_error
 
 from .app_state import AppState, state_snapshot
 from .progress import apply_progress_event, initialize_progress_state
@@ -79,7 +81,7 @@ async def on_submit(e: me.ClickEvent) -> AsyncGenerator[None, None]:
 
     wf_task: asyncio.Task[ResearchSession] | None = None
     try:
-        progress_queue: asyncio.Queue = asyncio.Queue()
+        progress_queue: ProgressQueue = asyncio.Queue()
         wf_task = asyncio.create_task(
             run_research_async(query_text, progress_queue=progress_queue)
         )

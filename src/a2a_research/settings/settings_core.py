@@ -88,12 +88,12 @@ class AppSettings(AgentEndpointsMixin, BaseSettings):
     workflow: WorkflowConfig = Field(default_factory=_build_workflow_settings)
 
     @model_validator(mode="after")
-    def validate_dotenv_contract(self) -> "AppSettings":
+    def validate_dotenv_contract(self) -> AppSettings:
         _validate_dotenv_keys(_EXPECTED_DOTENV_KEYS)
         return self
 
     @model_validator(mode="after")
-    def require_api_credentials(self) -> "AppSettings":
+    def require_api_credentials(self) -> AppSettings:
         if not self.llm.api_key.strip():
             msg = "LLM_API_KEY required — set in .env or env."
             raise ValueError(msg)

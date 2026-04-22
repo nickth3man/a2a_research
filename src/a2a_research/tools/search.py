@@ -22,9 +22,8 @@ import logging
 
 from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.settings import settings
-from a2a_research.tools.search_models import SearchResult, WebHit
-from a2a_research.tools.search_ddg import _search_ddg_sync
 from a2a_research.tools.search_merge import _SNIPPET_MERGE_SEP
+from a2a_research.tools.search_models import SearchResult, WebHit
 from a2a_research.tools.search_providers import (
     merge_hits_by_url,
     search_brave,
@@ -35,9 +34,9 @@ from a2a_research.tools.search_providers import (
 logger = get_logger(__name__)
 
 __all__ = [
+    "_SNIPPET_MERGE_SEP",
     "SearchResult",
     "WebHit",
-    "_SNIPPET_MERGE_SEP",
     "web_search",
 ]
 

@@ -33,8 +33,7 @@ class SynthesisOutputCheckpointingPIIMixin:
     # -- Checkpointing
     checkpointing_enabled: bool = Field(
         default=True,
-        description="Enable checkpointing "
-        "(env: WF_CHECKPOINTING__ENABLED).",
+        description="Enable checkpointing (env: WF_CHECKPOINTING__ENABLED).",
     )
     checkpointing_stages: list[str] = Field(
         default=["plan", "verify", "adversary_gate", "synthesize"],
@@ -52,8 +51,7 @@ class SynthesisOutputCheckpointingPIIMixin:
     )
     pii_checkpoint_write: str = Field(
         default="mask",
-        description="PII on checkpoint write "
-        "(env: WF_PII__CHECKPOINT_WRITE).",
+        description="PII on checkpoint write (env: WF_PII__CHECKPOINT_WRITE).",
     )
     pii_pre_synthesis: str = Field(
         default="mask",

@@ -1,6 +1,7 @@
 """System prompts for the Clarifier nodes."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 __all__ = ["AUDIT_PROMPT", "DISAMBIGUATE_PROMPT"]

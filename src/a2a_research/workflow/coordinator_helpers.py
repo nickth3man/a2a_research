@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from a2a.types import TaskState
 from pydantic import ValidationError
@@ -17,23 +17,25 @@ from a2a_research.models import (
     ReportOutput,
     ResearchSession,
 )
-from a2a_research.progress import ProgressPhase
 from a2a_research.tools import PageContent, WebHit
+
+if TYPE_CHECKING:
+    from a2a_research.progress import ProgressPhase
 
 logger = get_logger(__name__)
 
 __all__ = [
-    "task_failed",
-    "planner_failed_report",
-    "error_report",
-    "payload",
-    "set_status",
-    "emit_role_event",
-    "mark_running_failed",
     "coerce_claim",
+    "coerce_page_content",
     "coerce_report",
     "coerce_web_hit",
-    "coerce_page_content",
+    "emit_role_event",
+    "error_report",
+    "mark_running_failed",
+    "payload",
+    "planner_failed_report",
+    "set_status",
+    "task_failed",
 ]
 
 _TOTAL_STEPS = 12

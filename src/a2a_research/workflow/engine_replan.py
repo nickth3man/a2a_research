@@ -2,8 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from a2a_research.a2a import A2AClient
+    from a2a_research.models import (
+        ClaimState,
+        ResearchSession,
+        WorkflowBudget,
+    )
+
+from a2a_research.models import AgentRole
 from a2a_research.workflow.agents import run_agent as _run_agent
 
 if TYPE_CHECKING:
@@ -22,9 +33,9 @@ async def run_replan(
     client: A2AClient,
     query: str,
     claim_state: ClaimState,
-    replan_reasons: list,
+    replan_reasons: list[Any],
     budget: WorkflowBudget,
-    _update_wall_seconds: callable,
+    _update_wall_seconds: Callable[[], None],
 ) -> None:
     """Run replan stage."""
     from a2a_research.models import ClaimVerification

@@ -12,16 +12,18 @@ import pytest
 from a2a_research.a2a.registry import AgentRegistry
 from a2a_research.agents.langgraph.fact_checker import (
     main as fact_checker_main,
+)
+from a2a_research.agents.langgraph.fact_checker import (
     verify_route as fc_verify,
 )
 from a2a_research.agents.pocketflow.planner import main as planner_main
 from a2a_research.agents.pocketflow.planner import nodes as planner_nodes
 from a2a_research.agents.pydantic_ai.synthesizer import agent as synth_agent
 from a2a_research.agents.pydantic_ai.synthesizer import main as synth_main
-from a2a_research.agents.smolagents.reader import (
-    core as reader_core, main as reader_main)
-from a2a_research.agents.smolagents.searcher import (
-    core as searcher_core, main as searcher_main)
+from a2a_research.agents.smolagents.reader import core as reader_core
+from a2a_research.agents.smolagents.reader import main as reader_main
+from a2a_research.agents.smolagents.searcher import core as searcher_core
+from a2a_research.agents.smolagents.searcher import main as searcher_main
 from a2a_research.models import ReportOutput
 from tests.http_harness import make_multi_app_client
 
@@ -151,7 +153,6 @@ def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _install_http_services(monkeypatch: pytest.MonkeyPatch) -> Any:
     from a2a_research.a2a import client as client_module
-    from a2a_research.workflow import coordinator as coordinator_module
 
     shared_client = make_multi_app_client(_apps())
     registry = AgentRegistry()

@@ -1,6 +1,7 @@
 """System prompts for the Adversary nodes."""
 
 from __future__ import annotations
+
 from pathlib import Path
 
 INVERSION_QUERY_PROMPT = (

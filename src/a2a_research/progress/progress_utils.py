@@ -5,16 +5,12 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, Any
 
-from a2a_research.logging.app_logging import get_logger, log_event
-from .progress_bus import Bus
-
 if TYPE_CHECKING:
-    from .progress_types import (
-        AsyncGenerator,
-        ProgressEvent,
-        ProgressQueue,
-        ProgressReporter,
-    )
+    from collections.abc import AsyncGenerator
+
+    from .progress_types import ProgressEvent, ProgressQueue, ProgressReporter
+
+from a2a_research.logging.app_logging import get_logger, log_event
 
 logger = get_logger(__name__)
 
@@ -23,8 +19,8 @@ __all__ = ["create_progress_reporter", "drain_progress_while_running"]
 
 def create_progress_reporter(
     loop: asyncio.AbstractEventLoop,
-    queue: "ProgressQueue",
-) -> "ProgressReporter":
+    queue: ProgressQueue,
+) -> ProgressReporter:
     """Create thread-safe reporter for worker-thread execution."""
     log_event(
         logger,
@@ -34,7 +30,7 @@ def create_progress_reporter(
         queue_id=id(queue),
     )
 
-    def report(event: "ProgressEvent | None") -> None:
+    def report(event: ProgressEvent | None) -> None:
         log_event(
             logger,
             20,
@@ -63,9 +59,9 @@ def create_progress_reporter(
 
 
 async def drain_progress_while_running(
-    queue: "ProgressQueue",
+    queue: ProgressQueue,
     workflow_task: asyncio.Task[Any],
-) -> "AsyncGenerator[ProgressEvent, None]":
+) -> AsyncGenerator[ProgressEvent, None]:
     """Yield queued events until workflow finishes and queue is drained."""
     log_event(
         logger,

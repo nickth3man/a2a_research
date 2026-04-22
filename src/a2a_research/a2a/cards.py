@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from a2a.types import AgentCard
+from typing import TYPE_CHECKING
 
 from a2a_research.a2a.card_specs import CARD_SPECS
 from a2a_research.a2a.compat import make_agent_card, make_skill
 from a2a_research.models import AgentRole
 from a2a_research.settings import settings
+
+if TYPE_CHECKING:
+    from a2a.types import AgentCard
 
 __all__ = ["AGENT_CARDS", "build_cards", "get_card"]
 
@@ -69,4 +72,4 @@ AGENT_CARDS = build_cards()
 
 
 def get_card(role: AgentRole) -> AgentCard:
-    return build_cards()[role]
+    return AGENT_CARDS[role]

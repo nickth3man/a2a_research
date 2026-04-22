@@ -3,13 +3,9 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 from a2a_research.models import ResearchSession
-
-if TYPE_CHECKING:
-    from unittest.mock import MagicMock
 
 
 async def _drain_on_submit(

@@ -7,12 +7,9 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
-
-if TYPE_CHECKING:
-    from a2a_research.models.verification import ClaimState
 
 from a2a_research.models.enums import ReplanReasonCode, Verdict
 

@@ -18,13 +18,13 @@ Files under ``logs/``:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import sys
-import threading
 from pathlib import Path
-from typing import Any
 
+from a2a_research.settings import settings
+
+from .exception_logging import install_exception_hooks
 from .logging_formatters import (
     A2aSdkFilter,
     HttpClientsFilter,
@@ -35,7 +35,6 @@ from .logging_formatters import (
     log_event,
 )
 from .logging_streams import StreamToLogger
-from a2a_research.settings import settings
 
 _CONFIGURED = False
 _LOG_DIR = Path.cwd() / "logs"
@@ -57,73 +56,6 @@ def _configure_named_logger(
     logger.setLevel(level)
     logger.propagate = propagate
     return logger
-
-
-def _install_exception_hooks() -> None:
-    """Install exception hooks that log and preserve original handlers."""
-    original_excepthook = sys.excepthook
-    original_thread_excepthook = threading.excepthook
-
-    def _log_unhandled_exception(
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        exc_traceback: Any,
-    ) -> None:
-        if exc_type is not None and exc_value is not None:
-            if not issubclass(exc_type, KeyboardInterrupt):
-                logging.getLogger("a2a_research.unhandled").error(
-                    "Unhandled exception",
-                    exc_info=(exc_type, exc_value, exc_traceback),
-                )
-        original_excepthook(exc_type, exc_value, exc_traceback)
-
-    def _log_thread_exception(args: threading.ExceptHookArgs) -> None:
-        if args.exc_type is not None and args.exc_value is not None:
-            logging.getLogger("a2a_research.threading").error(
-                "Unhandled thread exception in %s",
-                getattr(args.thread, "name", "<unknown>"),
-                exc_info=(args.exc_type, args.exc_value, args.exc_traceback),
-            )
-        else:
-            logging.getLogger("a2a_research.threading").error(
-                "Unhandled thread exception in %s (no exception info)",
-                getattr(args.thread, "name", "<unknown>"),
-            )
-        original_thread_excepthook(args)
-
-    sys.excepthook = _log_unhandled_exception
-    threading.excepthook = _log_thread_exception
-
-
-def install_asyncio_exception_logging(
-    loop: asyncio.AbstractEventLoop | None = None,
-) -> None:
-    """Attach an exception handler that records background task failures."""
-    setup_logging()
-    target_loop = loop
-    if target_loop is None:
-        try:
-            target_loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-
-    def _handle_async_exception(
-        loop: asyncio.AbstractEventLoop, context: dict[str, object]
-    ) -> None:
-        exc_raw = context.get("exception")
-        exc_info: BaseException | None = (
-            exc_raw if isinstance(exc_raw, BaseException) else None
-        )
-        logging.getLogger("a2a_research.asyncio").error(
-            "Asyncio exception: %s",
-            context.get("message", "no message"),
-            extra={"context_keys": sorted(context.keys())},
-            exc_info=exc_info,
-        )
-        default_handler = loop.default_exception_handler
-        default_handler(context)
-
-    target_loop.set_exception_handler(_handle_async_exception)
 
 
 def _file_handler(
@@ -157,26 +89,26 @@ def setup_logging() -> None:
 
     app_handler = _file_handler(_APP_LOG, level, formatter)
     app_handler.addFilter(PrefixFilter(("a2a_research",)))
-
     a2a_sdk_handler = _file_handler(_LOG_A2A_SDK, level, formatter)
     a2a_sdk_handler.addFilter(A2aSdkFilter())
-
     http_handler = _file_handler(_LOG_HTTP_CLIENTS, level, formatter)
     http_handler.addFilter(HttpClientsFilter())
-
     mesop_handler = _file_handler(_LOG_MESOP_SERVER, level, formatter)
     mesop_handler.addFilter(MesopServerFilter())
-
     warnings_handler = _file_handler(_LOG_WARNINGS, level, formatter)
     warnings_handler.addFilter(WarningsFilter())
 
-    root.addHandler(console_handler)
-    root.addHandler(everything_handler)
-    root.addHandler(app_handler)
-    root.addHandler(a2a_sdk_handler)
-    root.addHandler(http_handler)
-    root.addHandler(mesop_handler)
-    root.addHandler(warnings_handler)
+    handlers: list[logging.Handler] = [
+        console_handler,
+        everything_handler,
+        app_handler,
+        a2a_sdk_handler,
+        http_handler,
+        mesop_handler,
+        warnings_handler,
+    ]
+    for h in handlers:
+        root.addHandler(h)
 
     logging.captureWarnings(True)
     _configure_named_logger("asyncio", level)
@@ -193,7 +125,7 @@ def setup_logging() -> None:
     for h in (everything_handler, stdio_handler):
         stdout_logger.addHandler(h)
         stderr_logger.addHandler(h)
-    _install_exception_hooks()
+    install_exception_hooks()
 
     log_event(
         logging.getLogger(__name__),
@@ -228,7 +160,6 @@ def redirect_stdio_to_logging() -> None:
 
 __all__ = [
     "get_logger",
-    "install_asyncio_exception_logging",
     "log_event",
     "redirect_stdio_to_logging",
     "setup_logging",

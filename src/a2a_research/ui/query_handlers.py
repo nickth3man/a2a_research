@@ -8,7 +8,7 @@ from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.models import ResearchSession
 from a2a_research.ui.tokens import EXAMPLE_QUERIES
 
-from .app_state import AppState, state_snapshot
+from .app_state import AppState
 
 logger = get_logger("a2a_research.ui.handlers")
 

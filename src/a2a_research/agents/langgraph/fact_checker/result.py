@@ -45,8 +45,7 @@ async def enqueue_verified_result(
                         for c in result["verified_claims"]
                     ],
                     "sources": [
-                        s.model_dump(mode="json")
-                        for s in result["sources"]
+                        s.model_dump(mode="json") for s in result["sources"]
                     ],
                     "errors": list(result["errors"]),
                     "search_exhausted": bool(result["search_exhausted"]),
@@ -71,9 +70,7 @@ async def enqueue_verified_result(
             status=TaskStatus(
                 state=status,
                 message=(
-                    new_agent_text_message(error_text)
-                    if error_text
-                    else None
+                    new_agent_text_message(error_text) if error_text else None
                 ),
             ),
         )

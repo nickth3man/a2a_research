@@ -13,10 +13,10 @@ from a2a_research.agents.pocketflow.planner.nodes_base import (
     TEMPORAL_PROMPT,
     _BaseDecomposeNode,
 )
-from a2a_research.logging.app_logging import get_logger
-from a2a_research.models import AgentRole, Claim, ClaimDAG, ClaimDependency
-from a2a_research.progress import emit_llm_response, emit_prompt
 from a2a_research.llm.providers import ProviderRequestError, get_llm
+from a2a_research.logging.app_logging import get_logger
+from a2a_research.models import AgentRole, Claim
+from a2a_research.progress import emit_llm_response, emit_prompt
 from a2a_research.settings import settings
 
 logger = get_logger(__name__)
@@ -53,10 +53,11 @@ class ClassifyNode(AsyncNode):
         return query
 
     async def exec_async(self, prep_res: str) -> dict[str, str]:
+        from time import perf_counter
+
         from a2a_research.agents.pocketflow.planner.nodes_base import (
             _heuristic_strategy,
         )
-        from time import perf_counter
 
         query = prep_res
         emit_prompt(

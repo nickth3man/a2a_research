@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import (
         ClaimState,
+        EvidenceUnit,
         ProvenanceTree,
         ResearchSession,
         WorkflowBudget,
@@ -28,7 +29,7 @@ async def run_final_stages(
     query: str,
     budget: WorkflowBudget,
     claim_state: ClaimState | None,
-    accumulated_evidence: list,
+    accumulated_evidence: list[EvidenceUnit],
     provenance_tree: ProvenanceTree,
 ) -> None:
     """Run synthesize, critique, and postprocess stages."""

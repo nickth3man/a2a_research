@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import json
 
-import pytest
-from a2a.types import Artifact, Task, TaskState, TaskStatus
+from a2a.types import Artifact, Task
 
 from a2a_research.a2a.client_helpers import (
     _payload_preview,
@@ -157,7 +156,7 @@ class TestPayloadPreview:
 
     def test_size_is_byte_count(self) -> None:
         payload = {"key": "value"}
-        _, size, preview = _payload_preview(payload)
+        _, size, _preview = _payload_preview(payload)
         expected = len(
             json.dumps(payload, default=str, indent=2, sort_keys=True).encode(
                 "utf-8"
@@ -176,7 +175,7 @@ class TestPayloadPreview:
 
         dt = datetime(2024, 1, 1, 0, 0, 0)
         payload = {"ts": dt}
-        keys, size, preview = _payload_preview(payload)
+        _keys, size, preview = _payload_preview(payload)
         assert size > 0
         # Should not raise, uses default=str
         parsed = json.loads(preview)

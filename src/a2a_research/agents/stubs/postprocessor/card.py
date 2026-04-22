@@ -9,8 +9,7 @@ POSTPROCESSOR_CARD = make_agent_card(
             skill_id="postprocess",
             name="Output Postprocessing",
             description=(
-                "Render citations, redact PII, format markdown/json"
-                " outputs."
+                "Render citations, redact PII, format markdown/json outputs."
             ),
             tags=["postprocess", "citations", "format"],
         )

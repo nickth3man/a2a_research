@@ -22,7 +22,7 @@ def build_message(
     text: str = "",
     data: dict[str, Any] | None = None,
     *,
-    role=ROLE_USER,
+    role: Any = ROLE_USER,
     task_id: str | None = None,
     context_id: str | None = None,
 ) -> Message:
@@ -39,7 +39,7 @@ def extract_data_payloads(
     task_or_message: Task | Message,
 ) -> list[dict[str, Any]]:
     payloads: list[dict[str, Any]] = []
-    parts = []
+    parts: list[Any] = []
     if isinstance(task_or_message, Task):
         for artifact in task_or_message.artifacts or []:
             parts.extend(artifact.parts)
@@ -54,7 +54,7 @@ def extract_data_payloads(
 
 def extract_text(task_or_message: Task | Message) -> str:
     chunks: list[str] = []
-    parts = []
+    parts: list[Any] = []
     if isinstance(task_or_message, Task):
         for artifact in task_or_message.artifacts or []:
             parts.extend(artifact.parts)
@@ -97,14 +97,16 @@ def _payload_preview(
 def _accumulate_stream(
     result: Task | Message | None, item: StreamResponse
 ) -> Task | Message | None:
-    if item.HasField("task"):
+    if item.HasField("task"):  # type: ignore[no-untyped-call]
         return item.task
-    if item.HasField("message"):
+    if item.HasField("message"):  # type: ignore[no-untyped-call]
         return item.message
     if result is None or not isinstance(result, Task):
         return result
-    if item.HasField("artifact_update"):
+    if item.HasField("artifact_update"):  # type: ignore[no-untyped-call]
         result.artifacts.append(item.artifact_update.artifact)
-    if item.HasField("status_update"):
-        result.status.CopyFrom(item.status_update.status)
+    if item.HasField("status_update"):  # type: ignore[no-untyped-call]
+        result.status.CopyFrom(
+            item.status_update.status
+        )  # type: ignore[no-untyped-call]
     return result

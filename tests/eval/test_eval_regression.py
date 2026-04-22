@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -16,6 +16,9 @@ from tests.eval.regression_helpers import (
     generate_markdown_report,
 )
 from tests.eval.regression_runner import main, run_eval
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestRegressionRunnerMockPipeline:

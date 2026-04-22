@@ -33,8 +33,7 @@ CARD_SPECS: dict[AgentRole, dict[str, str | list[str]]] = {
         "description": "Fetches URLs and extracts the main text as markdown.",
         "skill_id": "page-extraction",
         "skill_description": (
-            "Main-content extraction via trafilatura for one or many"
-            " URLs."
+            "Main-content extraction via trafilatura for one or many URLs."
         ),
         "tags": ["extraction", "reading"],
     },
@@ -57,8 +56,7 @@ CARD_SPECS: dict[AgentRole, dict[str, str | list[str]]] = {
         ),
         "skill_id": "report-synthesis",
         "skill_description": (
-            "Structured Pydantic output → markdown report with"
-            " citations."
+            "Structured Pydantic output → markdown report with citations."
         ),
         "tags": ["synthesis", "writing"],
     },
@@ -67,8 +65,7 @@ CARD_SPECS: dict[AgentRole, dict[str, str | list[str]]] = {
         "description": "Disambiguates underspecified queries.",
         "skill_id": "query-clarification",
         "skill_description": (
-            "Breaks ambiguous user questions into precise, actionable"
-            " queries."
+            "Breaks ambiguous user questions into precise, actionable queries."
         ),
         "tags": ["clarification", "disambiguation"],
     },
@@ -86,8 +83,7 @@ CARD_SPECS: dict[AgentRole, dict[str, str | list[str]]] = {
         ),
         "skill_id": "rank",
         "skill_description": (
-            "Rank search hits by claim relevance, credibility, and"
-            " freshness."
+            "Rank search hits by claim relevance, credibility, and freshness."
         ),
         "tags": ["rank", "score", "credibility"],
     },

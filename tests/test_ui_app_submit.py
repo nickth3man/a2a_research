@@ -11,7 +11,6 @@ from a2a_research.models import (
     AgentStatus,
     ResearchSession,
 )
-
 from tests.ui_app_helpers import _drain_on_submit, _make_state
 
 

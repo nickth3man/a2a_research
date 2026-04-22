@@ -9,7 +9,6 @@ from typing import Any, cast
 
 from a2a_research.agents.smolagents.reader.agent import build_agent
 from a2a_research.logging.app_logging import get_logger, log_event
-from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.models import AgentRole
 from a2a_research.progress import (
     emit_llm_response,
@@ -18,6 +17,7 @@ from a2a_research.progress import (
 )
 from a2a_research.settings import settings as _app_settings
 from a2a_research.tools import PageContent, fetch_many
+from a2a_research.utils.json_utils import parse_json_safely
 
 logger = get_logger(__name__)
 

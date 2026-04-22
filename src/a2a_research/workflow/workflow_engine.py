@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 from time import perf_counter
-from typing import TYPE_CHECKING
 
 from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import BudgetConsumption, ResearchSession
@@ -32,8 +31,6 @@ _PER_STAGE_TIMEOUTS = PER_STAGE_TIMEOUTS
 _budget_from_settings = budget_from_settings
 _stage_timeout = stage_timeout
 
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger(__name__)
 

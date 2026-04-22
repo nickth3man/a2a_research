@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-from a2a.server.agent_execution import RequestContext
-
 from a2a_research.a2a.proto import get_data_part, get_text_part
 from a2a_research.models import Claim, WebSource
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
 
 
 def _extract_payload(context: RequestContext) -> dict[str, Any]:

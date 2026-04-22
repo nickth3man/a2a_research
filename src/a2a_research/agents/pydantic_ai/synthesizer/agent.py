@@ -35,8 +35,8 @@ def build_model() -> OpenAIChatModel:
 
 @lru_cache(maxsize=1)
 def build_agent() -> Agent[None, ReportOutput]:
-    """Return a cached ``Agent`` with :class:`ReportOutput` as structured"""
-    """output."""
+    """Return a cached ``Agent`` with ``ReportOutput`` as structured output."""
+
     return cast(
         "Agent[None, ReportOutput]",
         Agent(

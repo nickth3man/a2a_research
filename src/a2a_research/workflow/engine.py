@@ -25,9 +25,9 @@ async def drive_v2(
     budget: WorkflowBudget,
 ) -> None:
     """Main v2 workflow driver."""
-    from a2a_research.workflow.engine_setup import run_setup_stages
-    from a2a_research.workflow.engine_loop import run_evidence_loop
     from a2a_research.workflow.engine_final import run_final_stages
+    from a2a_research.workflow.engine_loop import run_evidence_loop
+    from a2a_research.workflow.engine_setup import run_setup_stages
 
     workflow_start = perf_counter()
 

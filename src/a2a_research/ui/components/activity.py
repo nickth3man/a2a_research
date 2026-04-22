@@ -9,7 +9,7 @@ from a2a_research.ui.tokens import (
 )
 
 
-def AgentActivityPanel(
+def AgentActivityPanel(  # noqa: N802
     label: str,
     status: AgentStatus,
     lines: list[str],
@@ -18,14 +18,14 @@ def AgentActivityPanel(
     show_verbose_prompts: bool = True,
 ) -> None:
     """Render a single agent's activity panel within the loading card."""
-    _STATUS_ICON = {
+    _status_icon = {
         AgentStatus.PENDING: ("○", "#94a3b8"),
         AgentStatus.RUNNING: ("▸", "#f59e0b"),
         AgentStatus.COMPLETED: ("✓", "#16a34a"),
         AgentStatus.FAILED: ("✗", "#dc2626"),
     }
 
-    icon, color = _STATUS_ICON[status]
+    icon, color = _status_icon[status]
     with me.box(
         style=me.Style(
             margin=me.Margin(bottom=10),

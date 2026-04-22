@@ -16,7 +16,6 @@ import time
 import pytest
 
 from a2a_research.tools import search as search_module
-
 from tests.brave_live_helpers import _HAS_KEY, _SKIP_REASON
 
 pytestmark = pytest.mark.xdist_group("live_search_providers")

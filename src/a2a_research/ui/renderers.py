@@ -1,6 +1,8 @@
 """Rendering helpers for the main page."""
 
 import logging
+from collections.abc import Callable
+from typing import Any
 
 import mesop as me
 
@@ -18,8 +20,6 @@ from a2a_research.ui.tokens import (
     PAGE_MAX_WIDTH,
     PAGE_PADDING,
 )
-
-from .app_state import AppState
 
 logger = get_logger("a2a_research.ui.renderers")
 
@@ -43,7 +43,7 @@ def page_shell_style(loading: bool) -> me.Style:
     )
 
 
-def render_error_banner(error: str, on_retry: callable) -> None:
+def render_error_banner(error: str, on_retry: Callable[..., Any]) -> None:
     """Render the error banner with optional retry button."""
     BannerError(error, on_retry=on_retry)
 

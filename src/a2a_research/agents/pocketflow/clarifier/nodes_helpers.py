@@ -45,7 +45,10 @@ def _extract_disambiguations(
         if isinstance(item, dict):
             interp = str(item.get("interpretation") or "").strip()
             if interp:
-                conf = float(item.get("confidence", 0.5))
+                try:
+                    conf = float(item.get("confidence", 0.5))
+                except (TypeError, ValueError):
+                    conf = 0.5
                 result.append(
                     {
                         "interpretation": interp,

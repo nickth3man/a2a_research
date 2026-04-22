@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from .progress_bus import Bus
 from .progress_types import (
-    ProgressGranularity,
     ProgressPhase,
     current_session_id,
     truncate_text,
@@ -15,7 +13,7 @@ from .progress_types import (
 if TYPE_CHECKING:
     from a2a_research.models import AgentRole
 
-__all__ = ["emit_prompt", "emit_llm_response"]
+__all__ = ["emit_llm_response", "emit_prompt"]
 
 _STEP_INDEX_BY_ROLE: dict[str, int] = {
     "preprocessor": 0,
@@ -33,7 +31,7 @@ _STEP_INDEX_BY_ROLE: dict[str, int] = {
 }
 
 
-def _step_index(role: "AgentRole") -> int:
+def _step_index(role: AgentRole) -> int:
     return _STEP_INDEX_BY_ROLE.get(getattr(role, "value", str(role)), 0)
 
 
@@ -42,7 +40,7 @@ def _session_or_current(session_id: str | None) -> str:
 
 
 def emit_prompt(
-    role: "AgentRole",
+    role: AgentRole,
     label: str,
     prompt_text: str,
     *,
@@ -73,7 +71,7 @@ def emit_prompt(
 
 
 def emit_llm_response(
-    role: "AgentRole",
+    role: AgentRole,
     label: str,
     response_text: str,
     *,
@@ -109,11 +107,11 @@ def emit_llm_response(
 def _emit(
     session_id: str,
     phase: ProgressPhase,
-    role: "AgentRole",
+    role: AgentRole,
     step_index: int,
     total_steps: int,
     substep_label: str,
-    **extra,
+    **extra: Any,
 ) -> None:
     """Forward to the central emit function to avoid circular imports."""
     from .progress_emit_core import emit

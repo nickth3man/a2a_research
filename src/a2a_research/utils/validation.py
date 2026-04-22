@@ -15,7 +15,7 @@ def to_str_list(value: Any) -> list[str]:
 def to_float(value: Any, default: float) -> float:
     """Convert a value to a float, returning default on failure."""
     try:
-        return float(value)  # type: ignore[arg-type]
+        return float(value)
     except (ValueError, TypeError):
         return default
 

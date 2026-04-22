@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 from a2a.client import Client as SDKClient
@@ -144,7 +144,7 @@ class A2AClient:
                 task_state=task_state,
                 task_id=task_id_out,
             )
-            return result_local
+            return cast("Task | Message", result_local)
         try:
             client = await self._get_sdk_client(role)
             result: Task | Message | None = None

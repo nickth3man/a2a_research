@@ -1,8 +1,8 @@
 [project]
 name = "a2a-research"
-version = "0.1.0"
+version = "0.2.0"
 description = "5-agent A2A research and verification pipeline (HTTP-orchestrated, OpenRouter-backed)"
-readme = "README.md"
+
 license = "MIT"
 requires-python = ">=3.11"
 classifiers = [
@@ -83,6 +83,8 @@ select = [
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
+"src/a2a_research/models/session.py" = ["TC001"]
+"src/a2a_research/models/verification.py" = ["TC001"]
 "src/a2a_research/ui/**" = ["T20"]
 "src/a2a_research/workflow/__main__.py" = ["T20"]
 "tests/**" = ["T20", "TCH001", "TCH002"]
@@ -138,6 +140,14 @@ warn_unused_configs = true
 show_error_codes = true
 warn_no_return = true
 follow_untyped_imports = true
+
+[[tool.mypy.overrides]]
+module = "a2a_research.a2a.proto"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "a2a_research.agents.stubs.*"
+ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "pocketflow.*"

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
 
 from a2a.types import (
@@ -47,9 +46,7 @@ async def enqueue_plan_result(
                     "query": query,
                     "claims": [c.model_dump(mode="json") for c in claims],
                     "claim_dag": (
-                        claim_dag.model_dump(mode="json")
-                        if claim_dag
-                        else {}
+                        claim_dag.model_dump(mode="json") if claim_dag else {}
                     ),
                     "seed_queries": seed_queries,
                 }
@@ -72,9 +69,7 @@ async def enqueue_plan_result(
             status=TaskStatus(
                 state=status,
                 message=(
-                    new_agent_text_message(error_text)
-                    if error_text
-                    else None
+                    new_agent_text_message(error_text) if error_text else None
                 ),
             ),
         )

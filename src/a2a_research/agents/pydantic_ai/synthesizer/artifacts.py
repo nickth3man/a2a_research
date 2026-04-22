@@ -64,9 +64,7 @@ async def enqueue_report_artifacts(
             status=TaskStatus(
                 state=status,
                 message=(
-                    new_agent_text_message(error_text)
-                    if error_text
-                    else None
+                    new_agent_text_message(error_text) if error_text else None
                 ),
             ),
         )

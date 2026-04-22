@@ -7,17 +7,15 @@ role list helpers.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from a2a_research.models.claims import Claim, ReplanReason
-from a2a_research.models.verification import ClaimState
 from a2a_research.models.enums import AgentRole, AgentStatus
 from a2a_research.models.evidence import EvidenceUnit, IndependenceGraph
 from a2a_research.models.provenance import ProvenanceTree
 from a2a_research.models.reports import ReportOutput, WebSource
+from a2a_research.models.verification import ClaimState
 from a2a_research.models.workflow import BudgetConsumption, NoveltyTracker
 
 

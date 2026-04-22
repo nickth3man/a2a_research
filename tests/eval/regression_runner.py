@@ -20,13 +20,13 @@ from tests.eval.regression_helpers import (
 from tests.eval.scoring import score_run
 
 __all__ = [
-    "generate_markdown_report",
-    "main",
-    "run_eval",
     "_detect_regression",
     "_load_baseline",
     "_mean",
     "_mock_run_pipeline",
+    "generate_markdown_report",
+    "main",
+    "run_eval",
 ]
 
 

@@ -7,13 +7,15 @@ definitions.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 
-from a2a_research.models.enums import (
-    AgentCapability,
-    AgentRole,
-)
+if TYPE_CHECKING:
+    from a2a_research.models.enums import (
+        AgentCapability,
+        AgentRole,
+    )
 
 
 @dataclass

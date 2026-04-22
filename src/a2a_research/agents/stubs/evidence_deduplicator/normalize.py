@@ -17,9 +17,9 @@ def normalize_pages_to_evidence(
             continue
         url = p.get("url", "")
         content = p.get("markdown", "")
-        ev_id = hashlib.sha256(
-            f"{url}:{content[:200]}".encode()
-        ).hexdigest()[:16]
+        ev_id = hashlib.sha256(f"{url}:{content[:200]}".encode()).hexdigest()[
+            :16
+        ]
         if ev_id not in existing_ids:
             hostname = urlparse(url).hostname or ""
             publisher_id = hostname.removeprefix("www.")

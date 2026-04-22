@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from a2a_research.a2a import A2AClient
 from a2a_research.logging.app_logging import get_logger
 from a2a_research.models import AgentRole, AgentStatus, ResearchSession
 from a2a_research.workflow.coerce import payload, task_failed
 from a2a_research.workflow.definitions import AGENT_DEFINITIONS, stage_timeout
 from a2a_research.workflow.status import set_status
+
+if TYPE_CHECKING:
+    from a2a_research.a2a import A2AClient
 
 logger = get_logger(__name__)
 

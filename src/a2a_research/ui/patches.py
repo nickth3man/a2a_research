@@ -7,7 +7,8 @@ Windows).
 
 import os
 import sys
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 if sys.platform == "win32":
     import mesop.server.static_file_serving as _sfs

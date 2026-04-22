@@ -20,6 +20,7 @@ from a2a_research.workflow.status import emit_v2, set_status
 if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import (
+        Claim,
         ClaimDAG,
         ResearchSession,
         WorkflowBudget,
@@ -33,7 +34,7 @@ async def run_setup_stages(
     client: A2AClient,
     query: str,
     budget: WorkflowBudget,
-) -> tuple[str, list, ClaimDAG, list[str]] | None:
+) -> tuple[str, list[Claim], ClaimDAG, list[str]] | None:
     """Run preprocess, clarify, and plan stages.
 
     Returns ``None`` if the workflow should abort early. Otherwise

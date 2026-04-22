@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextvars
-from collections.abc import AsyncGenerator, Callable, Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import IntEnum, StrEnum
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from a2a_research.models import AgentRole
@@ -88,7 +89,7 @@ class ProgressEvent:
 
     session_id: str
     phase: ProgressPhase
-    role: "AgentRole | None"
+    role: AgentRole | None
     step_index: int
     total_steps: int
     substep_label: str
@@ -100,5 +101,5 @@ class ProgressEvent:
     created_at: float = field(default_factory=perf_counter)
 
 
-ProgressQueue = "asyncio.Queue[ProgressEvent | None]"
-ProgressReporter = Callable[["ProgressEvent | None"], None]
+ProgressQueue: TypeAlias = asyncio.Queue[ProgressEvent | None]
+ProgressReporter: TypeAlias = Callable[[ProgressEvent | None], None]

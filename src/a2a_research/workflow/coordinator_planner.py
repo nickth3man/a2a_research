@@ -17,12 +17,12 @@ from a2a_research.workflow.coordinator_helpers import (
 
 if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
-    from a2a_research.models import ResearchSession
+    from a2a_research.models import Claim, ResearchSession
 
 
 async def run_planner_step(
-    session: "ResearchSession", client: "A2AClient", query: str
-) -> tuple[list, list[str], bool]:
+    session: ResearchSession, client: A2AClient, query: str
+) -> tuple[list[Claim], list[str], bool]:
     """Run planner and return (claims, seed_queries, should_abort)."""
     emit_role_event(
         session.id,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2a.types import (
     Artifact,
@@ -51,9 +51,7 @@ async def enqueue_clarifier_result(
             status=TaskStatus(
                 state=status,
                 message=(
-                    new_agent_text_message(error_text)
-                    if error_text
-                    else None
+                    new_agent_text_message(error_text) if error_text else None
                 ),
             ),
         )

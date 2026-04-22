@@ -9,8 +9,8 @@ from pocketflow import AsyncNode
 from a2a_research.agents.pocketflow.adversary.prompt import (
     EVALUATE_EVIDENCE_PROMPT,
 )
+from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.logging.app_logging import get_logger
-from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.models import (
     AgentRole,
     Claim,
@@ -19,8 +19,8 @@ from a2a_research.models import (
     IndependenceGraph,
 )
 from a2a_research.progress import emit_llm_response, emit_prompt
-from a2a_research.llm.providers import ProviderRequestError, get_llm
 from a2a_research.settings import settings
+from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.utils.timing import perf_counter
 from a2a_research.utils.validation import to_float, to_str_list
 

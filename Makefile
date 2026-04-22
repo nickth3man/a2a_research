@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer
+.PHONY: help install dev test test-live test-live-brave test-live-tavily all-live watch lint format format-check typecheck typecheck-ty check all clean mesop htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -11,14 +11,22 @@ dev: install ## Full dev setup: install + activate pre-commit hooks
 	uv run pre-commit install
 	@echo "Dev environment ready. Run 'make test' to verify."
 
-test: ## Run pytest suite with coverage
-	uv run pytest
+test: ## Run pytest suite with coverage (excludes live API integration tests)
+	uv run pytest -m "not integration"
+
+test-live-brave: ## Run Brave live API tests (requires BRAVE_LIVE=1 + real BRAVE_API_KEY)
+	BRAVE_LIVE=1 uv run pytest tests/test_brave_live_smoke.py tests/test_brave_live_queries.py -n0 --no-cov -m integration
+
+test-live-tavily: ## Run Tavily live API tests (requires TAVILY_LIVE=1 + real keys)
+	TAVILY_LIVE=1 uv run pytest tests/test_tavily_live.py tests/test_tavily_live_merge.py -n0 --no-cov -m integration
+
+test-live: test-live-brave test-live-tavily ## Run all live API tests
 
 watch: ## Run pytest in watch mode (re-runs on file changes)
 	uv run pytest --tb=short -q --no-header -p no:warnings -f
 
-lint: ## Run ruff linter
-	uv run ruff check src/ tests/
+lint: ## Run ruff linter and auto-fix issues
+	uv run ruff check --fix src/ tests/
 
 format: ## Format code with ruff
 	uv run ruff format src/ tests/
@@ -37,6 +45,9 @@ check: lint typecheck typecheck-ty format-check ## Run all quality checks (no te
 all: test check ## Run tests + all quality checks (CI-ready)
 	@echo "[OK] All checks complete"
 
+all-live: test-live check ## Run live tests + all quality checks
+	@echo "[OK] All live checks complete"
+
 clean: ## Remove build artifacts and cache directories
 	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').glob('**/__pycache__')]"
 	python -c "import shutil; [shutil.rmtree(d, ignore_errors=True) for d in ['build', 'dist', '.mypy_cache', '.ruff_cache', '.pytest_cache', 'htmlcov']]"
@@ -46,7 +57,7 @@ mesop: ## Start Mesop UI (with MESOP_STATE_SESSION_BACKEND=memory)
 	export MESOP_STATE_SESSION_BACKEND=memory && uv run mesop src/a2a_research/ui/app.py
 
 serve-all: ## Start all agent HTTP services
-	uv run python -m a2a_research.launcher
+	uv run python -m a2a_research.entrypoints.launcher
 
 serve-planner: ## Start Planner HTTP service
 	uv run python -m a2a_research.agents.pocketflow.planner

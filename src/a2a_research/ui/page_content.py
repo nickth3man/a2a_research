@@ -5,16 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import mesop as me
-
 from a2a_research.logging.app_logging import get_logger, log_event
 from a2a_research.ui.components import (
     CardLoading,
     CardQueryInput,
     CardTimeline,
     PageEmptyState,
-    PageHeader,
-    PageInstructions,
 )
 from a2a_research.ui.handlers import on_retry, on_toggle_verbose
 from a2a_research.ui.query_handlers import (
@@ -37,7 +33,7 @@ if TYPE_CHECKING:
 logger = get_logger("a2a_research.ui.app")
 
 
-def render_loading_state(state: "AppState") -> None:
+def render_loading_state(state: AppState) -> None:
     """Render the loading card while research is in progress."""
     log_event(
         logger,
@@ -47,9 +43,7 @@ def render_loading_state(state: "AppState") -> None:
         progress_substep_label=state.current_substep,
         activity_counts={
             role: len(lines)
-            for role, lines in getattr(
-                state, "activity_by_role", {}
-            ).items()
+            for role, lines in getattr(state, "activity_by_role", {}).items()
         },
     )
     CardLoading(
@@ -66,7 +60,7 @@ def render_loading_state(state: "AppState") -> None:
     )
 
 
-def render_session_body(state: "AppState") -> None:
+def render_session_body(state: AppState) -> None:
     """Render results, progress timeline, or empty state."""
     session_error = get_session_error(state.session)
     if session_error:
@@ -111,7 +105,7 @@ def render_session_body(state: "AppState") -> None:
         PageEmptyState()
 
 
-def render_query_input_card(state: "AppState") -> None:
+def render_query_input_card(state: AppState) -> None:
     """Render the query input card at the bottom of the page."""
     log_event(
         logger,

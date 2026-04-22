@@ -10,10 +10,10 @@ def extract_prompts(py_file: Path) -> int:
     Returns number of extractions."""
     text = py_file.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
-    
+
     # Find variable assignments with triple-quoted strings
-    pattern = re.compile(r'^([ \t]*(\w+)\s*=\s*)("""[\s\S]*?""")\s*$', re.MULTILINE)
-    
+    re.compile(r'^([ \t]*(\w+)\s*=\s*)("""[\s\S]*?""")\s*$', re.MULTILINE)
+
     changed = 0
     new_lines = []
     i = 0
@@ -22,10 +22,11 @@ def extract_prompts(py_file: Path) -> int:
         # Check if this line starts a triple-quoted assignment
         m = re.match(r'^([ \t]*(\w+)\s*=\s*)(""")', line)
         if m:
-            indent, var_name, quote = m.groups()
+            indent, var_name, _quote = m.groups()
             # Find the end of the triple-quoted string
             start = i
-            content_lines = [line[len(indent) + len(var_name) + len('= '):]]
+            # Slice from opening """; do not use len('= ') — \s*=\s* can be 1–3+ chars
+            content_lines = [line[m.end(1):]]
             i += 1
             while i < len(lines):
                 if '"""' in lines[i] and lines[i].strip().endswith('"""'):
@@ -34,23 +35,23 @@ def extract_prompts(py_file: Path) -> int:
                     break
                 content_lines.append(lines[i])
                 i += 1
-            
+
             # Get the full content
             full_content = ''.join(content_lines)
             # Check if it's a single line that's too long
             if len(full_content.strip()) <= 79 + len(indent) + len(var_name):
                 new_lines.extend(lines[start:i])
                 continue
-                
+
             # Extract to .txt file
             txt_file = py_file.with_name(f"{py_file.stem}_{var_name}.txt")
             # Remove the triple quotes
             content = full_content.strip()
             if content.startswith('"""') and content.endswith('"""'):
                 content = content[3:-3]
-            
+
             txt_file.write_text(content, encoding="utf-8")
-            
+
             # Replace with file read
             new_lines.append(f'{indent}{var_name} = (')
             new_lines.append(f'{indent}    Path(__file__).parent / "{txt_file.name}"')
@@ -60,10 +61,10 @@ def extract_prompts(py_file: Path) -> int:
         else:
             new_lines.append(line)
             i += 1
-    
+
     if changed:
         py_file.write_text(''.join(new_lines), encoding="utf-8")
-    
+
     return changed
 
 
@@ -77,7 +78,6 @@ def main():
             total += extract_prompts(py_file)
         for py_file in directory.rglob("*_prompt.py"):
             total += extract_prompts(py_file)
-    print(f"Extracted {total} prompts")
 
 
 if __name__ == "__main__":

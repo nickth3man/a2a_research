@@ -13,8 +13,7 @@ class TestScoringAdversaryCatchRate:
 
     def test_half_caught(self) -> None:
         assert (
-            score_adversary_catch_rate(["false1", "false2"], ["false1"])
-            == 0.5
+            score_adversary_catch_rate(["false1", "false2"], ["false1"]) == 0.5
         )
 
     def test_no_false_claims(self) -> None:
@@ -32,16 +31,12 @@ class TestScoringCompositeScore:
         assert result == 1.0
 
     def test_zero_weights(self) -> None:
-        result = compute_composite_score(
-            1.0, 1.0, 1.0, 1.0, weights={}
-        )
+        result = compute_composite_score(1.0, 1.0, 1.0, 1.0, weights={})
         assert result == 0.0
 
     def test_custom_weights(self) -> None:
         weights = {"claim_recall": 1.0}
-        result = compute_composite_score(
-            0.5, 0.0, 0.0, 0.0, weights=weights
-        )
+        result = compute_composite_score(0.5, 0.0, 0.0, 0.0, weights=weights)
         assert result == 0.5
 
     def test_all_zero_scores(self) -> None:

@@ -6,6 +6,9 @@ import asyncio
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from a2a_research.models import AgentRole
+
 from .progress_bus import Bus
 from .progress_types import (
     ProgressEvent,
@@ -14,10 +17,7 @@ from .progress_types import (
     current_session_id,
 )
 
-if TYPE_CHECKING:
-    from a2a_research.models import AgentRole
-
-__all__ = ["emit", "emit_tool_call", "emit_rate_limit"]
+__all__ = ["emit", "emit_rate_limit", "emit_tool_call"]
 
 _STEP_INDEX_BY_ROLE: dict[str, int] = {
     "preprocessor": 0,
@@ -35,7 +35,9 @@ _STEP_INDEX_BY_ROLE: dict[str, int] = {
 }
 
 
-def _step_index(role: "AgentRole") -> int:
+def _step_index(role: AgentRole | None) -> int:
+    if role is None:
+        return 0
     return _STEP_INDEX_BY_ROLE.get(getattr(role, "value", str(role)), 0)
 
 
@@ -44,7 +46,7 @@ def _session_or_current(session_id: str | None) -> str:
 
 
 def emit_tool_call(
-    role: "AgentRole",
+    role: AgentRole,
     tool_name: str,
     *,
     args_preview: str = "",
@@ -74,7 +76,7 @@ def emit_tool_call(
 
 
 def emit_rate_limit(
-    role: "AgentRole",
+    role: AgentRole,
     *,
     provider: str,
     attempt: int,
@@ -106,7 +108,7 @@ def emit_rate_limit(
 def emit(
     session_id: str,
     phase: ProgressPhase,
-    role: "AgentRole",
+    role: AgentRole | None,
     step_index: int,
     total_steps: int,
     substep_label: str,

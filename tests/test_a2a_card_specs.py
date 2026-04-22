@@ -69,7 +69,9 @@ class TestCardSpecsStructure:
 
 class TestCardSpecsValues:
     def test_planner_skill_id(self) -> None:
-        assert CARD_SPECS[AgentRole.PLANNER]["skill_id"] == "query-decomposition"
+        assert (
+            CARD_SPECS[AgentRole.PLANNER]["skill_id"] == "query-decomposition"
+        )
 
     def test_searcher_skill_id(self) -> None:
         assert CARD_SPECS[AgentRole.SEARCHER]["skill_id"] == "web-search"

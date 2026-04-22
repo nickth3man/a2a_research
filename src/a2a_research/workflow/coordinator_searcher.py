@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a_research.models import AgentRole, AgentStatus, WebSource
+from a2a_research.models import AgentRole, AgentStatus
 from a2a_research.progress import ProgressPhase
 from a2a_research.workflow.coordinator_helpers import (
     coerce_web_hit,
@@ -18,14 +18,15 @@ from a2a_research.workflow.coordinator_helpers import (
 if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import ResearchSession
+    from a2a_research.tools import WebHit
 
 
 async def run_searcher_step(
-    session: "ResearchSession",
-    client: "A2AClient",
+    session: ResearchSession,
+    client: A2AClient,
     query: str,
     seed_queries: list[str],
-) -> tuple[list, list[str], bool]:
+) -> tuple[list[WebHit], list[str], bool]:
     """Run searcher and return (hits, search_errors, should_abort)."""
     set_status(session, AgentRole.SEARCHER, AgentStatus.RUNNING, "Searching…")
     emit_role_event(
@@ -42,8 +43,8 @@ async def run_searcher_step(
     search_data = payload(search_task)
     search_failed = task_failed(search_task)
     raw_hits = search_data.get("hits") or []
-    hits = [coerce_web_hit(h) for h in raw_hits]
-    hits = [h for h in hits if h is not None]
+    hits_maybe = [coerce_web_hit(h) for h in raw_hits]
+    hits: list[WebHit] = [h for h in hits_maybe if h is not None]
     search_errors = [
         str(e) for e in (search_data.get("errors") or []) if isinstance(e, str)
     ]

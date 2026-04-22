@@ -26,18 +26,18 @@ from a2a_research.tools import PageContent, WebHit
 logger = get_logger(__name__)
 
 __all__ = [
-    "payload",
-    "task_failed",
+    "coerce_claim_state",
     "coerce_claims",
     "coerce_dag",
-    "coerce_claim_state",
-    "coerce_follow_ups",
-    "coerce_replan_reasons",
     "coerce_evidence_unit",
-    "coerce_web_hit",
+    "coerce_follow_ups",
     "coerce_page_content",
+    "coerce_replan_reasons",
     "coerce_report",
+    "coerce_web_hit",
     "merge_verified_claims_into_state",
+    "payload",
+    "task_failed",
 ]
 
 

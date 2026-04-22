@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from dotenv import load_dotenv
 
@@ -20,10 +21,9 @@ os.environ.setdefault("LLM_API_KEY", "test-llm-key-placeholder")
 os.environ.setdefault("TAVILY_API_KEY", "test-tavily-key-placeholder")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-placeholder")
 
-from unittest.mock import MagicMock, patch
 
-import pytest
-from mesop.component_helpers import helper
+import pytest  # noqa: E402
+from mesop.component_helpers import helper  # noqa: E402
 
 
 @pytest.fixture

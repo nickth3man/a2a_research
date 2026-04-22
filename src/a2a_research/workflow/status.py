@@ -9,10 +9,9 @@ from a2a_research.models import (
     ResearchSession,
 )
 from a2a_research.progress import ProgressPhase, emit
-
 from a2a_research.workflow.definitions import STEP_INDEX_V2, TOTAL_STEPS_V2
 
-__all__ = ["set_status", "emit_v2", "mark_running_failed"]
+__all__ = ["emit_v2", "mark_running_failed", "set_status"]
 
 
 def set_status(

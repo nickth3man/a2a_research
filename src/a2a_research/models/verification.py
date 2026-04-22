@@ -6,22 +6,16 @@ Models for tracking verification results and aggregated claim state.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from a2a_research.models.claims import Claim, ClaimDAG, FreshnessWindow
 from a2a_research.models.enums import Verdict
 
-if TYPE_CHECKING:
-    pass
 
-from a2a_research.models.claims import Claim, ClaimDAG, FreshnessWindow
-
-
-def _default_claim_dag():
+def _default_claim_dag() -> ClaimDAG:
     """Factory to avoid circular import at module load time."""
-    from a2a_research.models.claims import ClaimDAG
-
     return ClaimDAG()
 
 
@@ -60,7 +54,7 @@ class ClaimState(BaseModel):
     """Aggregated verification state for all claims."""
 
     original_claims: list[Claim] = Field(default_factory=list)
-    dag: "ClaimDAG" = Field(default_factory=lambda: _default_claim_dag())
+    dag: ClaimDAG = Field(default_factory=lambda: _default_claim_dag())
     verification: dict[str, ClaimVerification] = Field(default_factory=dict)
     unresolved_claim_ids: list[str] = Field(default_factory=list)
     stale_claim_ids: list[str] = Field(default_factory=list)
@@ -69,7 +63,6 @@ class ClaimState(BaseModel):
     def mark_dependents_stale(self, parent_id: str) -> None:
         """Cascade STALE to descendants when a parent verdict flips."""
         # Import here to avoid circular dependency at module load time.
-        from a2a_research.models.claims import ClaimDAG
 
         for descendant in self.dag.descendants_of(parent_id):
             v = self.verification.get(descendant)
@@ -142,6 +135,6 @@ class ClaimState(BaseModel):
         return list(set(self.unresolved_claim_ids + self.stale_claim_ids))
 
     @property
-    def freshness_windows(self) -> dict[str, "FreshnessWindow"]:
+    def freshness_windows(self) -> dict[str, FreshnessWindow]:
         """Map claim IDs to their freshness windows."""
         return {c.id: c.freshness for c in self.original_claims}

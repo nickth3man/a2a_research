@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from dotenv import dotenv_values
-
 if TYPE_CHECKING:
     from pydantic_settings import BaseSettings
 

@@ -4,21 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from a2a_research.logging.app_logging import get_logger
-from a2a_research.models import AgentRole
-from a2a_research.progress import ProgressPhase
-from a2a_research.workflow.agents import run_agent as _run_agent
-from a2a_research.workflow.coerce import (
-    coerce_evidence_unit,
-    coerce_page_content,
-    coerce_web_hit,
-)
-from a2a_research.workflow.engine_provenance import update_provenance
-from a2a_research.workflow.status import emit_v2
-
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from a2a_research.a2a import A2AClient
     from a2a_research.models import (
+        Claim,
         ClaimState,
         EvidenceUnit,
         IndependenceGraph,
@@ -27,6 +18,31 @@ if TYPE_CHECKING:
         ResearchSession,
         WorkflowBudget,
     )
+    from a2a_research.tools import PageContent
+
+from a2a_research.logging.app_logging import get_logger
+from a2a_research.models import AgentRole
+from a2a_research.workflow.agents import run_agent as _run_agent
+from a2a_research.workflow.coerce import (
+    coerce_evidence_unit,
+    coerce_page_content,
+    coerce_web_hit,
+)
+from a2a_research.workflow.engine_provenance import update_provenance
+
+if TYPE_CHECKING:
+    from a2a_research.a2a import A2AClient
+    from a2a_research.models import (
+        Claim,
+        ClaimState,
+        EvidenceUnit,
+        IndependenceGraph,
+        NoveltyTracker,
+        ProvenanceTree,
+        ResearchSession,
+        WorkflowBudget,
+    )
+    from a2a_research.tools import PageContent, WebHit
 
 logger = get_logger(__name__)
 
@@ -38,16 +54,18 @@ async def gather_evidence(
     client: A2AClient,
     budget: WorkflowBudget,
     claim_state: ClaimState,
-    to_process: list,
+    to_process: list[Claim],
     claim_queries: list[str],
     accumulated_evidence: list[EvidenceUnit],
     independence_graph: IndependenceGraph,
     provenance_tree: ProvenanceTree,
     novelty_tracker: NoveltyTracker,
-    _update_wall_seconds: callable,
-    _emit_budget: callable,
+    _update_wall_seconds: Callable[[], None],
+    _emit_budget: Callable[[str, AgentRole, str], None],
     loop_round: int,
-) -> tuple[list[EvidenceUnit], list, list[str]] | None:
+) -> tuple[
+    list[EvidenceUnit], list[PageContent], list[EvidenceUnit]
+] | None:
     """Run search, rank, read, and normalize stages.
 
     Returns ``(new_accumulated_evidence, pages, claim_queries)`` or
@@ -66,8 +84,8 @@ async def gather_evidence(
         },
     )
     raw_hits = search_result.get("hits", [])
-    hits = [coerce_web_hit(h) for h in raw_hits]
-    hits = [h for h in hits if h is not None]
+    hits_maybe = [coerce_web_hit(h) for h in raw_hits]
+    hits: list[WebHit] = [h for h in hits_maybe if h is not None]
     _update_wall_seconds()
 
     if not hits:
@@ -125,8 +143,12 @@ async def gather_evidence(
         },
     )
     raw_pages = read_result.get("pages", [])
-    pages = [coerce_page_content(p) for p in raw_pages]
-    pages = [p for p in pages if p is not None and not p.error and p.markdown]
+    pages_maybe = [coerce_page_content(p) for p in raw_pages]
+    pages: list[PageContent] = [
+        p
+        for p in pages_maybe
+        if p is not None and not p.error and p.markdown
+    ]
     session.budget_consumed.urls_fetched += len(urls_to_fetch)
     _update_wall_seconds()
 
@@ -156,8 +178,10 @@ async def gather_evidence(
         },
     )
     raw_evidence = normalize_result.get("new_evidence", [])
-    new_evidence = [coerce_evidence_unit(e) for e in raw_evidence]
-    new_evidence = [e for e in new_evidence if e is not None]
+    new_evidence_maybe = [coerce_evidence_unit(e) for e in raw_evidence]
+    new_evidence: list[EvidenceUnit] = [
+        e for e in new_evidence_maybe if e is not None
+    ]
 
     novelty_tracker.new_unique_hits += len(hits)
     novelty_tracker.new_unique_pages += len(pages)

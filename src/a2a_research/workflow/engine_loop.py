@@ -6,7 +6,13 @@ from time import perf_counter
 from typing import TYPE_CHECKING
 
 from a2a_research.logging.app_logging import get_logger
-from a2a_research.models import AgentRole, ClaimState
+from a2a_research.models import (
+    AgentRole,
+    ClaimState,
+    IndependenceGraph,
+    NoveltyTracker,
+    ProvenanceTree,
+)
 from a2a_research.progress import ProgressPhase
 from a2a_research.workflow.agents import run_agent as _run_agent
 from a2a_research.workflow.claims import claims_to_process
@@ -19,9 +25,6 @@ if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import (
         EvidenceUnit,
-        IndependenceGraph,
-        NoveltyTracker,
-        ProvenanceTree,
         ResearchSession,
         WorkflowBudget,
     )

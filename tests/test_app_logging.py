@@ -6,9 +6,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import a2a_research.logging.app_logging as logging_module
 import a2a_research.logging.logging_formatters as _lf
-from a2a_research.logging.app_logging import get_logger, log_event, setup_logging
+from a2a_research.logging.app_logging import (
+    get_logger,
+    log_event,
+    setup_logging,
+)
 from a2a_research.models import AgentRole, AgentStatus
 
 if TYPE_CHECKING:
@@ -44,7 +47,9 @@ class TestNormalizeLogValue:
         result = normalize(AgentRole.SEARCHER)
         assert result == "searcher"
 
-    def test_object_with_attributes_is_normalized_via___dict__(self) -> None:
+    def test_object_with_attributes_is_normalized_via___dict__(
+        self,
+    ) -> None:
         class Foo:
             def __init__(self) -> None:
                 self.role = AgentRole.PLANNER
@@ -87,17 +92,21 @@ class TestSetupLogging:
             handler.close()
             root.removeHandler(handler)
 
-        with (
-            patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
+        patches = [
             patch(
-                "a2a_research.app_logging._APP_LOG",
+                "a2a_research.logging.app_logging._LOG_DIR",
+                tmp_path / "logs",
+            ),
+            patch(
+                "a2a_research.logging.app_logging._APP_LOG",
                 tmp_path / "logs" / "app.log",
             ),
             patch(
-                "a2a_research.app_logging.logging.FileHandler",
+                "a2a_research.logging.app_logging.logging.FileHandler",
                 side_effect=make_file_handler,
             ),
-        ):
+        ]
+        with patches[0], patches[1], patches[2]:
             import a2a_research.logging.app_logging as logging_mod
 
             original = logging_mod._CONFIGURED
@@ -127,17 +136,21 @@ class TestSetupLogging:
             handler.close()
             root.removeHandler(handler)
 
-        with (
-            patch("a2a_research.app_logging._LOG_DIR", tmp_path / "logs"),
+        patches = [
             patch(
-                "a2a_research.app_logging._APP_LOG",
+                "a2a_research.logging.app_logging._LOG_DIR",
+                tmp_path / "logs",
+            ),
+            patch(
+                "a2a_research.logging.app_logging._APP_LOG",
                 tmp_path / "logs" / "app.log",
             ),
             patch(
-                "a2a_research.app_logging.logging.FileHandler",
+                "a2a_research.logging.app_logging.logging.FileHandler",
                 side_effect=make_file_handler,
             ),
-        ):
+        ]
+        with patches[0], patches[1], patches[2]:
             import a2a_research.logging.app_logging as logging_mod
 
             original = logging_mod._CONFIGURED

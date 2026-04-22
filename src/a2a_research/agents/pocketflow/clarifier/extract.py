@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from a2a.server.agent_execution import RequestContext
 from a2a_research.a2a.proto import get_data_part, get_text_part
+
+if TYPE_CHECKING:
+    from a2a.server.agent_execution import RequestContext
 
 
 def _extract_query(context: RequestContext, payload: dict[str, Any]) -> str:

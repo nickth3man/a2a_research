@@ -12,6 +12,8 @@ from a2a_research.a2a import A2AClient, AgentRegistry, extract_data_payloads
 from a2a_research.agents.pocketflow.planner import PlannerExecutor, plan
 from a2a_research.agents.pocketflow.planner import (
     nodes as planner_nodes,
+)
+from a2a_research.agents.pocketflow.planner import (
     nodes_base as planner_nodes_base,
 )
 from a2a_research.models import AgentRole
@@ -35,9 +37,7 @@ def _router_llm(
 
 
 @pytest.mark.asyncio
-def _patch_get_llm(
-    monkeypatch: pytest.MonkeyPatch, mock_fn: Any
-) -> None:
+def _patch_get_llm(monkeypatch: pytest.MonkeyPatch, mock_fn: Any) -> None:
     monkeypatch.setattr(planner_nodes, "get_llm", mock_fn)
     monkeypatch.setattr(planner_nodes_base, "get_llm", mock_fn)
 

@@ -5,12 +5,16 @@ Structured output contract for the LangGraph-based FactChecker agent.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, Field
 
-from a2a_research.models.claims import ClaimFollowUp, ReplanReason
 from a2a_research.models.enums import Verdict
 from a2a_research.models.verification import ClaimState
 from a2a_research.models.workflow import BudgetConsumption
+
+if TYPE_CHECKING:
+    from a2a_research.models.claims import ClaimFollowUp, ReplanReason
 
 
 class FactCheckerOutput(BaseModel):

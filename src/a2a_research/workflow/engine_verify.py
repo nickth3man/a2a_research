@@ -2,14 +2,34 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from a2a_research.a2a import A2AClient
+    from a2a_research.models import (
+        Claim,
+        ClaimState,
+        EvidenceUnit,
+        IndependenceGraph,
+        ProvenanceTree,
+        ResearchSession,
+        WorkflowBudget,
+    )
+    from a2a_research.tools import PageContent
 
 from a2a_research.logging.app_logging import get_logger
-from a2a_research.models import AgentRole, Verdict
+from a2a_research.models import (
+    AgentRole,
+    ProvenanceEdgeType,
+    ProvenanceNode,
+    Verdict,
+)
 from a2a_research.workflow.agents import run_agent as _run_agent
 from a2a_research.workflow.coerce import (
-    coerce_claims,
     coerce_claim_state,
+    coerce_claims,
     coerce_follow_ups,
     coerce_replan_reasons,
     merge_verified_claims_into_state,
@@ -25,13 +45,15 @@ from a2a_research.workflow.provenance import (
 if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import (
+        Claim,
         ClaimState,
+        EvidenceUnit,
         IndependenceGraph,
-        ProvenanceEdgeType,
         ProvenanceTree,
         ResearchSession,
         WorkflowBudget,
     )
+    from a2a_research.tools import PageContent
 
 logger = get_logger(__name__)
 
@@ -44,16 +66,16 @@ async def run_verify(
     query: str,
     budget: WorkflowBudget,
     claim_state: ClaimState,
-    to_process: list,
-    pages: list,
-    deduped_new: list,
-    accumulated_evidence: list,
+    to_process: list[Claim],
+    pages: list[PageContent],
+    deduped_new: list[EvidenceUnit],
+    accumulated_evidence: list[EvidenceUnit],
     independence_graph: IndependenceGraph,
     provenance_tree: ProvenanceTree,
-    _update_wall_seconds: callable,
-    _emit_budget: callable,
+    _update_wall_seconds: Callable[[], None],
+    _emit_budget: Callable[[str, AgentRole, str], None],
     loop_round: int,
-) -> list | None:
+) -> list[Any] | None:
     """Run verify and adversary stages.
 
     Returns ``None`` if the loop should break (budget exhausted).
@@ -95,7 +117,7 @@ async def run_verify(
     claim_state.refresh_resolution_lists()
     session.claim_state = claim_state
 
-    follow_ups = coerce_follow_ups(verify_result.get("claim_follow_ups", []))
+    coerce_follow_ups(verify_result.get("claim_follow_ups", []))
     replan_reasons = coerce_replan_reasons(
         verify_result.get("replan_reasons", [])
     )

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 import a2a_research.settings as settings_module
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestValidateDotenvKeys:

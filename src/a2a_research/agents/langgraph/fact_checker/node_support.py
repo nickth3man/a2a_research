@@ -7,8 +7,8 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from a2a_research.logging.app_logging import get_logger
-from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.models import Claim, Verdict
+from a2a_research.utils.json_utils import parse_json_safely
 
 logger = get_logger(__name__)
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-import pytest
 from a2a.types import Message, Part, Role, Task, TaskState
 
 from a2a_research.a2a.proto import (

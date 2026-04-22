@@ -131,5 +131,3 @@ class TestBudgetFromSettings:
         assert budget.max_wall_seconds > 0
         assert budget.min_marginal_evidence >= 0
         assert budget.max_critic_revision_loops >= 0
-
-

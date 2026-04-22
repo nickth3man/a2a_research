@@ -15,7 +15,6 @@ import os
 import pytest
 
 from a2a_research.tools import search as search_module
-
 from tests.brave_live_helpers import _HAS_KEY, _SKIP_REASON, _any_hit_mentions
 
 pytestmark = pytest.mark.xdist_group("live_search_providers")
@@ -38,9 +37,7 @@ async def test_brave_multiple_queries_different_results() -> None:
     assert len(hits2) >= 1
     urls1 = {h.url for h in hits1}
     urls2 = {h.url for h in hits2}
-    assert urls1 != urls2, (
-        "Different queries should return different URL sets"
-    )
+    assert urls1 != urls2, "Different queries should return different URL sets"
 
 
 @pytest.mark.integration

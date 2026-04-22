@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from a2a_research.utils.json_utils import parse_json_safely
 from a2a_research.tools import WebHit, web_search
+from a2a_research.utils.json_utils import parse_json_safely
 
 
 def parse_search_results(raw_output: str) -> dict[str, Any]:
@@ -70,9 +70,7 @@ async def merge_with_fallback(
         for result in fallback_results:
             for hit in result.hits:
                 by_url.setdefault(hit.url, hit)
-            errors.extend(
-                err for err in result.errors if err not in errors
-            )
+            errors.extend(err for err in result.errors if err not in errors)
             successful_providers.update(result.providers_successful)
         if not by_url and not errors:
             errors.append("Searcher agent returned no usable hits.")

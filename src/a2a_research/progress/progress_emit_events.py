@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .progress_types import (
     ProgressPhase,
@@ -13,7 +13,7 @@ from .progress_types import (
 if TYPE_CHECKING:
     from a2a_research.models import AgentRole
 
-__all__ = ["emit_handoff", "emit_claim_verdict"]
+__all__ = ["emit_claim_verdict", "emit_handoff"]
 
 _STEP_INDEX_BY_ROLE: dict[str, int] = {
     "preprocessor": 0,
@@ -31,7 +31,7 @@ _STEP_INDEX_BY_ROLE: dict[str, int] = {
 }
 
 
-def _step_index(role: "AgentRole") -> int:
+def _step_index(role: AgentRole) -> int:
     return _STEP_INDEX_BY_ROLE.get(getattr(role, "value", str(role)), 0)
 
 
@@ -42,8 +42,8 @@ def _session_or_current(session_id: str | None) -> str:
 def emit_handoff(
     *,
     direction: str,
-    role: "AgentRole",
-    peer_role: "AgentRole | str",
+    role: AgentRole,
+    peer_role: AgentRole | str,
     payload_keys: list[str] | None = None,
     payload_bytes: int | None = None,
     payload_preview: str = "",
@@ -73,7 +73,7 @@ def emit_handoff(
 
 
 def emit_claim_verdict(
-    role: "AgentRole",
+    role: AgentRole,
     claim_id: str,
     claim_text: str,
     old_verdict: str,
@@ -105,11 +105,11 @@ def emit_claim_verdict(
 def _emit(
     session_id: str,
     phase: ProgressPhase,
-    role: "AgentRole",
+    role: AgentRole,
     step_index: int,
     total_steps: int,
     substep_label: str,
-    **extra,
+    **extra: Any,
 ) -> None:
     """Forward to the central emit function to avoid circular imports."""
     from .progress_emit_core import emit

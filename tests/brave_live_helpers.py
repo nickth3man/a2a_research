@@ -8,8 +8,7 @@ from a2a_research.tools.search import WebHit
 
 _HAS_KEY = bool(os.environ.get("BRAVE_API_KEY"))
 _SKIP_REASON = (
-    "Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP"
-    " tests."
+    "Set BRAVE_LIVE=1 and a real BRAVE_API_KEY to run live Brave HTTP tests."
 )
 
 

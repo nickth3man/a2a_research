@@ -18,15 +18,16 @@ from a2a_research.workflow.coordinator_helpers import (
 if TYPE_CHECKING:
     from a2a_research.a2a import A2AClient
     from a2a_research.models import Claim, ResearchSession
+    from a2a_research.tools import PageContent, WebHit
 
 
 async def run_reader_step(
-    session: "ResearchSession",
-    client: "A2AClient",
+    session: ResearchSession,
+    client: A2AClient,
     query: str,
-    claims: list["Claim"],
-    hits: list,
-) -> tuple[list[WebSource], list, bool]:
+    claims: list[Claim],
+    hits: list[WebHit],
+) -> tuple[list[WebSource], list[PageContent], bool]:
     """Run reader and return (sources, successful_pages, should_abort)."""
     urls = [h.url for h in hits[:6]]
     set_status(
@@ -50,9 +51,11 @@ async def run_reader_step(
     read_data = payload(read_task)
     read_failed = task_failed(read_task)
     raw_pages = read_data.get("pages") or []
-    pages = [coerce_page_content(p) for p in raw_pages]
-    pages = [p for p in pages if p is not None]
-    successful_pages = [p for p in pages if not p.error and p.markdown]
+    pages_maybe = [coerce_page_content(p) for p in raw_pages]
+    pages: list[PageContent] = [p for p in pages_maybe if p is not None]
+    successful_pages: list[PageContent] = [
+        p for p in pages if not p.error and p.markdown
+    ]
     sources: list[WebSource] = [
         WebSource(
             url=p.url,

@@ -64,8 +64,11 @@ class PlannerExecutor(AgentExecutor):
             )
         from a2a_research.workflow.definitions import (
             STEP_INDEX_V2 as SI,
+        )
+        from a2a_research.workflow.definitions import (
             TOTAL_STEPS_V2 as TS,
         )
+
         planner_step = SI[AgentRole.PLANNER]
         emit(
             session_id,

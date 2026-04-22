@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
@@ -34,4 +33,4 @@ class StreamToLogger:
         return bool(getattr(self._original_stream, "isatty", lambda: False)())
 
 
-__all__ = ["_StreamToLogger"]
+__all__ = ["StreamToLogger"]

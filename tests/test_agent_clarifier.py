@@ -28,9 +28,7 @@ def _mock_llm(response_payload: dict[str, Any]) -> Any:
 async def test_clarify_factual_query_returns_passthrough(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        clarifier_nodes, "get_llm", lambda: _mock_llm({})
-    )
+    monkeypatch.setattr(clarifier_nodes, "get_llm", lambda: _mock_llm({}))
 
     result = await clarify("What is the speed of light?")
     assert result["committed_interpretation"] == "What is the speed of light?"

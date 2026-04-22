@@ -28,7 +28,7 @@ async def search_tavily(
         max_results=max_results,
     )
     try:
-        from tavily import AsyncTavilyClient
+        from tavily import AsyncTavilyClient  # type: ignore[attr-defined]
 
         client = AsyncTavilyClient(api_key=api_key)
         response: dict[str, Any] = await client.search(

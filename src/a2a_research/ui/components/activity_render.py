@@ -28,21 +28,18 @@ def _render_summary_line(
     is_verbose: bool,
 ) -> None:
     """Render a non-expandable summary line."""
-    if not show_verbose_prompts:
-        if is_verbose:
-            me.text(
-                summary + " — hidden",
-                style=me.Style(
-                    margin=me.Margin(bottom=2),
-                    color="#64748b",
-                ),
-            )
-            return
+    if not show_verbose_prompts and is_verbose:
+        me.text(
+            summary + " — hidden",
+            style=me.Style(
+                margin=me.Margin(bottom=2),
+                color="#64748b",
+            ),
+        )
+        return
     me.text(
         summary,
-        style=me.Style(
-            margin=me.Margin(bottom=2), color=line_color
-        ),
+        style=me.Style(margin=me.Margin(bottom=2), color=line_color),
     )
 
 
