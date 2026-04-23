@@ -5,7 +5,6 @@ Also retains an in-process handler seam for executor-level unit tests.
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -82,8 +81,7 @@ class AgentRegistry:
         """Return capability map: role → {url} for workflow init logging."""
         snapshot: dict[str, Any] = {}
         for role in AgentRole:
-            with contextlib.suppress(KeyError):
-                snapshot[role.value] = {"url": self.get_url(role)}
+            snapshot[role.value] = {"url": self.get_url(role)}
         return snapshot
 
     def has_handler(self, role: AgentRole) -> bool:

@@ -80,6 +80,9 @@ class A2AClient:
         self._sdk_clients[key] = sdk_client
         return sdk_client
 
+    def build_registry_snapshot(self) -> dict[str, Any]:
+        return self._registry.build_snapshot()
+
     async def send(
         self,
         role: AgentRole,
