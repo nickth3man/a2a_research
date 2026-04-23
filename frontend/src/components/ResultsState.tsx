@@ -296,16 +296,32 @@ function ReportCard({ report }: { report: string }) {
   );
 }
 
-export function ResultsState({ report, claims, sources }: {
+export function ResultsState({ report, claims, sources, diagnostics }: {
   report: string
   claims: Claim[]
   sources: Source[]
+  diagnostics?: import('../types').DiagnosticItem[]
 }) {
   const supported = claims.filter((c) => c.verdict === 'SUPPORTED').length;
   const refuted = claims.filter((c) => c.verdict === 'REFUTED').length;
+  const warnings = diagnostics?.filter((d) => d.severity !== 'fatal') ?? [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+      {warnings.length > 0 && (
+        <details style={{ padding: '10px 16px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600, color: '#7c5f00' }}>
+            ⚡ Known limitations ({warnings.length})
+          </summary>
+          <ul style={{ margin: '8px 0 0 16px', color: '#595959', lineHeight: 1.7 }}>
+            {warnings.map((d, i) => (
+              <li key={i}>
+                <strong>{d.code}</strong>{d.role ? ` (${d.role})` : ''}: {d.root_cause || d.remediation || d.severity}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <SummaryStrip claims={claims} sources={sources} />
       <div style={{ display: 'grid', gridTemplateColumns: '1.55fr 1fr', gap: 16, alignItems: 'flex-start' }}>
         <ReportCard report={report} />

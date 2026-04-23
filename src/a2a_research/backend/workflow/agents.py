@@ -1,4 +1,4 @@
-"""Agent execution helper for the v2 workflow engine."""
+"""Agent execution helper for the workflow engine."""
 
 from __future__ import annotations
 

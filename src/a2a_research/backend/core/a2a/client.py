@@ -51,6 +51,11 @@ class A2AClient:
         self._httpx_client = httpx_client
         self._sdk_clients: dict[str, SDKClient] = {}
 
+    @property
+    def registry(self) -> AgentRegistry:
+        """Access the agent registry."""
+        return self._registry
+
     async def _get_httpx_client(self) -> httpx.AsyncClient:
         if self._httpx_client is None:
             self._httpx_client = httpx.AsyncClient(
@@ -74,6 +79,9 @@ class A2AClient:
             )
         self._sdk_clients[key] = sdk_client
         return sdk_client
+
+    def build_registry_snapshot(self) -> dict[str, Any]:
+        return self._registry.build_snapshot()
 
     async def send(
         self,

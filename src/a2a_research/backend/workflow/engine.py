@@ -1,13 +1,14 @@
-"""Main workflow driver for the v2 claim-centric engine."""
+"""Main workflow driver."""
 
 from __future__ import annotations
 
+import json
 from time import perf_counter
 from typing import TYPE_CHECKING
 
 from a2a_research.backend.core.logging.app_logging import get_logger
 from a2a_research.backend.core.progress import ProgressPhase
-from a2a_research.backend.workflow.status import emit_v2
+from a2a_research.backend.workflow.status import emit_step
 
 if TYPE_CHECKING:
     from a2a_research.backend.core.a2a import A2AClient
@@ -18,21 +19,31 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-__all__ = ["drive_v2"]
+__all__ = ["drive"]
 
 
-async def drive_v2(
+async def drive(
     session: ResearchSession,
     client: A2AClient,
     query: str,
     budget: WorkflowBudget,
 ) -> None:
-    """Main v2 workflow driver."""
+    """Main workflow driver."""
     from a2a_research.backend.workflow.engine_final import run_final_stages
     from a2a_research.backend.workflow.engine_loop import run_evidence_loop
     from a2a_research.backend.workflow.engine_setup import run_setup_stages
 
     workflow_start = perf_counter()
+
+    # Emit registry snapshot so frontend/bus sees agent capability map
+    snapshot = client.build_registry_snapshot()
+    emit_step(
+        session.id,
+        None,
+        ProgressPhase.STEP_STARTED,
+        "registry_snapshot",
+        detail=json.dumps(snapshot),
+    )
 
     setup = await run_setup_stages(session, client, query, budget)
     if setup is None:
@@ -66,6 +77,6 @@ async def drive_v2(
         provenance_tree,
     )
 
-    emit_v2(
+    emit_step(
         session.id, None, ProgressPhase.STEP_COMPLETED, "workflow_completed"
     )

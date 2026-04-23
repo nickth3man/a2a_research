@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
     from a2a_research.backend.core.models import AgentRole
+    from a2a_research.backend.core.models.errors import ErrorEnvelope
 
 __all__ = [
     "PROMPT_DETAIL_MAX_CHARS",
@@ -81,6 +82,11 @@ class ProgressPhase(StrEnum):
     STEP_SUBSTEP = "step_substep"
     STEP_COMPLETED = "step_completed"
     STEP_FAILED = "step_failed"
+    # Diagnostic event types (map to distinct SSE event names)
+    WARNING = "warning"
+    RETRYING = "retrying"
+    DEGRADED_MODE = "degraded_mode"
+    FINAL_DIAGNOSTICS = "final_diagnostics"
 
 
 @dataclass(frozen=True)
@@ -99,6 +105,7 @@ class ProgressEvent:
     detail: str = ""
     elapsed_ms: float | None = None
     created_at: float = field(default_factory=perf_counter)
+    envelope: ErrorEnvelope | None = None
 
 
 ProgressQueue: TypeAlias = asyncio.Queue[ProgressEvent | None]

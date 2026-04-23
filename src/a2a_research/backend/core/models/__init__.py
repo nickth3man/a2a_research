@@ -28,6 +28,11 @@ from a2a_research.backend.core.models.enums import (
     TaskStatus,
     Verdict,
 )
+from a2a_research.backend.core.models.errors import (
+    ErrorCode,
+    ErrorEnvelope,
+    ErrorSeverity,
+)
 from a2a_research.backend.core.models.evidence import (
     CredibilitySignals,
     EvidenceUnit,
@@ -49,8 +54,7 @@ from a2a_research.backend.core.models.reports import (
 from a2a_research.backend.core.models.session import (
     AgentResult,
     ResearchSession,
-    default_roles,
-    workflow_v2_roles,
+    workflow_roles,
 )
 from a2a_research.backend.core.models.verification import (
     ClaimState,
@@ -88,6 +92,10 @@ __all__ = [
     "ClaimVerification",
     # Evidence
     "CredibilitySignals",
+    # Errors
+    "ErrorCode",
+    "ErrorEnvelope",
+    "ErrorSeverity",
     "EvidenceUnit",
     # FactChecker
     "FactCheckerOutput",
@@ -111,6 +119,5 @@ __all__ = [
     "VerificationRevision",
     "WebSource",
     "WorkflowBudget",
-    "default_roles",
-    "workflow_v2_roles",
+    "workflow_roles",
 ]

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from a2a_research.backend.core.models.claims import Claim, ReplanReason
 from a2a_research.backend.core.models.enums import AgentRole, AgentStatus
+from a2a_research.backend.core.models.errors import ErrorEnvelope
 from a2a_research.backend.core.models.evidence import (
     EvidenceUnit,
     IndependenceGraph,
@@ -40,6 +41,7 @@ class ResearchSession(BaseModel):
     """Full state of a research session across all pipeline stages."""
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    trace_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     query: str = ""
     roles: list[AgentRole] = Field(default_factory=list)
     agent_results: dict[AgentRole, AgentResult] = Field(default_factory=dict)
@@ -48,8 +50,9 @@ class ResearchSession(BaseModel):
     report: ReportOutput | None = None
     final_report: str = ""
     error: str | None = None
+    error_ledger: list[ErrorEnvelope] = Field(default_factory=list)
 
-    # New v2.2 fields
+    # Claim-centric workflow fields
     claim_state: ClaimState | None = None
     accumulated_evidence: list[EvidenceUnit] = Field(default_factory=list)
     independence_graph: IndependenceGraph = Field(
@@ -71,24 +74,13 @@ class ResearchSession(BaseModel):
 
     def ensure_agent_results(self) -> None:
         """Ensure every role has an AgentResult entry."""
-        roles = self.roles if self.roles else default_roles()
+        roles = self.roles if self.roles else workflow_roles()
         for role in roles:
             self.agent_results.setdefault(role, AgentResult(role=role))
 
 
-def default_roles() -> list[AgentRole]:
-    """Pipeline order for v1 simple sequential flow."""
-    return [
-        AgentRole.PLANNER,
-        AgentRole.SEARCHER,
-        AgentRole.READER,
-        AgentRole.FACT_CHECKER,
-        AgentRole.SYNTHESIZER,
-    ]
-
-
-def workflow_v2_roles() -> list[AgentRole]:
-    """Full pipeline order for v2.2 claim-centric workflow."""
+def workflow_roles() -> list[AgentRole]:
+    """Full pipeline order for the claim-centric workflow."""
     return [
         AgentRole.PREPROCESSOR,
         AgentRole.CLARIFIER,

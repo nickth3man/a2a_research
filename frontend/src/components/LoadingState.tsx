@@ -5,6 +5,86 @@ import { useTicker } from '../hooks/useTicker';
 import { AGENTS, STAGES, MOCK_METRICS, TICKER_LINES } from '../mocks/data';
 import type { StatusMap } from '../types';
 
+const AGENT_LABELS = new Map(AGENTS.map((agent) => [agent.key, agent.label]));
+
+function statusFor(statuses: StatusMap, key: string) {
+  return statuses[key] || 'pending';
+}
+
+function isRunningLike(status: ReturnType<typeof statusFor>) {
+  return status === 'running' || status === 'warning' || status === 'degraded';
+}
+
+function isCompletedLike(status: ReturnType<typeof statusFor>) {
+  return status === 'completed';
+}
+
+function nodeColors(status: ReturnType<typeof statusFor>) {
+  if (status === 'failed') {
+    return {
+      fill: '#fdeaea',
+      stroke: '#c62828',
+      text: '#c62828',
+      background: '#fff0f0',
+      border: '#f3c6c6',
+      dot: '#c62828',
+    };
+  }
+
+  if (status === 'degraded') {
+    return {
+      fill: '#fff8db',
+      stroke: '#7c5f00',
+      text: '#7c5f00',
+      background: '#fffbe6',
+      border: '#ffe58f',
+      dot: '#7c5f00',
+    };
+  }
+
+  if (status === 'warning') {
+    return {
+      fill: '#fff4db',
+      stroke: 'var(--amber)',
+      text: 'var(--amber)',
+      background: 'var(--amber-soft)',
+      border: '#f3dfa8',
+      dot: 'var(--amber)',
+    };
+  }
+
+  if (status === 'running') {
+    return {
+      fill: 'var(--amber)',
+      stroke: 'var(--amber)',
+      text: 'var(--amber)',
+      background: 'var(--amber-soft)',
+      border: '#f3dfa8',
+      dot: 'var(--amber)',
+    };
+  }
+
+  if (status === 'completed') {
+    return {
+      fill: 'var(--accent)',
+      stroke: 'var(--accent)',
+      text: 'var(--ink)',
+      background: 'transparent',
+      border: 'transparent',
+      dot: 'var(--accent)',
+    };
+  }
+
+  return {
+    fill: 'var(--paper)',
+    stroke: 'var(--rule)',
+    text: 'var(--muted)',
+    background: 'transparent',
+    border: 'transparent',
+    dot: 'var(--muted-2)',
+  };
+}
+
 function PipelineFlow({ statuses }: { statuses: StatusMap }) {
   const byStage = STAGES.map((st) => ({
     ...st,
@@ -35,16 +115,16 @@ function PipelineFlow({ statuses }: { statuses: StatusMap }) {
     });
   }
 
-  const statusFor = (k: string) => statuses[k] || 'pending';
   const edgeColor = (a: string, b: string) => {
-    const sa = statusFor(a);
-    const sb = statusFor(b);
-    if (sa === 'completed' && (sb === 'completed' || sb === 'running')) return 'var(--accent)';
-    if (sa === 'completed' || sb === 'running') return 'var(--accent)';
+    const sa = statusFor(statuses, a);
+    const sb = statusFor(statuses, b);
+    if (sa === 'failed' || sb === 'failed') return '#c62828';
+    if (sa === 'completed' && (sb === 'completed' || isRunningLike(sb))) return 'var(--accent)';
+    if (sa === 'completed' || isRunningLike(sb)) return 'var(--accent)';
     return 'var(--rule)';
   };
   const edgeActive = (a: string, b: string) =>
-    statusFor(a) === 'completed' && (statusFor(b) === 'running' || statusFor(b) === 'completed');
+    statusFor(statuses, a) === 'completed' && (isRunningLike(statusFor(statuses, b)) || statusFor(statuses, b) === 'completed');
 
   return (
     <Paper style={{ padding: '22px 24px 20px', overflow: 'hidden', position: 'relative' }}>
@@ -119,13 +199,11 @@ function PipelineFlow({ statuses }: { statuses: StatusMap }) {
 
           {AGENTS.map((a) => {
             const { x, y } = nodes[a.key];
-            const s = statusFor(a.key);
-            const isRunning = s === 'running';
-            const isDone = s === 'completed';
-            const fill = isDone ? 'var(--accent)' : isRunning ? 'var(--amber)' : 'var(--paper)';
-            const stroke = isDone ? 'var(--accent)' : isRunning ? 'var(--amber)' : 'var(--rule)';
+            const s = statusFor(statuses, a.key);
+            const isRunning = isRunningLike(s);
+            const isDone = isCompletedLike(s);
+            const colors = nodeColors(s);
             const labelY = y - 16;
-            const textColor = isRunning ? 'var(--amber)' : isDone ? 'var(--ink)' : 'var(--muted)';
             const approxTextW = a.label.length * 6.4 + 8;
             return (
               <g key={a.key} style={{ cursor: 'default' }}>
@@ -135,7 +213,7 @@ function PipelineFlow({ statuses }: { statuses: StatusMap }) {
                   y={labelY + 1}
                   textAnchor="middle"
                   fontSize="10.5"
-                  fill={textColor}
+                  fill={colors.text}
                   fontFamily="Inter, system-ui, sans-serif"
                   fontWeight={isRunning ? 600 : 500}
                   letterSpacing="0.01em"
@@ -149,7 +227,7 @@ function PipelineFlow({ statuses }: { statuses: StatusMap }) {
                     <animate attributeName="stroke-opacity" from="0.45" to="0" dur="1.4s" repeatCount="indefinite" />
                   </circle>
                 )}
-                <circle cx={x} cy={y} r={8} fill={fill} stroke={stroke} strokeWidth="1.5" />
+                <circle cx={x} cy={y} r={8} fill={colors.fill} stroke={colors.stroke} strokeWidth="1.5" />
                 {isDone && (
                   <path
                     d={`M${x - 3},${y} L${x - 0.5},${y + 2.5} L${x + 3.5},${y - 2.5}`}
@@ -265,12 +343,13 @@ function BigProgress({ pct, statuses }: { pct: number; statuses: StatusMap }) {
 
   const stageStatus = (stageKey: string) => {
     const agents = stageAgents.find((s) => s.key === stageKey)?.agents ?? [];
-    if (agents.every((a) => (statuses[a.key] || 'pending') === 'completed')) return 'done';
-    if (agents.some((a) => (statuses[a.key] || 'pending') === 'running')) return 'running';
+    if (agents.some((a) => statusFor(statuses, a.key) === 'failed')) return 'failed';
+    if (agents.every((a) => statusFor(statuses, a.key) === 'completed')) return 'done';
+    if (agents.some((a) => isRunningLike(statusFor(statuses, a.key)))) return 'running';
     return 'pending';
   };
 
-  const runningAgent = AGENTS.find((a) => (statuses[a.key] || 'pending') === 'running');
+  const runningAgent = AGENTS.find((a) => isRunningLike(statusFor(statuses, a.key)));
 
   return (
     <Paper style={{ padding: 28, display: 'flex', alignItems: 'center', gap: 26, position: 'relative', overflow: 'hidden' }}>
@@ -350,13 +429,16 @@ function BigProgress({ pct, statuses }: { pct: number; statuses: StatusMap }) {
             const s = stageStatus(st.key);
             const done = s === 'done';
             const running = s === 'running';
+            const failed = s === 'failed';
             return (
               <div key={st.key} style={{ flex: 1 }}>
                 <div
                   style={{
                     height: 4,
                     borderRadius: 2,
-                    background: done
+                    background: failed
+                      ? '#c62828'
+                      : done
                       ? 'var(--accent)'
                       : running
                         ? 'linear-gradient(90deg, var(--accent) 0%, var(--amber) 60%, var(--rule) 60%)'
@@ -372,7 +454,7 @@ function BigProgress({ pct, statuses }: { pct: number; statuses: StatusMap }) {
                     fontSize: 9.5,
                     letterSpacing: '.12em',
                     textTransform: 'uppercase',
-                    color: done ? 'var(--accent)' : running ? 'var(--amber)' : 'var(--muted)',
+                    color: failed ? '#c62828' : done ? 'var(--accent)' : running ? 'var(--amber)' : 'var(--muted)',
                     fontWeight: running ? 600 : 500,
                   }}
                 >
@@ -398,11 +480,11 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
         {AGENTS.map((a, i) => {
-          const s = statuses[a.key] || 'pending';
+          const s = statusFor(statuses, a.key);
           const m = MOCK_METRICS[a.key];
-          const isRunning = s === 'running';
-          const isDone = s === 'completed';
-          const dotColor = isDone ? 'var(--accent)' : isRunning ? 'var(--amber)' : 'var(--muted-2)';
+          const isRunning = isRunningLike(s);
+          const isDone = isCompletedLike(s);
+          const colors = nodeColors(s);
           return (
             <div
               key={a.key}
@@ -413,8 +495,8 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
                 alignItems: 'center',
                 gap: 10,
                 padding: '9px 12px',
-                background: isRunning ? 'var(--amber-soft)' : 'transparent',
-                border: `1px solid ${isRunning ? '#f3dfa8' : 'transparent'}`,
+                background: isRunning || s === 'failed' ? colors.background : 'transparent',
+                border: `1px solid ${isRunning || s === 'failed' ? colors.border : 'transparent'}`,
                 borderRadius: 3,
                 position: 'relative',
                 overflow: 'hidden',
@@ -426,8 +508,8 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: isDone || isRunning ? dotColor : 'transparent',
-                  border: `1.5px solid ${dotColor}`,
+                  background: isDone || isRunning || s === 'failed' ? colors.dot : 'transparent',
+                  border: `1.5px solid ${colors.dot}`,
                   animation: isRunning ? 'pulse-ring-amber 1.5s ease-out infinite' : 'none',
                   flexShrink: 0,
                 }}
@@ -447,7 +529,7 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
               <span
                 style={{
                   fontSize: 12.5,
-                  color: isRunning ? 'var(--amber)' : isDone ? 'var(--ink)' : 'var(--muted)',
+                  color: colors.text,
                   fontWeight: isRunning ? 600 : 500,
                   flex: 1,
                 }}
@@ -465,7 +547,7 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
                   className="mono"
                   style={{
                     fontSize: 10,
-                    color: isRunning ? 'var(--amber)' : 'var(--muted)',
+                    color: isRunning ? colors.text : 'var(--muted)',
                     minWidth: 36,
                     textAlign: 'right',
                   }}
@@ -481,13 +563,28 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
   );
 }
 
-export function LoadingState({ progress, statuses, tickerLines }: {
+export function LoadingState({ progress, statuses, tickerLines, degradedRoles }: {
   progress: number
   statuses: StatusMap
   tickerLines: string[]
+  degradedRoles?: Set<string>
 }) {
+  const degradedLabels = degradedRoles
+    ? [...degradedRoles].map((role) => AGENT_LABELS.get(role) || role)
+    : [];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
+      {degradedRoles && degradedRoles.size > 0 && (
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          style={{ padding: '8px 14px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#7c5f00' }}
+        >
+          ⚡ Degraded mode active for: {degradedLabels.join(', ')}
+        </div>
+      )}
       <div className="reveal reveal-1">
         <BigProgress pct={progress} statuses={statuses} />
       </div>

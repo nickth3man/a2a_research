@@ -93,6 +93,8 @@ class PreprocessorExecutor(AgentExecutor):
                 "query_class_confidence": 0.91,
                 "pii_findings": [],
                 "domain_hints": [],
+                "normalization_notes": "",
+                "risky_spans": [],
             }
 
         artifact = Artifact(

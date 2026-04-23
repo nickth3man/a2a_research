@@ -13,13 +13,18 @@ from a2a_research.backend.core.models import (
     NoveltyTracker,
     ProvenanceTree,
 )
+from a2a_research.backend.core.models.errors import (
+    ErrorCode,
+    ErrorEnvelope,
+    ErrorSeverity,
+)
 from a2a_research.backend.core.progress import ProgressPhase
 from a2a_research.backend.workflow.agents import run_agent as _run_agent
 from a2a_research.backend.workflow.claims import claims_to_process
 from a2a_research.backend.workflow.engine_gather import gather_evidence
 from a2a_research.backend.workflow.engine_replan import run_replan
 from a2a_research.backend.workflow.engine_verify import run_verify
-from a2a_research.backend.workflow.status import emit_v2
+from a2a_research.backend.workflow.status import emit_envelope, emit_step
 
 if TYPE_CHECKING:
     from a2a_research.backend.core.a2a import A2AClient
@@ -62,7 +67,7 @@ async def run_evidence_loop(
             f"critic_loops={bc.critic_revision_loops}/"
             f"{budget.max_critic_revision_loops}"
         )
-        emit_v2(
+        emit_step(
             session_id,
             role,
             ProgressPhase.STEP_SUBSTEP,
@@ -108,7 +113,7 @@ async def run_evidence_loop(
         _emit_budget(
             session.id, AgentRole.SEARCHER, f"round_{loop_round}_start"
         )
-        emit_v2(
+        emit_step(
             session.id,
             AgentRole.SEARCHER,
             ProgressPhase.STEP_STARTED,
@@ -168,6 +173,10 @@ async def run_evidence_loop(
                 ],
                 "mode": "tentative",
                 "session_id": session.id,
+                "trace_id": session.trace_id,
+                "diagnostics": [
+                    e.model_dump(mode="json") for e in session.error_ledger
+                ],
             },
         )
         from a2a_research.backend.workflow.coerce import coerce_report
@@ -181,10 +190,17 @@ async def run_evidence_loop(
             logger.info(
                 "Budget exhausted after snapshot in round %s", loop_round
             )
-            _emit_budget(
+            emit_envelope(
                 session.id,
-                AgentRole.SYNTHESIZER,
-                "budget_exhausted_after_snapshot",
+                ErrorEnvelope(
+                    role=AgentRole.SYNTHESIZER,
+                    code=ErrorCode.BUDGET_EXHAUSTED_AFTER_SNAPSHOT,
+                    severity=ErrorSeverity.DEGRADED,
+                    retryable=False,
+                    root_cause="Budget exhausted after tentative snapshot.",
+                    trace_id=session.trace_id,
+                ),
+                session,
             )
             break
 

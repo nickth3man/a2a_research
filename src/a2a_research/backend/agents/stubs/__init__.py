@@ -1,1 +1,1 @@
-"""Stub agents for the v2.2 workflow pipeline."""
+"""Stub agents for the workflow pipeline."""

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from a2a.server.agent_execution import AgentExecutor
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -75,6 +76,13 @@ class AgentRegistry:
     ) -> None:
         self._factories[role] = lambda: executor
         self._handlers.pop(role, None)
+
+    def build_snapshot(self) -> dict[str, Any]:
+        """Return capability map: role → {url} for workflow init logging."""
+        snapshot: dict[str, Any] = {}
+        for role in AgentRole:
+            snapshot[role.value] = {"url": self.get_url(role)}
+        return snapshot
 
     def has_handler(self, role: AgentRole) -> bool:
         return role in self._factories

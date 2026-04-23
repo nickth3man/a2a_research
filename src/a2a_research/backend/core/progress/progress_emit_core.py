@@ -139,6 +139,7 @@ def emit(
         granularity=granularity,
         detail=str(extra.get("detail") or ""),
         elapsed_ms=extra.get("elapsed_ms"),
+        envelope=extra.get("envelope"),
     )
     try:
         running = asyncio.get_running_loop()
