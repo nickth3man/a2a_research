@@ -75,7 +75,8 @@ export default function App() {
           setStatuses((prev) => {
             const next = { ...prev }
             if (e.phase === 'step_started') next[role] = 'running'
-            else if (e.phase === 'step_completed' || e.phase === 'step_failed') next[role] = 'completed'
+            else if (e.phase === 'step_completed') next[role] = 'completed'
+            else if (e.phase === 'step_failed') next[role] = 'failed'
             return next
           })
         }
