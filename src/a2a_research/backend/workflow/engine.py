@@ -36,13 +36,13 @@ async def drive(
     workflow_start = perf_counter()
 
     # Emit registry snapshot so frontend/bus sees agent capability map
-    snapshot = client.registry.build_snapshot()
+    snapshot = client.build_registry_snapshot()
     emit_step(
         session.id,
         None,
         ProgressPhase.STEP_STARTED,
         "registry_snapshot",
-        detail=json.dumps({"agent_count": len(snapshot)}),
+        detail=json.dumps(snapshot),
     )
 
     setup = await run_setup_stages(session, client, query, budget)

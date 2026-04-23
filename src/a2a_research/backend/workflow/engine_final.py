@@ -34,6 +34,9 @@ async def run_final_stages(
 ) -> None:
     """Run synthesize, critique, and postprocess stages."""
 
+    def diagnostics_dump() -> list[dict[str, object]]:
+        return [e.model_dump(mode="json") for e in session.error_ledger]
+
     # ── Final Synthesize ─────────────────────────────────────────────
     emit_step(
         session.id,
@@ -64,9 +67,7 @@ async def run_final_stages(
             ),
             "session_id": session.id,
             "trace_id": session.trace_id,
-            "diagnostics": [
-                e.model_dump(mode="json") for e in session.error_ledger
-            ],
+            "diagnostics": diagnostics_dump(),
         },
     )
     report = coerce_report(syn_result.get("report"))
@@ -102,9 +103,7 @@ async def run_final_stages(
                 ],
                 "session_id": session.id,
                 "trace_id": session.trace_id,
-                "diagnostics": [
-                    e.model_dump(mode="json") for e in session.error_ledger
-                ],
+                "diagnostics": diagnostics_dump(),
             },
         )
         critique_passed = bool(crit_result.get("passed", True))
@@ -133,9 +132,7 @@ async def run_final_stages(
             "warnings": [] if critique_passed else [session.critique],
             "session_id": session.id,
             "trace_id": session.trace_id,
-            "error_ledger": [
-                e.model_dump(mode="json") for e in session.error_ledger
-            ],
+            "diagnostics": diagnostics_dump(),
         },
     )
     session.formatted_outputs = post_result.get("formatted_outputs", {})
