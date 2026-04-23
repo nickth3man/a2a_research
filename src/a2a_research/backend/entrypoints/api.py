@@ -1,9 +1,4 @@
-"""FastAPI SSE gateway for the React frontend.
-
-POST /api/research          → {"session_id": str}
-GET  /api/research/{id}/stream → SSE text/event-stream
-GET  /api/health            → {"status": "ok"}
-"""
+"""FastAPI SSE gateway for the React frontend."""
 
 from __future__ import annotations
 
@@ -25,6 +20,7 @@ from a2a_research.backend.core.progress.progress_utils import (
     drain_progress_while_running,
 )
 from a2a_research.backend.core.settings import settings
+from a2a_research.backend.entrypoints.agent_mounts import mount_agents
 from a2a_research.backend.workflow.coordinator_drive import drive
 from a2a_research.backend.workflow.coordinator_helpers import (
     mark_running_failed,
@@ -91,7 +87,9 @@ def _serialize_claim(claim: Claim) -> dict[str, Any]:
         "verdict": _normalize_verdict(str(claim.verdict)),
         "confidence": claim.confidence,
         "sources": list(claim.sources),
-        "evidence": claim.evidence_snippets[0] if claim.evidence_snippets else None,
+        "evidence": (
+            claim.evidence_snippets[0] if claim.evidence_snippets else None
+        ),
     }
 
 
@@ -110,10 +108,16 @@ def _serialize_result(session: ResearchSession) -> dict[str, Any]:
     }
 
 
-async def _run_workflow(session: ResearchSession, queue: asyncio.Queue[Any]) -> ResearchSession:
+async def _run_workflow(
+    session: ResearchSession, queue: asyncio.Queue[Any]
+) -> ResearchSession:
     client = A2AClient(get_registry())
     started = perf_counter()
-    logger.info("api.workflow.start session_id=%s query=%r", session.id, session.query)
+    logger.info(
+        "api.workflow.start session_id=%s query=%r",
+        session.id,
+        session.query,
+    )
     try:
         await asyncio.wait_for(
             drive(session, client, session.query),
@@ -175,7 +179,14 @@ async def _stream_events(session_id: str) -> AsyncGenerator[str, None]:
     queue = Bus.get(session_id)
 
     if task is None or queue is None:
-        yield _sse("error", {"type": "error", "session_id": session_id, "message": "Session not found"})
+        yield _sse(
+            "app-error",
+            {
+                "type": "error",
+                "session_id": session_id,
+                "message": "Session not found",
+            },
+        )
         return
 
     async for event in drain_progress_while_running(queue, task):
@@ -184,12 +195,26 @@ async def _stream_events(session_id: str) -> AsyncGenerator[str, None]:
     try:
         session = await task
     except Exception as exc:
-        yield _sse("error", {"type": "error", "session_id": session_id, "message": str(exc)})
+        yield _sse(
+            "app-error",
+            {
+                "type": "error",
+                "session_id": session_id,
+                "message": str(exc),
+            },
+        )
         _sessions.pop(session_id, None)
         return
 
     if session.error:
-        yield _sse("error", {"type": "error", "session_id": session_id, "message": session.error})
+        yield _sse(
+            "app-error",
+            {
+                "type": "error",
+                "session_id": session_id,
+                "message": session.error,
+            },
+        )
 
     yield _sse("result", _serialize_result(session))
     _sessions.pop(session_id, None)
@@ -207,3 +232,7 @@ async def stream_research(session_id: str) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Agent sub-apps ──
+mount_agents(app)

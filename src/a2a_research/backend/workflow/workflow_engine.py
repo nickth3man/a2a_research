@@ -48,9 +48,9 @@ async def run_workflow_v2_async(
     started = perf_counter()
     logger.info("workflow_v2 start session_id=%s query=%r", session.id, query)
 
-    from a2a_research.backend.core.a2a import A2AClient, get_registry
+    import a2a_research.backend.core.a2a as _a2a
 
-    client = A2AClient(get_registry())
+    client = _a2a.A2AClient(_a2a.get_registry())
     if progress_queue is not None:
         Bus.register(session.id, progress_queue)
 

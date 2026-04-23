@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 __all__ = ["AGENT_CARDS", "build_cards", "get_card"]
 
 
+def _normalize_agent_url(url: str) -> str:
+    return url.rstrip("/") + "/"
+
+
 def _url_for(role: AgentRole) -> str:
     mapping = {
         AgentRole.PLANNER: settings.planner_url,
@@ -30,7 +34,7 @@ def _url_for(role: AgentRole) -> str:
         AgentRole.CRITIC: settings.critic_url,
         AgentRole.POSTPROCESSOR: settings.postprocessor_url,
     }
-    return mapping[role]
+    return _normalize_agent_url(mapping[role])
 
 
 def _card(

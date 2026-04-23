@@ -1,6 +1,3 @@
-def main() -> None:
-    from a2a_research.backend.entrypoints.launcher import main as _main
-    _main()
-
+from a2a_research.backend.entrypoints.launcher import main
 
 __all__ = ["main"]

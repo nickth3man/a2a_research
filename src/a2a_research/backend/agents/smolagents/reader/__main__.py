@@ -9,7 +9,7 @@ from a2a_research.backend.core.settings import settings
 
 def main() -> None:
     uvicorn.run(
-        "a2a_research.agents.smolagents.reader.main:build_http_app",
+        "a2a_research.backend.agents.smolagents.reader.main:build_http_app",
         host="0.0.0.0",
         port=settings.reader_port,
         factory=True,

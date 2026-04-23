@@ -21,6 +21,10 @@ __all__ = ["AgentRegistry", "get_registry", "reset_registry"]
 ExecutorFactory = Callable[[], AgentExecutor]
 
 
+def _normalize_agent_url(url: str) -> str:
+    return url.rstrip("/") + "/"
+
+
 @dataclass
 class AgentRegistry:
     """Resolves agent roles to configured HTTP service URLs."""
@@ -58,7 +62,7 @@ class AgentRegistry:
             AgentRole.CRITIC: self.critic_url,
             AgentRole.POSTPROCESSOR: self.postprocessor_url,
         }
-        return mapping[role]
+        return _normalize_agent_url(mapping[role])
 
     def register_factory(
         self, role: AgentRole, factory: ExecutorFactory

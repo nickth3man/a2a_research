@@ -40,9 +40,25 @@ export interface ResearchCallbacks {
   onError(msg: string): void
 }
 
+interface ErrorMsg {
+  type: 'error'
+  session_id: string
+  message: string
+}
+
+async function readErrorMessage(resp: Response): Promise<string> {
+  try {
+    const payload = await resp.json() as { detail?: string; message?: string; error?: { message?: string } }
+    return payload.error?.message ?? payload.message ?? payload.detail ?? `HTTP ${resp.status}`
+  } catch {
+    return `HTTP ${resp.status}`
+  }
+}
+
 export async function startResearch(query: string, cb: ResearchCallbacks): Promise<{ cleanup: () => void; session_id: string }> {
   let resp: Response
   const ctrl = new AbortController()
+  let terminalEventReceived = false
   const timeoutId = setTimeout(() => ctrl.abort(), 30000)
   try {
     resp = await fetch('/api/research', {
@@ -59,7 +75,7 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
   clearTimeout(timeoutId)
 
   if (!resp.ok) {
-    cb.onError(`HTTP ${resp.status}`)
+    cb.onError(await readErrorMessage(resp))
     return { cleanup: () => {}, session_id: '' }
   }
 
@@ -82,15 +98,17 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
   }
   const handleResult = (e: MessageEvent) => {
     try {
+      terminalEventReceived = true
       cb.onResult(JSON.parse(e.data) as ResultMsg)
     } catch {
       cb.onError('Invalid result data')
     }
     es.close()
   }
-  const handleError = (e: MessageEvent) => {
+  const handleAppError = (e: MessageEvent) => {
     try {
-      const data = JSON.parse(e.data) as { message: string }
+      terminalEventReceived = true
+      const data = JSON.parse(e.data) as ErrorMsg
       cb.onError(data.message)
     } catch {
       cb.onError('Unknown server error')
@@ -98,20 +116,23 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
     es.close()
   }
   const handleGenericError = () => {
+    if (terminalEventReceived || es.readyState === EventSource.CLOSED) {
+      return
+    }
     cb.onError('Connection lost')
     es.close()
   }
 
   es.addEventListener('progress', handleProgress)
   es.addEventListener('result', handleResult)
-  es.addEventListener('error', handleError)
+  es.addEventListener('app-error', handleAppError)
   es.onerror = handleGenericError
 
   return {
     cleanup: () => {
       es.removeEventListener('progress', handleProgress)
       es.removeEventListener('result', handleResult)
-      es.removeEventListener('error', handleError)
+      es.removeEventListener('app-error', handleAppError)
       es.onerror = null
       es.close()
     },

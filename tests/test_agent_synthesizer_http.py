@@ -7,6 +7,9 @@ import pytest
 from a2a.types import Task
 
 from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+    card as synth_card,
+)
+from a2a_research.backend.agents.pydantic_ai.synthesizer import (
     main as synth_main,
 )
 from a2a_research.backend.core.a2a.client import extract_data_payloads
@@ -18,6 +21,10 @@ from tests.http_harness import build_sdk_client, send_and_get_result
 async def test_synthesizer_http_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    synth_card.SYNTHESIZER_CARD.supported_interfaces[
+        0
+    ].url = "http://localhost:10005"
+
     async def _fake_synthesize(
         query: str,
         claims: list[object],

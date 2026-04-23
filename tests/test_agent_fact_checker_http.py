@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from a2a.types import Task
 
+from a2a_research.backend.agents.langgraph.fact_checker import card as fc_card
 from a2a_research.backend.agents.langgraph.fact_checker import (
     main as fact_checker_main,
 )
@@ -28,6 +29,9 @@ from tests.http_harness import (
 async def test_fact_checker_http_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    fc_card.FACT_CHECKER_CARD.supported_interfaces[
+        0
+    ].url = "http://localhost:10004"
     model = MagicMock()
     model.ainvoke = AsyncMock(
         return_value=MagicMock(

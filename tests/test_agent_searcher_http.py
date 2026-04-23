@@ -9,6 +9,9 @@ import pytest
 from a2a.types import Task
 
 from a2a_research.backend.agents.smolagents.searcher import (
+    card as searcher_card,
+)
+from a2a_research.backend.agents.smolagents.searcher import (
     core as searcher_core,
 )
 from a2a_research.backend.agents.smolagents.searcher import (
@@ -28,6 +31,9 @@ class _FakeJSONAgent:
 
 @pytest.mark.asyncio
 async def test_searcher_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    searcher_card.SEARCHER_CARD.supported_interfaces[
+        0
+    ].url = "http://localhost:10002"
     monkeypatch.setattr(
         searcher_core,
         "build_agent",

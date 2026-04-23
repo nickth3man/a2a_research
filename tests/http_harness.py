@@ -34,9 +34,13 @@ class MultiAppTransport(httpx.AsyncBaseTransport):
             await transport.aclose()
 
 
-def make_multi_app_client(apps_by_url: dict[str, Any]) -> httpx.AsyncClient:
+def make_multi_app_client(
+    apps_by_url: dict[str, Any],
+) -> httpx.AsyncClient:
     return httpx.AsyncClient(
-        transport=MultiAppTransport(apps_by_url), timeout=30.0
+        transport=MultiAppTransport(apps_by_url),
+        timeout=30.0,
+        follow_redirects=True,
     )
 
 
@@ -70,7 +74,10 @@ def _accumulate_stream(
 
 
 async def send_and_get_result(
-    client: SDKClient, *, payload: dict[str, Any] | None = None, text: str = ""
+    client: SDKClient,
+    *,
+    payload: dict[str, Any] | None = None,
+    text: str = "",
 ) -> Task | Message:
     result: Task | Message | None = None
     async for response in client.send_message(

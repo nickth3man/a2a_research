@@ -6,7 +6,7 @@ Prefixes (Pydantic ``BaseSettings``):
 
 - ``LLM_*`` — OpenRouter model id, base URL, API key.
 
-Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``, ``MESOP_PORT``,
+Unprefixed fields on :class:`AppSettings`: ``LOG_LEVEL``,
 ``WORKFLOW_TIMEOUT``, ``TAVILY_API_KEY`` and ``BRAVE_API_KEY`` (required),
 ``SEARCH_MAX_RESULTS``, ``SEARCHER_MAX_STEPS``, ``RESEARCH_MAX_ROUNDS``,
 ``*_PORT``, ``*_URL``.

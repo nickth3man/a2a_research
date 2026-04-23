@@ -9,7 +9,6 @@ from .settings_workflow import WorkflowConfig
 _EXPECTED_DOTENV_KEYS = {
     "LLM_PROVIDER",
     "LOG_LEVEL",
-    "MESOP_PORT",
     "WORKFLOW_TIMEOUT",
     "TAVILY_API_KEY",
     "BRAVE_API_KEY",

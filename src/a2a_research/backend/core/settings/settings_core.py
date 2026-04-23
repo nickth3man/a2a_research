@@ -50,10 +50,6 @@ class AppSettings(AgentEndpointsMixin, BaseSettings):
         default="DEBUG",
         description="Logging threshold (env: LOG_LEVEL).",
     )
-    mesop_port: int = Field(
-        default=32123,
-        description="Mesop UI port (env: MESOP_PORT).",
-    )
     workflow_timeout: float = Field(
         default=180.0,
         description="Workflow timeout seconds (env: WORKFLOW_TIMEOUT).",

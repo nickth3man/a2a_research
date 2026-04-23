@@ -2,177 +2,101 @@
 
 from __future__ import annotations
 
-import json
-from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from a2a_research.backend.agents.langgraph.fact_checker import (
     main as fact_checker_main,
 )
-from a2a_research.backend.agents.langgraph.fact_checker import (
-    verify_route as fc_verify,
-)
 from a2a_research.backend.agents.pocketflow.planner import main as planner_main
-from a2a_research.backend.agents.pocketflow.planner import (
-    nodes as planner_nodes,
-)
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
-    agent as synth_agent,
-)
 from a2a_research.backend.agents.pydantic_ai.synthesizer import (
     main as synth_main,
 )
-from a2a_research.backend.agents.smolagents.reader import core as reader_core
 from a2a_research.backend.agents.smolagents.reader import main as reader_main
-from a2a_research.backend.agents.smolagents.searcher import (
-    core as searcher_core,
-)
 from a2a_research.backend.agents.smolagents.searcher import (
     main as searcher_main,
 )
 from a2a_research.backend.core.a2a.registry import AgentRegistry
-from a2a_research.backend.core.models import ReportOutput
 from tests.http_harness import make_multi_app_client
 
 
-def _llm_stub(payload: dict[str, Any]) -> Any:
-    model = MagicMock()
-    model.ainvoke = AsyncMock(
-        return_value=MagicMock(content=json.dumps(payload))
-    )
-    return model
-
-
-class _FakePydAgent:
-    def __init__(self, report: ReportOutput) -> None:
-        self._report = report
-
-    async def run(self, prompt: str) -> Any:
-        return SimpleNamespace(output=self._report)
-
-
-class _FakeJSONAgent:
-    def __init__(self, payload: dict[str, object]) -> None:
-        self._payload = payload
-
-    def run(self, prompt: str) -> str:
-        return json.dumps(self._payload)
-
-
 def _apps() -> dict[str, object]:
-    return {
-        "http://localhost:10001": planner_main.build_http_app(),
-        "http://localhost:10002": searcher_main.build_http_app(),
-        "http://localhost:10003": reader_main.build_http_app(),
-        "http://localhost:10004": fact_checker_main.build_http_app(),
-        "http://localhost:10005": synth_main.build_http_app(),
+    from fastapi import FastAPI
+
+    from a2a_research.backend.entrypoints.agent_mounts import (
+        mount_agents,
+    )
+
+    # Individual agent apps for card serving
+    apps = {
+        "http://localhost:10001": (planner_main.build_http_app()),
+        "http://localhost:10002": (searcher_main.build_http_app()),
+        "http://localhost:10003": (reader_main.build_http_app()),
+        "http://localhost:10004": (fact_checker_main.build_http_app()),
+        "http://localhost:10005": (synth_main.build_http_app()),
     }
 
+    # Unified gateway for message routing
+    gateway = FastAPI()
+    mount_agents(gateway)
+    apps["http://localhost:8000"] = gateway
 
-def _configure_success_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    planner_model = MagicMock()
-    planner_model.ainvoke = AsyncMock(
-        side_effect=[
-            MagicMock(content=json.dumps({"strategy": "temporal"})),
-            MagicMock(
-                content=json.dumps(
-                    {
-                        "claims": [
-                            {
-                                "id": "c0",
-                                "text": "JWST launched in December 2021.",
-                            }
-                        ],
-                        "seed_queries": ["JWST launch date"],
-                    }
-                )
-            ),
-        ]
-    )
-    monkeypatch.setattr(planner_nodes, "get_llm", lambda: planner_model)
-    monkeypatch.setattr(
-        searcher_core,
-        "build_agent",
-        lambda: _FakeJSONAgent(
-            {
-                "queries_used": ["JWST launch date"],
-                "hits": [
-                    {
-                        "url": "https://nasa.example/jwst",
-                        "title": "NASA JWST",
-                        "snippet": "launched 2021",
-                        "source": "tavily",
-                        "score": 0.9,
-                    }
-                ],
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        reader_core,
-        "build_agent",
-        lambda: _FakeJSONAgent(
-            {
-                "pages": [
-                    {
-                        "url": "https://nasa.example/jwst",
-                        "title": "NASA JWST",
-                        "markdown": (
-                            "# NASA\n\nJWST launched December 25, 2021."
-                        ),
-                        "word_count": 6,
-                    }
-                ]
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        fc_verify,
-        "get_llm",
-        lambda: _llm_stub(
-            {
-                "verified_claims": [
-                    {
-                        "id": "c0",
-                        "text": "JWST launched in December 2021.",
-                        "verdict": "SUPPORTED",
-                        "confidence": 0.95,
-                        "sources": ["https://nasa.example/jwst"],
-                    }
-                ],
-                "follow_up_queries": [],
-            }
-        ),
-    )
-    synth_agent.reset_agent_cache()
-    monkeypatch.setattr(
-        synth_agent,
-        "build_agent",
-        lambda: _FakePydAgent(
-            ReportOutput(
-                title="JWST Launch",
-                summary="JWST launched in December 2021.",
-                sections=[],
-            )
-        ),
-    )
+    return apps
 
 
-def _install_http_services(monkeypatch: pytest.MonkeyPatch) -> Any:
-    from a2a_research.backend.core.a2a import client as client_module
+def _install_http_services(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Any:
+    from a2a_research.backend.core.a2a import (
+        client as client_mod,
+    )
+    from a2a_research.backend.core.settings import settings
 
     shared_client = make_multi_app_client(_apps())
-    registry = AgentRegistry()
 
-    def _client_factory(*args: object, **kwargs: object) -> Any:
+    # Patch settings to use trailing slashes for mount compatibility
+    monkeypatch.setattr(
+        settings, "planner_url", "http://localhost:8000/agents/planner/"
+    )
+    monkeypatch.setattr(
+        settings, "searcher_url", "http://localhost:8000/agents/searcher/"
+    )
+    monkeypatch.setattr(
+        settings, "reader_url", "http://localhost:8000/agents/reader/"
+    )
+    monkeypatch.setattr(
+        settings,
+        "fact_checker_url",
+        "http://localhost:8000/agents/fact-checker/",
+    )
+    monkeypatch.setattr(
+        settings,
+        "synthesizer_url",
+        "http://localhost:8000/agents/synthesizer/",
+    )
+
+    # Rebuild agent cards with patched URLs
+    import a2a_research.backend.core.a2a.cards as cards_mod
+
+    monkeypatch.setattr(cards_mod, "AGENT_CARDS", cards_mod.build_cards())
+
+    registry = AgentRegistry(
+        planner_url="http://localhost:8000/agents/planner/",
+        searcher_url="http://localhost:8000/agents/searcher/",
+        reader_url="http://localhost:8000/agents/reader/",
+        fact_checker_url=("http://localhost:8000/agents/fact-checker/"),
+        synthesizer_url=("http://localhost:8000/agents/synthesizer/"),
+    )
+
+    def _client_factory(*a: object, **kw: object) -> Any:
         return shared_client
 
-    monkeypatch.setattr(client_module.httpx, "AsyncClient", _client_factory)
-    monkeypatch.setattr(client_module, "get_registry", lambda: registry)
-    import a2a_research.backend.core.a2a as a2a_module
+    monkeypatch.setattr(client_mod.httpx, "AsyncClient", _client_factory)
+    monkeypatch.setattr(client_mod, "get_registry", lambda: registry)
 
-    monkeypatch.setattr(a2a_module, "get_registry", lambda: registry)
+    import a2a_research.backend.core.a2a as a2a_mod
+
+    monkeypatch.setattr(a2a_mod, "get_registry", lambda: registry)
+
     return shared_client

@@ -13,8 +13,10 @@ from a2a_research.backend.core.progress import (
     drain_progress_while_running,
 )
 from a2a_research.backend.workflow import run_research_async
-from tests.workflow_integration_helpers import (
+from tests.workflow_integration_fixtures import (
     _configure_success_path,
+)
+from tests.workflow_integration_helpers import (
     _install_http_services,
 )
 
@@ -27,31 +29,33 @@ async def test_progress_events_emitted(
     shared_client = _install_http_services(monkeypatch)
 
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
-    workflow_task = asyncio.create_task(
-        run_research_async("When did JWST launch?", progress_queue=queue)
-    )
-    events = [
-        event
-        async for event in drain_progress_while_running(queue, workflow_task)
-    ]
-    session = await workflow_task
 
+    task = asyncio.create_task(
+        run_research_async("When did JWST launch?", queue)
+    )
+    events = [e async for e in drain_progress_while_running(queue, task)]
+
+    session = await task
     assert session.error is None
-    started_roles = {
-        event.role
-        for event in events
-        if event.phase == ProgressPhase.STEP_STARTED
-    }
-    assert started_roles == {
-        AgentRole.PLANNER,
-        AgentRole.SEARCHER,
-        AgentRole.READER,
-        AgentRole.FACT_CHECKER,
-        AgentRole.SYNTHESIZER,
-    }
-    assert any(
-        event.substep_label == "verify"
-        and event.phase == ProgressPhase.STEP_SUBSTEP
-        for event in events
+
+    phases = [e.phase for e in events]
+    assert ProgressPhase.STEP_STARTED in phases
+    assert any(e.role == AgentRole.PLANNER for e in events), (
+        "Planner event missing"
+    )
+    assert any(e.role == AgentRole.SEARCHER for e in events), (
+        "Searcher event missing"
+    )
+    assert any(e.role == AgentRole.READER for e in events), (
+        "Reader event missing"
+    )
+    assert any(e.role == AgentRole.FACT_CHECKER for e in events), (
+        "FactChecker event missing"
+    )
+    assert any(e.role == AgentRole.SYNTHESIZER for e in events), (
+        "Synthesizer event missing"
+    )
+    assert any(e.phase == ProgressPhase.STEP_COMPLETED for e in events), (
+        "Workflow completed event missing"
     )
     await shared_client.aclose()

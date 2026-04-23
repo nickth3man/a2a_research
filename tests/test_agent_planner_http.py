@@ -9,6 +9,7 @@ import httpx
 import pytest
 from a2a.types import Task
 
+from a2a_research.backend.agents.pocketflow.planner import card as planner_card
 from a2a_research.backend.agents.pocketflow.planner import (
     nodes as planner_nodes,
 )
@@ -22,6 +23,9 @@ from tests.http_harness import build_sdk_client, send_and_get_result
 
 @pytest.mark.asyncio
 async def test_planner_http_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    planner_card.PLANNER_CARD.supported_interfaces[
+        0
+    ].url = "http://localhost:10001"
     model = MagicMock()
     model.ainvoke = AsyncMock(
         side_effect=[

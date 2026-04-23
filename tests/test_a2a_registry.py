@@ -29,23 +29,23 @@ class TestAgentRegistryGetUrl:
     def test_planner_url_default(self) -> None:
         reg = AgentRegistry()
         url = reg.get_url(AgentRole.PLANNER)
-        assert "10001" in url
+        assert "/agents/planner" in url
 
     def test_searcher_url_default(self) -> None:
         reg = AgentRegistry()
-        assert "10002" in reg.get_url(AgentRole.SEARCHER)
+        assert "/agents/searcher" in reg.get_url(AgentRole.SEARCHER)
 
     def test_reader_url_default(self) -> None:
         reg = AgentRegistry()
-        assert "10003" in reg.get_url(AgentRole.READER)
+        assert "/agents/reader" in reg.get_url(AgentRole.READER)
 
     def test_fact_checker_url_default(self) -> None:
         reg = AgentRegistry()
-        assert "10004" in reg.get_url(AgentRole.FACT_CHECKER)
+        assert "/agents/fact-checker" in reg.get_url(AgentRole.FACT_CHECKER)
 
     def test_synthesizer_url_default(self) -> None:
         reg = AgentRegistry()
-        assert "10005" in reg.get_url(AgentRole.SYNTHESIZER)
+        assert "/agents/synthesizer" in reg.get_url(AgentRole.SYNTHESIZER)
 
     def test_custom_planner_url(self) -> None:
         reg = AgentRegistry(planner_url="http://custom:9999")
