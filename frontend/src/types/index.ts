@@ -1,6 +1,6 @@
 export type UIState = 'empty' | 'loading' | 'results';
 
-export type AgentStatus = 'pending' | 'running' | 'completed';
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'warning' | 'degraded';
 
 export interface Agent {
   key: string;
@@ -37,3 +37,13 @@ export interface Source {
 }
 
 export type StatusMap = Record<string, AgentStatus>;
+
+export interface DiagnosticItem {
+  role: string | null;
+  code: string;
+  severity: 'fatal' | 'warning' | 'degraded';
+  retryable: boolean;
+  root_cause: string;
+  remediation: string;
+  trace_id?: string;
+}

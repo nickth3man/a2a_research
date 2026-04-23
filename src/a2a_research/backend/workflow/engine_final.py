@@ -8,7 +8,7 @@ from a2a_research.backend.core.models import AgentRole, AgentStatus
 from a2a_research.backend.core.progress import ProgressPhase
 from a2a_research.backend.workflow.agents import run_agent as _run_agent
 from a2a_research.backend.workflow.coerce import coerce_report
-from a2a_research.backend.workflow.status import emit_v2, set_status
+from a2a_research.backend.workflow.status import emit_step, set_status
 
 if TYPE_CHECKING:
     from a2a_research.backend.core.a2a import A2AClient
@@ -34,8 +34,12 @@ async def run_final_stages(
 ) -> None:
     """Run synthesize, critique, and postprocess stages."""
 
-    # Final Synthesize
-    emit_v2(
+    diagnostics_dump = [
+        e.model_dump(mode="json") for e in session.error_ledger
+    ]
+
+    # ── Final Synthesize ─────────────────────────────────────────────
+    emit_step(
         session.id,
         AgentRole.SYNTHESIZER,
         ProgressPhase.STEP_STARTED,
@@ -63,6 +67,8 @@ async def run_final_stages(
                 else None
             ),
             "session_id": session.id,
+            "trace_id": session.trace_id,
+            "diagnostics": diagnostics_dump,
         },
     )
     report = coerce_report(syn_result.get("report"))
@@ -74,14 +80,14 @@ async def run_final_stages(
         AgentStatus.COMPLETED if report else AgentStatus.FAILED,
         "Report synthesized." if report else "Failed to synthesize report.",
     )
-    emit_v2(
+    emit_step(
         session.id,
         AgentRole.SYNTHESIZER,
         ProgressPhase.STEP_COMPLETED if report else ProgressPhase.STEP_FAILED,
         "synthesizer_completed" if report else "synthesizer_failed",
     )
 
-    # Critique
+    # ── Critique ─────────────────────────────────────────────────────
     critique_passed = True
     if report:
         crit_result = await _run_agent(
@@ -97,6 +103,8 @@ async def run_final_stages(
                     e.model_dump(mode="json") for e in accumulated_evidence
                 ],
                 "session_id": session.id,
+                "trace_id": session.trace_id,
+                "diagnostics": diagnostics_dump,
             },
         )
         critique_passed = bool(crit_result.get("passed", True))
@@ -109,7 +117,7 @@ async def run_final_stages(
         ):
             session.budget_consumed.critic_revision_loops += 1
 
-    # Postprocess
+    # ── Postprocess ──────────────────────────────────────────────────
     post_result = await _run_agent(
         session,
         client,
@@ -124,8 +132,19 @@ async def run_final_stages(
             "citation_style": "hyperlinked_footnotes",
             "warnings": [] if critique_passed else [session.critique],
             "session_id": session.id,
+            "trace_id": session.trace_id,
+            "error_ledger": diagnostics_dump,
         },
     )
     session.formatted_outputs = post_result.get("formatted_outputs", {})
     if session.formatted_outputs.get("markdown"):
         session.final_report = session.formatted_outputs["markdown"]
+
+    # ── Emit final_diagnostics SSE ───────────────────────────────────
+    emit_step(
+        session.id,
+        None,
+        ProgressPhase.FINAL_DIAGNOSTICS,
+        "workflow_complete",
+        detail=f"error_count={len(session.error_ledger)}",
+    )

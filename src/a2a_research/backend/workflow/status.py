@@ -2,19 +2,34 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
     AgentStatus,
     ResearchSession,
 )
+from a2a_research.backend.core.models.errors import (
+    ErrorEnvelope,
+    ErrorSeverity,
+)
 from a2a_research.backend.core.progress import ProgressPhase, emit
 from a2a_research.backend.workflow.definitions import (
-    STEP_INDEX_V2,
-    TOTAL_STEPS_V2,
+    STEP_INDEX,
+    TOTAL_STEPS,
 )
 
-__all__ = ["emit_v2", "mark_running_failed", "set_status"]
+if TYPE_CHECKING:
+    pass
+
+__all__ = ["emit_envelope", "emit_step", "mark_running_failed", "set_status"]
+
+_SEVERITY_TO_PHASE: dict[ErrorSeverity, ProgressPhase] = {
+    ErrorSeverity.FATAL: ProgressPhase.FINAL_DIAGNOSTICS,
+    ErrorSeverity.WARNING: ProgressPhase.WARNING,
+    ErrorSeverity.DEGRADED: ProgressPhase.DEGRADED_MODE,
+}
 
 
 def set_status(
@@ -28,22 +43,42 @@ def set_status(
     )
 
 
-def emit_v2(
+def emit_step(
     session_id: str,
     role: AgentRole | None,
     phase: ProgressPhase,
     label: str,
     detail: str = "",
+    envelope: ErrorEnvelope | None = None,
 ) -> None:
-    step_index = STEP_INDEX_V2.get(role, 0) if role else 0
+    step_index = STEP_INDEX.get(role, 0) if role else 0
     emit(
         session_id,
         phase,
         role,
         step_index,
-        TOTAL_STEPS_V2,
+        TOTAL_STEPS,
         label,
         detail=detail,
+        envelope=envelope,
+    )
+
+
+def emit_envelope(
+    session_id: str,
+    envelope: ErrorEnvelope,
+    session: ResearchSession,
+) -> None:
+    """Append envelope to error ledger and emit the matching SSE phase."""
+    session.error_ledger.append(envelope)
+    phase = _SEVERITY_TO_PHASE.get(envelope.severity, ProgressPhase.WARNING)
+    emit_step(
+        session_id,
+        envelope.role,
+        phase,
+        envelope.code.value,
+        detail=envelope.root_cause,
+        envelope=envelope,
     )
 
 

@@ -26,6 +26,11 @@ from a2a_research.backend.core.models import (
     ProvenanceNode,
     Verdict,
 )
+from a2a_research.backend.core.models.errors import (
+    ErrorCode,
+    ErrorEnvelope,
+    ErrorSeverity,
+)
 from a2a_research.backend.workflow.agents import run_agent as _run_agent
 from a2a_research.backend.workflow.coerce import (
     coerce_claim_state,
@@ -41,6 +46,7 @@ from a2a_research.backend.workflow.provenance import (
     ensure_node,
     verdict_node_id,
 )
+from a2a_research.backend.workflow.status import emit_envelope
 
 logger = get_logger(__name__)
 
@@ -71,6 +77,7 @@ async def run_verify(
     if not deduped_new:
         return []
 
+    # ── Fact-check (back-channel: DAG + extraction confidence) ───────
     verify_result = await _run_agent(
         session,
         client,
@@ -86,6 +93,12 @@ async def run_verify(
             ],
             "independence_graph": independence_graph.model_dump(mode="json"),
             "session_id": session.id,
+            "trace_id": session.trace_id,
+            # extraction confidence from reader (if provided upstream)
+            "extraction_confidence": {
+                getattr(p, "url", ""): getattr(p, "confidence", 1.0)
+                for p in pages
+            },
         },
     )
     updated_state = coerce_claim_state(
@@ -136,31 +149,90 @@ async def run_verify(
     _update_wall_seconds()
     if session.budget_consumed.is_exhausted(budget):
         logger.info("Budget exhausted after verify in round %s", loop_round)
-        _emit_budget(
+        emit_envelope(
             session.id,
-            AgentRole.FACT_CHECKER,
-            "budget_exhausted_after_verify",
+            ErrorEnvelope(
+                role=AgentRole.FACT_CHECKER,
+                code=ErrorCode.BUDGET_EXHAUSTED_AFTER_VERIFY,
+                severity=ErrorSeverity.DEGRADED,
+                retryable=False,
+                root_cause="Budget exhausted after fact-check.",
+                trace_id=session.trace_id,
+            ),
+            session,
         )
         return None
 
-    # Adversary gate
+    # ── Adversary (back-channel: FAC→ADV, ADV→SEA, ADV→REA) ──────────
     tentative = claim_state.tentatively_supported_claim_ids
     if tentative:
+        tentative_claims = [
+            c.model_dump(mode="json")
+            for c in claim_state.original_claims
+            if c.id in tentative
+        ]
+
+        # FAC→ADV: pass vulnerable claims + confidence breakdown
+        adv_payload: dict[str, Any] = {
+            "claims": tentative_claims,
+            "evidence": [
+                e.model_dump(mode="json") for e in accumulated_evidence
+            ],
+            "session_id": session.id,
+            "trace_id": session.trace_id,
+            "vulnerable_claims": verify_result.get("vulnerable_claims", []),
+            "confidence_breakdown": {
+                v.claim_id: v.confidence
+                for v in claim_state.verification.values()
+                if v.claim_id in tentative
+            },
+        }
+
+        # ADV→SEA: direct counter-evidence search
+        counter_queries = verify_result.get("counter_queries", [])
+        if counter_queries:
+            adv_sea_result = await _run_agent(
+                session,
+                client,
+                AgentRole.SEARCHER,
+                {
+                    "queries": counter_queries,
+                    "session_id": session.id,
+                    "trace_id": session.trace_id,
+                    "mode": "counter_evidence",
+                },
+            )
+            counter_hits = adv_sea_result.get("hits", [])
+            adv_payload["counter_hits"] = counter_hits
+
+            # ADV→REA: fetch counter-sources
+            if counter_hits:
+                counter_urls = [
+                    str(h.get("url", ""))
+                    for h in counter_hits
+                    if isinstance(h, dict) and h.get("url")
+                ][:4]
+                if counter_urls:
+                    adv_rea_result = await _run_agent(
+                        session,
+                        client,
+                        AgentRole.READER,
+                        {
+                            "urls": counter_urls,
+                            "session_id": session.id,
+                            "trace_id": session.trace_id,
+                            "mode": "counter_evidence",
+                        },
+                    )
+                    adv_payload["counter_pages"] = adv_rea_result.get(
+                        "pages", []
+                    )
+
         adversary_result = await _run_agent(
             session,
             client,
             AgentRole.ADVERSARY,
-            {
-                "claims": [
-                    c.model_dump(mode="json")
-                    for c in claim_state.original_claims
-                    if c.id in tentative
-                ],
-                "evidence": [
-                    e.model_dump(mode="json") for e in accumulated_evidence
-                ],
-                "session_id": session.id,
-            },
+            adv_payload,
         )
         challenges = adversary_result.get("challenge_results", [])
         for ch in challenges:
@@ -198,10 +270,17 @@ async def run_verify(
                 "Budget exhausted after adversary in round %s",
                 loop_round,
             )
-            _emit_budget(
+            emit_envelope(
                 session.id,
-                AgentRole.ADVERSARY,
-                "budget_exhausted_after_adversary",
+                ErrorEnvelope(
+                    role=AgentRole.ADVERSARY,
+                    code=ErrorCode.BUDGET_EXHAUSTED_AFTER_VERIFY,
+                    severity=ErrorSeverity.DEGRADED,
+                    retryable=False,
+                    root_cause="Budget exhausted after adversary.",
+                    trace_id=session.trace_id,
+                ),
+                session,
             )
             return None
 

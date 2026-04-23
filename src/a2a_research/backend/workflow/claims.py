@@ -1,4 +1,4 @@
-"""Claim processing helpers for the v2 workflow engine."""
+"""Claim processing helpers for the workflow engine."""
 
 from __future__ import annotations
 

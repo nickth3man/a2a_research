@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException
@@ -12,25 +11,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from a2a_research.backend.core.a2a import A2AClient, get_registry
 from a2a_research.backend.core.logging.app_logging import get_logger
-from a2a_research.backend.core.models import ResearchSession
 from a2a_research.backend.core.progress import Bus
 from a2a_research.backend.core.progress.progress_utils import (
     drain_progress_while_running,
 )
-from a2a_research.backend.core.settings import settings
 from a2a_research.backend.entrypoints.agent_mounts import mount_agents
-from a2a_research.backend.workflow.coordinator_drive import drive
-from a2a_research.backend.workflow.coordinator_helpers import (
-    mark_running_failed,
-)
+from a2a_research.backend.workflow.status import mark_running_failed
+from a2a_research.backend.workflow.workflow_engine import run_workflow_async
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from a2a_research.backend.core.models.claims import Claim
+    from a2a_research.backend.core.models.errors import ErrorEnvelope
     from a2a_research.backend.core.models.reports import WebSource
+    from a2a_research.backend.core.models.session import ResearchSession
     from a2a_research.backend.core.progress.progress_types import ProgressEvent
 
 logger = get_logger(__name__)
@@ -47,6 +43,14 @@ app.add_middleware(
 _sessions: dict[str, asyncio.Task[ResearchSession]] = {}
 
 _ROLE_NORM: dict[str, str] = {"evidence_deduplicator": "deduplicator"}
+
+# SSE phases that map to non-progress event names
+_PHASE_TO_EVENT: dict[str, str] = {
+    "warning": "warning",
+    "retrying": "retrying",
+    "degraded_mode": "degraded_mode",
+    "final_diagnostics": "final_diagnostics",
+}
 
 
 def _normalize_role(role: str | None) -> str | None:
@@ -65,8 +69,20 @@ def _sse(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-def _serialize_progress(event: ProgressEvent) -> dict[str, Any]:
+def _serialize_envelope(envelope: ErrorEnvelope) -> dict[str, Any]:
     return {
+        "role": _normalize_role(str(envelope.role) if envelope.role else None),
+        "code": envelope.code,
+        "severity": envelope.severity,
+        "retryable": envelope.retryable,
+        "root_cause": envelope.root_cause,
+        "remediation": envelope.remediation,
+        "trace_id": envelope.trace_id,
+    }
+
+
+def _serialize_progress(event: ProgressEvent) -> dict[str, Any]:
+    data: dict[str, Any] = {
         "type": "progress",
         "session_id": event.session_id,
         "phase": event.phase,
@@ -79,6 +95,9 @@ def _serialize_progress(event: ProgressEvent) -> dict[str, Any]:
         "detail": event.detail,
         "elapsed_ms": event.elapsed_ms,
     }
+    if event.envelope is not None:
+        data["envelope"] = _serialize_envelope(event.envelope)
+    return data
 
 
 def _serialize_claim(claim: Claim) -> dict[str, Any]:
@@ -104,46 +123,28 @@ def _serialize_result(session: ResearchSession) -> dict[str, Any]:
         "report": session.final_report,
         "sources": [_serialize_source(s) for s in session.sources],
         "claims": [_serialize_claim(c) for c in session.claims],
+        "diagnostics": [
+            _serialize_envelope(e) for e in session.error_ledger
+        ],
         "error": session.error,
     }
 
 
 async def _run_workflow(
-    session: ResearchSession, queue: asyncio.Queue[Any]
+    session_id: str,
+    query: str,
+    queue: asyncio.Queue[Any],
 ) -> ResearchSession:
-    client = A2AClient(get_registry())
-    started = perf_counter()
     logger.info(
-        "api.workflow.start session_id=%s query=%r",
-        session.id,
-        session.query,
+        "api.workflow.start session_id=%s query=%r", session_id, query
     )
-    try:
-        await asyncio.wait_for(
-            drive(session, client, session.query),
-            timeout=settings.workflow_timeout,
-        )
-    except TimeoutError:
-        session.error = (
-            f"Workflow timed out after {settings.workflow_timeout:.0f}s"
-            " — partial results below."
-        )
-        mark_running_failed(session)
-        logger.warning("api.workflow.timeout session_id=%s", session.id)
-    except Exception as exc:
-        session.error = str(exc)
-        mark_running_failed(session)
-        logger.exception("api.workflow.error session_id=%s", session.id)
-
-    elapsed_ms = (perf_counter() - started) * 1000
+    # run_workflow_async creates its own session; we need it to use the
+    # already-registered queue. Register before calling so the engine
+    # picks it up on Bus.get().
+    session = await run_workflow_async(query, progress_queue=queue)
     logger.info(
-        "api.workflow.done session_id=%s elapsed_ms=%.1f error=%s",
-        session.id,
-        elapsed_ms,
-        session.error,
+        "api.workflow.done session_id=%s error=%s", session_id, session.error
     )
-    queue.put_nowait(None)
-    Bus.unregister(session.id)
     return session
 
 
@@ -162,19 +163,76 @@ async def health() -> dict[str, str]:
 
 @app.post("/api/research", response_model=ResearchResponse)
 async def start_research(req: ResearchRequest) -> ResearchResponse:
+    # Pre-generate a placeholder session_id for the SSE route; the real
+    # session id is assigned inside run_workflow_async. We use a queue
+    # handshake: the queue is registered by run_workflow_async using its
+    # internal session id, so we let it drive. We store the task keyed
+    # by a temporary key and update after the session id is known.
+    #
+    # Simpler approach: create a dedicated queue here; run_workflow_async
+    # accepts an optional progress_queue and registers it internally.
+    # We expose the session_id from the ResearchSession returned by the task.
+    # But the SSE client needs the session_id before the task finishes.
+    #
+    # Solution: create session id first here using ResearchSession, register
+    # queue, then pass query + pre-created queue to engine.
+    from a2a_research.backend.core.models import ResearchSession
+    from a2a_research.backend.workflow.definitions import STEP_INDEX
+
     session = ResearchSession(query=req.query)
+    session.roles = list(STEP_INDEX.keys())
     session.ensure_agent_results()
 
     queue: asyncio.Queue[Any] = asyncio.Queue()
     Bus.register(session.id, queue)
 
-    task = asyncio.create_task(_run_workflow(session, queue))
+    # Run the workflow, passing the pre-registered queue so the engine
+    # reuses it rather than creating a new one.
+    async def _run() -> ResearchSession:
+        from a2a_research.backend.core.models import BudgetConsumption
+        import a2a_research.backend.core.a2a as _a2a
+        from a2a_research.backend.core.settings import settings
+        from a2a_research.backend.workflow.definitions import (
+            budget_from_settings,
+        )
+        from a2a_research.backend.workflow.engine import drive
+
+        client = _a2a.A2AClient(_a2a.get_registry())
+        session.budget_consumed = BudgetConsumption()
+        try:
+            await asyncio.wait_for(
+                drive(session, client, req.query, budget_from_settings()),
+                timeout=settings.workflow_timeout,
+            )
+        except TimeoutError:
+            from a2a_research.backend.core.settings import settings as s
+            session.error = (
+                f"Workflow timed out after {s.workflow_timeout:.0f}s"
+                " — partial results below."
+            )
+            mark_running_failed(session)
+            logger.warning(
+                "api.workflow.timeout session_id=%s", session.id
+            )
+        except Exception as exc:
+            session.error = str(exc)
+            mark_running_failed(session)
+            logger.exception(
+                "api.workflow.error session_id=%s", session.id
+            )
+        queue.put_nowait(None)
+        Bus.unregister(session.id)
+        return session
+
+    task = asyncio.create_task(_run())
     _sessions[session.id] = task
 
     return ResearchResponse(session_id=session.id)
 
 
-async def _stream_events(session_id: str) -> AsyncGenerator[str, None]:
+async def _stream_events(
+    session_id: str,
+) -> AsyncGenerator[str, None]:
     task = _sessions.get(session_id)
     queue = Bus.get(session_id)
 
@@ -190,7 +248,9 @@ async def _stream_events(session_id: str) -> AsyncGenerator[str, None]:
         return
 
     async for event in drain_progress_while_running(queue, task):
-        yield _sse("progress", _serialize_progress(event))
+        phase = str(event.phase) if event.phase else ""
+        sse_event = _PHASE_TO_EVENT.get(phase, "progress")
+        yield _sse(sse_event, _serialize_progress(event))
 
     try:
         session = await task

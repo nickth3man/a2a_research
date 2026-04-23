@@ -481,13 +481,19 @@ function AgentRoster({ statuses }: { statuses: StatusMap }) {
   );
 }
 
-export function LoadingState({ progress, statuses, tickerLines }: {
+export function LoadingState({ progress, statuses, tickerLines, degradedRoles }: {
   progress: number
   statuses: StatusMap
   tickerLines: string[]
+  degradedRoles?: Set<string>
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
+      {degradedRoles && degradedRoles.size > 0 && (
+        <div style={{ padding: '8px 14px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#7c5f00' }}>
+          ⚡ Degraded mode active for: {[...degradedRoles].join(', ')}
+        </div>
+      )}
       <div className="reveal reveal-1">
         <BigProgress pct={progress} statuses={statuses} />
       </div>

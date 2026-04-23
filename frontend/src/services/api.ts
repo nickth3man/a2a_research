@@ -1,3 +1,5 @@
+import type { DiagnosticItem } from '../types'
+
 export interface ProgressMsg {
   type: 'progress'
   session_id: string
@@ -10,6 +12,16 @@ export interface ProgressMsg {
   substep_total: number
   detail: string
   elapsed_ms: number | null
+  envelope?: DiagnosticItem
+}
+
+export interface DiagnosticMsg {
+  type: string
+  session_id: string
+  phase: string
+  role: string | null
+  envelope?: DiagnosticItem
+  detail: string
 }
 
 export interface BackendSource {
@@ -31,6 +43,7 @@ export interface ResultMsg {
   report: string
   sources: BackendSource[]
   claims: BackendClaim[]
+  diagnostics: DiagnosticItem[]
   error: string | null
 }
 
@@ -38,6 +51,10 @@ export interface ResearchCallbacks {
   onProgress(e: ProgressMsg): void
   onResult(e: ResultMsg): void
   onError(msg: string): void
+  onWarning?(e: DiagnosticMsg): void
+  onRetrying?(e: DiagnosticMsg): void
+  onDegraded?(e: DiagnosticMsg): void
+  onFinalDiagnostics?(e: DiagnosticMsg): void
 }
 
 interface ErrorMsg {
@@ -115,6 +132,17 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
     }
     es.close()
   }
+  const handleDiagnostic = (type: string) => (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data) as DiagnosticMsg
+      if (type === 'warning') cb.onWarning?.(data)
+      else if (type === 'retrying') cb.onRetrying?.(data)
+      else if (type === 'degraded_mode') cb.onDegraded?.(data)
+      else if (type === 'final_diagnostics') cb.onFinalDiagnostics?.(data)
+    } catch {
+      /* ignore */
+    }
+  }
   const handleGenericError = () => {
     if (terminalEventReceived || es.readyState === EventSource.CLOSED) {
       return
@@ -123,9 +151,18 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
     es.close()
   }
 
+  const handleWarning = handleDiagnostic('warning')
+  const handleRetrying = handleDiagnostic('retrying')
+  const handleDegraded = handleDiagnostic('degraded_mode')
+  const handleFinalDiagnostics = handleDiagnostic('final_diagnostics')
+
   es.addEventListener('progress', handleProgress)
   es.addEventListener('result', handleResult)
   es.addEventListener('app-error', handleAppError)
+  es.addEventListener('warning', handleWarning)
+  es.addEventListener('retrying', handleRetrying)
+  es.addEventListener('degraded_mode', handleDegraded)
+  es.addEventListener('final_diagnostics', handleFinalDiagnostics)
   es.onerror = handleGenericError
 
   return {
@@ -133,6 +170,10 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
       es.removeEventListener('progress', handleProgress)
       es.removeEventListener('result', handleResult)
       es.removeEventListener('app-error', handleAppError)
+      es.removeEventListener('warning', handleWarning)
+      es.removeEventListener('retrying', handleRetrying)
+      es.removeEventListener('degraded_mode', handleDegraded)
+      es.removeEventListener('final_diagnostics', handleFinalDiagnostics)
       es.onerror = null
       es.close()
     },

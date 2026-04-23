@@ -1,8 +1,4 @@
-"""Agent definitions, step indices, timeouts, and budget helpers.
-
-Provides the canonical agent registry used by both the v1 coordinator
-and the v2 claim-centric workflow engine.
-"""
+"""Agent definitions, step indices, timeouts, and budget helpers."""
 
 from __future__ import annotations
 
@@ -16,8 +12,8 @@ from a2a_research.backend.core.settings import settings
 
 __all__ = [
     "AGENT_DEFINITIONS",
-    "STEP_INDEX_V2",
-    "TOTAL_STEPS_V2",
+    "STEP_INDEX",
+    "TOTAL_STEPS",
     "budget_from_settings",
     "stage_timeout",
 ]
@@ -85,7 +81,7 @@ AGENT_DEFINITIONS: dict[AgentRole, AgentDefinition] = {
     ),
 }
 
-STEP_INDEX_V2: dict[AgentRole, int] = {
+STEP_INDEX: dict[AgentRole, int] = {
     AgentRole.PREPROCESSOR: 0,
     AgentRole.CLARIFIER: 1,
     AgentRole.PLANNER: 2,
@@ -100,7 +96,7 @@ STEP_INDEX_V2: dict[AgentRole, int] = {
     AgentRole.POSTPROCESSOR: 11,
 }
 
-TOTAL_STEPS_V2 = len(STEP_INDEX_V2)
+TOTAL_STEPS = len(STEP_INDEX)
 
 PER_STAGE_TIMEOUTS: dict[AgentRole, float] = {
     AgentRole.PREPROCESSOR: 10.0,

@@ -7,7 +7,7 @@ import { LoadingState } from './components/LoadingState'
 import { ResultsState } from './components/ResultsState'
 import { startResearch, normalizeRole } from './services/api'
 import { AGENTS } from './mocks/data'
-import type { UIState, StatusMap, Claim, Source, Verdict } from './types'
+import type { UIState, StatusMap, Claim, Source, Verdict, DiagnosticItem } from './types'
 
 function initialStatuses(): StatusMap {
   return Object.fromEntries(AGENTS.map((a) => [a.key, 'pending' as const]))
@@ -34,6 +34,8 @@ export default function App() {
   const [report, setReport] = useState('')
   const [claims, setClaims] = useState<Claim[]>([])
   const [sources, setSources] = useState<Source[]>([])
+  const [diagnostics, setDiagnostics] = useState<DiagnosticItem[]>([])
+  const [degradedRoles, setDegradedRoles] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const cleanupRef = useRef<(() => void) | null>(null)
   const mountedRef = useRef(true)
@@ -60,6 +62,8 @@ export default function App() {
     setReport('')
     setClaims([])
     setSources([])
+    setDiagnostics([])
+    setDegradedRoles(new Set())
     setError(null)
     setAndSave('loading')
 
@@ -97,6 +101,7 @@ export default function App() {
             return { file: s.url, title: s.title || s.url, meta: host }
           })
         )
+        if (e.diagnostics?.length) setDiagnostics(e.diagnostics)
         setAndSave('results')
         localStorage.removeItem('a2a_session_id')
       },
@@ -105,6 +110,31 @@ export default function App() {
         setError(msg)
         setAndSave('empty')
         localStorage.removeItem('a2a_session_id')
+      },
+      onWarning(e) {
+        if (!mountedRef.current) return
+        if (e.envelope) setDiagnostics((prev) => [...prev, e.envelope!])
+        const role = normalizeRole(e.role)
+        if (role) setStatuses((prev) => ({ ...prev, [role]: 'warning' }))
+        if (e.detail) setTickerLines((prev) => [`⚠ ${e.detail}`, ...prev].slice(0, 20))
+      },
+      onDegraded(e) {
+        if (!mountedRef.current) return
+        if (e.envelope) setDiagnostics((prev) => [...prev, e.envelope!])
+        const role = normalizeRole(e.role)
+        if (role) {
+          setDegradedRoles((prev) => new Set([...prev, role]))
+          setStatuses((prev) => ({ ...prev, [role]: 'degraded' }))
+        }
+        if (e.detail) setTickerLines((prev) => [`⚡ degraded: ${e.detail}`, ...prev].slice(0, 20))
+      },
+      onRetrying(e) {
+        if (!mountedRef.current) return
+        if (e.detail) setTickerLines((prev) => [`↺ retrying: ${e.detail}`, ...prev].slice(0, 20))
+      },
+      onFinalDiagnostics(e) {
+        if (!mountedRef.current) return
+        if (e.detail) setTickerLines((prev) => [`✓ ${e.detail}`, ...prev].slice(0, 20))
       },
     })
     cleanupRef.current = result.cleanup
@@ -131,10 +161,20 @@ export default function App() {
           </>
         )}
         {uiState === 'loading' && (
-          <LoadingState progress={progress} statuses={statuses} tickerLines={tickerLines} />
+          <LoadingState
+            progress={progress}
+            statuses={statuses}
+            tickerLines={tickerLines}
+            degradedRoles={degradedRoles}
+          />
         )}
         {uiState === 'results' && (
-          <ResultsState report={report} claims={claims} sources={sources} />
+          <ResultsState
+            report={report}
+            claims={claims}
+            sources={sources}
+            diagnostics={diagnostics}
+          />
         )}
 
         <QueryInput onSubmit={handleSubmit} state={uiState} />
