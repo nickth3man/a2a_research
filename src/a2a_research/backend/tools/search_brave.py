@@ -91,14 +91,14 @@ async def search_brave(
             for attempt in range(_BRAVE_MAX_RETRIES + 1):
                 await _brave_throttle()
                 response = await client.get(
-                        _BRAVE_SEARCH_URL,
-                        params={"q": query, "count": count},
-                        headers={
-                            "Accept": "application/json",
-                            "X-Subscription-Token": api_key,
-                        },
-                        timeout=30.0,
-                    )
+                    _BRAVE_SEARCH_URL,
+                    params={"q": query, "count": count},
+                    headers={
+                        "Accept": "application/json",
+                        "X-Subscription-Token": api_key,
+                    },
+                    timeout=30.0,
+                )
                 text = response.text
                 if (
                     response.status_code != 429
