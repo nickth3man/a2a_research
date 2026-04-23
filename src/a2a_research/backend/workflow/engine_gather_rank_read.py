@@ -40,6 +40,7 @@ async def run_rank_stage(
     hits: list[WebHit],
     update_wall_seconds: Callable[[], None],
     loop_round: int,
+    back_channel: dict[str, Any] | None = None,
 ) -> tuple[list[str], dict[str, Any]] | None:
     rank_result = await _run_agent(
         session,
@@ -56,11 +57,13 @@ async def run_rank_stage(
             },
             "session_id": session.id,
             "trace_id": session.trace_id,
+            **(back_channel or {}),
         },
     )
-    ranked_urls = [str(url) for url in rank_result.get("ranked_urls", [])]
-    fetch_budget = min(
-        budget.max_urls_fetched - session.budget_consumed.urls_fetched, 8
+    ranked_urls = [str(url) for url in (rank_result.get("ranked_urls") or [])]
+    fetch_budget = max(
+        0,
+        min(budget.max_urls_fetched - session.budget_consumed.urls_fetched, 8),
     )
     urls_to_fetch = ranked_urls[:fetch_budget]
     update_wall_seconds()

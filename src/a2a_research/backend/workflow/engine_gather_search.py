@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2a_research.backend.core.logging.app_logging import get_logger
 from a2a_research.backend.core.models import AgentRole
@@ -39,7 +39,7 @@ async def run_search_stage(
     update_wall_seconds: Callable[[], None],
     emit_budget: Callable[[str, AgentRole, str], None],
     loop_round: int,
-) -> list[WebHit] | None:
+) -> tuple[list[WebHit], dict[str, Any]] | None:
     search_result = await _run_agent(
         session,
         client,
@@ -82,7 +82,8 @@ async def run_search_stage(
         )
         return None
     if not session.budget_consumed.is_exhausted(budget):
-        return hits
+        back_channel = {k: v for k, v in search_result.items() if k != "hits"}
+        return hits, back_channel
     logger.info("Budget exhausted after search in round %s", loop_round)
     emit_budget(
         session.id, AgentRole.SEARCHER, "budget_exhausted_after_search"

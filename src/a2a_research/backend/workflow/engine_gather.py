@@ -49,7 +49,7 @@ async def gather_evidence(
     loop_round: int,
 ) -> tuple[list[EvidenceUnit], list[PageContent], list[EvidenceUnit]] | None:
     """Run search, rank, read, and normalize stages."""
-    hits = await run_search_stage(
+    search_stage = await run_search_stage(
         session,
         client,
         budget,
@@ -59,8 +59,9 @@ async def gather_evidence(
         _emit_budget,
         loop_round,
     )
-    if hits is None:
+    if search_stage is None:
         return None
+    hits, search_back_channel = search_stage
 
     rank_stage = await run_rank_stage(
         session,
@@ -71,6 +72,7 @@ async def gather_evidence(
         hits,
         _update_wall_seconds,
         loop_round,
+        search_back_channel,
     )
     if rank_stage is None:
         return None
