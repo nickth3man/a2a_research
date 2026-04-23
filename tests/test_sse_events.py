@@ -18,7 +18,8 @@ from a2a_research.backend.workflow.status import emit_envelope, emit_step
 
 
 @pytest.fixture()
-def session_with_queue() -> tuple[ResearchSession, asyncio.Queue]:  # type: ignore[type-arg]
+def session_with_queue(  # type: ignore[type-arg]
+) -> tuple[ResearchSession, asyncio.Queue]:
     session = ResearchSession(query="test")
     queue: asyncio.Queue = asyncio.Queue()  # type: ignore[type-arg]
     Bus.register(session.id, queue)
@@ -61,7 +62,9 @@ def test_emit_envelope_puts_event_on_queue(session_with_queue) -> None:
     assert event.envelope is env
 
 
-def test_emit_envelope_fatal_maps_to_final_diagnostics(session_with_queue) -> None:
+def test_emit_envelope_fatal_maps_to_final_diagnostics(
+    session_with_queue,
+) -> None:
     session, queue = session_with_queue
     env = ErrorEnvelope(
         role=AgentRole.PLANNER,

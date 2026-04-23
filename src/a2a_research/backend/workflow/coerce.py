@@ -97,6 +97,8 @@ def coerce_claim_state(
     if isinstance(raw, ClaimState):
         state = raw
     elif isinstance(raw, dict):
+        if not raw:
+            return None
         try:
             state = ClaimState.model_validate(raw)
         except ValidationError:
