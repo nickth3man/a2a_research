@@ -16,7 +16,7 @@ export interface ProgressMsg {
 }
 
 export interface DiagnosticMsg {
-  type: string
+  type: 'warning' | 'retrying' | 'degraded_mode' | 'final_diagnostics'
   session_id: string
   phase: string
   role: string | null
@@ -132,13 +132,17 @@ export async function startResearch(query: string, cb: ResearchCallbacks): Promi
     }
     es.close()
   }
-  const handleDiagnostic = (type: string) => (e: MessageEvent) => {
+  const handleDiagnostic = (type: DiagnosticMsg['type']) => (e: MessageEvent) => {
     try {
       const data = JSON.parse(e.data) as DiagnosticMsg
       if (type === 'warning') cb.onWarning?.(data)
       else if (type === 'retrying') cb.onRetrying?.(data)
       else if (type === 'degraded_mode') cb.onDegraded?.(data)
       else if (type === 'final_diagnostics') cb.onFinalDiagnostics?.(data)
+      else {
+        const _exhaustive: never = type
+        return _exhaustive
+      }
     } catch {
       /* ignore */
     }

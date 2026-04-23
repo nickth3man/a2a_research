@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from a2a_research.backend.core.models import (
     AgentResult,
     AgentRole,
@@ -19,9 +17,6 @@ from a2a_research.backend.workflow.definitions import (
     STEP_INDEX,
     TOTAL_STEPS,
 )
-
-if TYPE_CHECKING:
-    pass
 
 __all__ = ["emit_envelope", "emit_step", "mark_running_failed", "set_status"]
 
@@ -51,7 +46,7 @@ def emit_step(
     detail: str = "",
     envelope: ErrorEnvelope | None = None,
 ) -> None:
-    step_index = STEP_INDEX.get(role, 0) if role else 0
+    step_index = STEP_INDEX.get(role, TOTAL_STEPS) if role else TOTAL_STEPS
     emit(
         session_id,
         phase,

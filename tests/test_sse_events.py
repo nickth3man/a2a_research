@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import patch
 
 import pytest
 
 from a2a_research.backend.core.models import ResearchSession
+from a2a_research.backend.core.models.enums import AgentRole
 from a2a_research.backend.core.models.errors import (
     ErrorCode,
     ErrorEnvelope,
     ErrorSeverity,
 )
-from a2a_research.backend.core.models.enums import AgentRole
 from a2a_research.backend.core.progress import Bus, ProgressPhase
 from a2a_research.backend.workflow.status import emit_envelope, emit_step
 
@@ -35,7 +34,7 @@ def test_new_progress_phases_exist() -> None:
 
 
 def test_emit_envelope_appends_to_ledger(session_with_queue) -> None:
-    session, queue = session_with_queue
+    session, _queue = session_with_queue
     env = ErrorEnvelope(
         role=AgentRole.SEARCHER,
         code=ErrorCode.NO_HITS,

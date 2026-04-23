@@ -205,6 +205,26 @@ async def run_verify(
             counter_hits = adv_sea_result.get("hits", [])
             adv_payload["counter_hits"] = counter_hits
 
+            _update_wall_seconds()
+            if session.budget_consumed.is_exhausted(budget):
+                logger.info(
+                    "Budget exhausted after adversarial SEA in round %s",
+                    loop_round,
+                )
+                emit_envelope(
+                    session.id,
+                    ErrorEnvelope(
+                        role=AgentRole.SEARCHER,
+                        code=ErrorCode.BUDGET_EXHAUSTED_AFTER_VERIFY,
+                        severity=ErrorSeverity.DEGRADED,
+                        retryable=False,
+                        root_cause="Budget exhausted after adversarial search.",
+                        trace_id=session.trace_id,
+                    ),
+                    session,
+                )
+                return None
+
             # ADV→REA: fetch counter-sources
             if counter_hits:
                 counter_urls = [
@@ -227,6 +247,26 @@ async def run_verify(
                     adv_payload["counter_pages"] = adv_rea_result.get(
                         "pages", []
                     )
+
+                    _update_wall_seconds()
+                    if session.budget_consumed.is_exhausted(budget):
+                        logger.info(
+                            "Budget exhausted after adversarial REA in round %s",
+                            loop_round,
+                        )
+                        emit_envelope(
+                            session.id,
+                            ErrorEnvelope(
+                                role=AgentRole.READER,
+                                code=ErrorCode.BUDGET_EXHAUSTED_AFTER_VERIFY,
+                                severity=ErrorSeverity.DEGRADED,
+                                retryable=False,
+                                root_cause="Budget exhausted after adversarial reading.",
+                                trace_id=session.trace_id,
+                            ),
+                            session,
+                        )
+                        return None
 
         adversary_result = await _run_agent(
             session,

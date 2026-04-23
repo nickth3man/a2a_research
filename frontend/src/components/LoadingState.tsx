@@ -490,8 +490,12 @@ export function LoadingState({ progress, statuses, tickerLines, degradedRoles }:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 24 }}>
       {degradedRoles && degradedRoles.size > 0 && (
-        <div style={{ padding: '8px 14px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#7c5f00' }}>
-          ⚡ Degraded mode active for: {[...degradedRoles].join(', ')}
+        <div
+          role="status"
+          aria-live="polite"
+          style={{ padding: '8px 14px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4, fontSize: 12, color: '#7c5f00' }}
+        >
+          ⚡ Degraded mode active for: {[...degradedRoles].map(key => AGENTS.get(key)?.label || key).join(', ')}
         </div>
       )}
       <div className="reveal reveal-1">

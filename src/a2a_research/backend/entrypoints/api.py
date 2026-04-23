@@ -189,8 +189,8 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
     # Run the workflow, passing the pre-registered queue so the engine
     # reuses it rather than creating a new one.
     async def _run() -> ResearchSession:
-        from a2a_research.backend.core.models import BudgetConsumption
         import a2a_research.backend.core.a2a as _a2a
+        from a2a_research.backend.core.models import BudgetConsumption
         from a2a_research.backend.core.settings import settings
         from a2a_research.backend.workflow.definitions import (
             budget_from_settings,
@@ -205,9 +205,8 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
                 timeout=settings.workflow_timeout,
             )
         except TimeoutError:
-            from a2a_research.backend.core.settings import settings as s
             session.error = (
-                f"Workflow timed out after {s.workflow_timeout:.0f}s"
+                f"Workflow timed out after {settings.workflow_timeout:.0f}s"
                 " — partial results below."
             )
             mark_running_failed(session)
@@ -221,7 +220,6 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
                 "api.workflow.error session_id=%s", session.id
             )
         queue.put_nowait(None)
-        Bus.unregister(session.id)
         return session
 
     task = asyncio.create_task(_run())
@@ -247,37 +245,40 @@ async def _stream_events(
         )
         return
 
-    async for event in drain_progress_while_running(queue, task):
-        phase = str(event.phase) if event.phase else ""
-        sse_event = _PHASE_TO_EVENT.get(phase, "progress")
-        yield _sse(sse_event, _serialize_progress(event))
-
     try:
-        session = await task
-    except Exception as exc:
-        yield _sse(
-            "app-error",
-            {
-                "type": "error",
-                "session_id": session_id,
-                "message": str(exc),
-            },
-        )
+        async for event in drain_progress_while_running(queue, task):
+            phase = str(event.phase) if event.phase else ""
+            sse_event = _PHASE_TO_EVENT.get(phase, "progress")
+            yield _sse(sse_event, _serialize_progress(event))
+
+        try:
+            session = await task
+        except Exception as exc:
+            yield _sse(
+                "app-error",
+                {
+                    "type": "error",
+                    "session_id": session_id,
+                    "message": str(exc),
+                },
+            )
+            _sessions.pop(session_id, None)
+            return
+
+        if session.error:
+            yield _sse(
+                "app-error",
+                {
+                    "type": "error",
+                    "session_id": session_id,
+                    "message": session.error,
+                },
+            )
+
+        yield _sse("result", _serialize_result(session))
         _sessions.pop(session_id, None)
-        return
-
-    if session.error:
-        yield _sse(
-            "app-error",
-            {
-                "type": "error",
-                "session_id": session_id,
-                "message": session.error,
-            },
-        )
-
-    yield _sse("result", _serialize_result(session))
-    _sessions.pop(session_id, None)
+    finally:
+        Bus.unregister(session_id)
 
 
 @app.get("/api/research/{session_id}/stream")

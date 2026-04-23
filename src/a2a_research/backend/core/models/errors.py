@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from a2a_research.backend.core.models.enums import AgentRole
+from a2a_research.backend.core.models.enums import AgentRole  # noqa: TC001
 
 
-class ErrorSeverity(str, Enum):
+class ErrorSeverity(StrEnum):
     FATAL = "fatal"
     WARNING = "warning"
     DEGRADED = "degraded"
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     QUERY_REJECTED = "QUERY_REJECTED"
     LOW_CLAIM_COVERAGE = "LOW_CLAIM_COVERAGE"
     PLANNER_EMPTY = "PLANNER_EMPTY"

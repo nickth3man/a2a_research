@@ -2,15 +2,13 @@
 
 from __future__ import annotations
 
-import pytest
-
 from a2a_research.backend.core.models import ResearchSession
+from a2a_research.backend.core.models.enums import AgentRole
 from a2a_research.backend.core.models.errors import (
     ErrorCode,
     ErrorEnvelope,
     ErrorSeverity,
 )
-from a2a_research.backend.core.models.enums import AgentRole
 
 
 def test_error_envelope_defaults() -> None:
@@ -60,6 +58,14 @@ def test_session_has_trace_id() -> None:
     assert len(session.trace_id) == 32  # uuid4().hex
 
 
+def test_session_trace_id_uniqueness() -> None:
+    session1 = ResearchSession(query="test1")
+    session2 = ResearchSession(query="test2")
+    assert session1.trace_id != session2.trace_id
+    assert len(session1.trace_id) == 32
+    assert len(session2.trace_id) == 32
+
+
 def test_session_error_ledger_starts_empty() -> None:
     session = ResearchSession(query="test")
     assert session.error_ledger == []
@@ -74,6 +80,7 @@ def test_session_error_ledger_append() -> None:
     )
     session.error_ledger.append(env)
     assert len(session.error_ledger) == 1
+    assert isinstance(session.error_ledger[0], ErrorEnvelope)
     assert session.error_ledger[0].code == ErrorCode.PLANNER_EMPTY
 
 

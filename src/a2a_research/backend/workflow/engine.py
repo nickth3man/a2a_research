@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -35,14 +36,13 @@ async def drive(
     workflow_start = perf_counter()
 
     # Emit registry snapshot so frontend/bus sees agent capability map
-    import json as _json
-    snapshot = client._registry.build_snapshot()
+    snapshot = client.registry.build_snapshot()
     emit_step(
         session.id,
         None,
         ProgressPhase.STEP_STARTED,
         "registry_snapshot",
-        detail=_json.dumps({"agent_count": len(snapshot)}),
+        detail=json.dumps({"agent_count": len(snapshot)}),
     )
 
     setup = await run_setup_stages(session, client, query, budget)

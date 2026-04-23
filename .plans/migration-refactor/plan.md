@@ -26,7 +26,11 @@ src/a2a_research/backend/workflow/coordinator_synthesizer.py
 src/a2a_research/backend/workflow/coordinator_helpers.py
 src/a2a_research/backend/agents/stubs/clarifier/          ← duplicate of pocketflow/clarifier
 src/a2a_research/backend/agents/pocketflow/adversary/     ← WIP nodes, no main.py, not mounted
-scripts/extract_prompts_v2.py                             ← rename to extract_prompts.py
+```
+
+**Files to rename:**
+```
+scripts/extract_prompts_v2.py → scripts/extract_prompts.py
 ```
 
 **Note:** `coordinator_helpers.mark_running_failed` already exists verbatim in `workflow/status.py`. No migration needed.
@@ -99,6 +103,7 @@ class ErrorCode(str, Enum):
     BUDGET_EXHAUSTED_AFTER_GATHER = "BUDGET_EXHAUSTED_AFTER_GATHER"
     BUDGET_EXHAUSTED_AFTER_VERIFY = "BUDGET_EXHAUSTED_AFTER_VERIFY"
     BUDGET_EXHAUSTED_AFTER_SNAPSHOT = "BUDGET_EXHAUSTED_AFTER_SNAPSHOT"
+    DIAGNOSTIC_SUMMARY = "DIAGNOSTIC_SUMMARY"
 
 class ErrorEnvelope(BaseModel):
     role: AgentRole | None
@@ -427,7 +432,7 @@ pos_result = await _run_agent(session, client, AgentRole.POSTPROCESSOR, pos_payl
 # Merge condensed diagnostic appendix back into session
 if condensed := pos_result.get("diagnostic_appendix"):
     session.error_ledger.append(ErrorEnvelope(
-        role=AgentRole.POSTPROCESSOR, code=ErrorCode.QUERY_REJECTED,  # use a SUMMARY code
+        role=AgentRole.POSTPROCESSOR, code=ErrorCode.DIAGNOSTIC_SUMMARY,
         severity=ErrorSeverity.WARNING, root_cause=str(condensed),
     ))
 ```

@@ -1,6 +1,6 @@
 export type UIState = 'empty' | 'loading' | 'results';
 
-export type AgentStatus = 'pending' | 'running' | 'completed' | 'warning' | 'degraded';
+export type AgentStatus = 'pending' | 'running' | 'completed' | 'warning' | 'degraded' | 'failed';
 
 export interface Agent {
   key: string;
