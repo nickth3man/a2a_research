@@ -81,7 +81,7 @@ async def run_adversary_stage(
         claim_state,
         provenance_tree,
         cast(
-            list[dict[str, Any]], adversary_result.get("challenge_results", [])
+            "list[dict[str, Any]]", adversary_result.get("challenge_results", [])
         ),
     )
     claim_state.refresh_resolution_lists()

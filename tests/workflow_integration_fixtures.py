@@ -14,6 +14,8 @@ from a2a_research.backend.agents.langgraph.fact_checker import (
 )
 from a2a_research.backend.agents.pocketflow.planner import (
     nodes as planner_nodes,
+)
+from a2a_research.backend.agents.pocketflow.planner import (
     nodes_base as planner_nodes_base,
 )
 from a2a_research.backend.agents.pydantic_ai.synthesizer import (
@@ -21,10 +23,14 @@ from a2a_research.backend.agents.pydantic_ai.synthesizer import (
 )
 from a2a_research.backend.agents.smolagents.reader import (
     agent as reader_agent,
+)
+from a2a_research.backend.agents.smolagents.reader import (
     core as reader_core,
 )
 from a2a_research.backend.agents.smolagents.searcher import (
     agent as searcher_agent,
+)
+from a2a_research.backend.agents.smolagents.searcher import (
     core as searcher_core,
 )
 from a2a_research.backend.core.models import ReportOutput

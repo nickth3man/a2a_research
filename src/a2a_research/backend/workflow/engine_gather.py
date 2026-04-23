@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
     from a2a_research.backend.core.a2a import A2AClient
     from a2a_research.backend.core.models import (
+        AgentRole,
         Claim,
         ClaimState,
         EvidenceUnit,
@@ -20,7 +21,6 @@ if TYPE_CHECKING:
     )
     from a2a_research.backend.tools import PageContent
 
-from a2a_research.backend.core.models import AgentRole
 from a2a_research.backend.workflow.engine_gather_normalize import (
     run_normalize_stage,
 )

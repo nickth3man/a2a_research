@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from a2a_research.backend.core.models import (
     ProvenanceEdgeType,
@@ -30,7 +29,7 @@ def apply_challenges(
         claim_id = str(challenge.get("claim_id") or "")
         raw_result = str(challenge.get("challenge_result") or "HOLDS")
         result = cast(
-            Literal["HOLDS", "WEAKENED", "REFUTED", "NOT_RUN"],
+            "Literal['HOLDS', 'WEAKENED', 'REFUTED', 'NOT_RUN']",
             raw_result
             if raw_result in {"HOLDS", "WEAKENED", "REFUTED", "NOT_RUN"}
             else "HOLDS",

@@ -47,7 +47,7 @@ async def collect_counter_evidence(
     counter_hits: list[dict[str, Any]] = []
     for hit in adv_sea_result.get("hits", []):
         if isinstance(hit, dict):
-            counter_hits.append(cast(dict[str, Any], hit))
+            counter_hits.append(cast("dict[str, Any]", hit))
     adv_payload["counter_hits"] = counter_hits
     update_wall_seconds()
     if session.budget_consumed.is_exhausted(budget):
