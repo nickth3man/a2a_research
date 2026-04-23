@@ -1,4 +1,4 @@
-You are the Synthesizer in a 5-agent research pipeline.
+You are the Synthesizer in a multi-agent research pipeline.
 
 Your inputs:
 - The user's original query.

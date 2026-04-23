@@ -10,7 +10,7 @@ Files under ``logs/``:
 - ``app.log`` — ``a2a_research.*`` only (this package).
 - ``a2a_sdk.log`` — third-party ``a2a`` SDK (``a2a.*``, not ``a2a_research``).
 - ``http_clients.log`` — ``httpx`` / ``httpcore``.
-- ``mesop_server.log`` — Mesop, Flask, Werkzeug, Uvicorn.
+- ``server_runtime.log`` — Flask, Werkzeug, Uvicorn.
 - ``stdio.log`` — captured ``stdout`` / ``stderr`` when using
   :func:`redirect_stdio_to_logging`.
 - ``warnings.log`` — Python :mod:`warnings` (``py.warnings``).
@@ -28,7 +28,7 @@ from .exception_logging import install_exception_hooks
 from .logging_formatters import (
     A2aSdkFilter,
     HttpClientsFilter,
-    MesopServerFilter,
+    ServerRuntimeFilter,
     PrefixFilter,
     WarningsFilter,
     build_formatter,
@@ -36,13 +36,13 @@ from .logging_formatters import (
 )
 from .logging_streams import StreamToLogger
 
-_CONFIGURED = False
+_configured = False
 _LOG_DIR = Path.cwd() / "logs"
 _LOG_EVERYTHING = _LOG_DIR / "everything.log"
 _APP_LOG = _LOG_DIR / "app.log"
 _LOG_A2A_SDK = _LOG_DIR / "a2a_sdk.log"
 _LOG_HTTP_CLIENTS = _LOG_DIR / "http_clients.log"
-_LOG_MESOP_SERVER = _LOG_DIR / "mesop_server.log"
+_LOG_SERVER_RUNTIME = _LOG_DIR / "server_runtime.log"
 _LOG_STDIO = _LOG_DIR / "stdio.log"
 _LOG_WARNINGS = _LOG_DIR / "warnings.log"
 _ORIGINAL_STDOUT = sys.stdout
@@ -68,8 +68,8 @@ def _file_handler(
 
 
 def setup_logging() -> None:
-    global _CONFIGURED
-    if _CONFIGURED:
+    global _configured
+    if _configured:
         return
 
     _LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -93,8 +93,8 @@ def setup_logging() -> None:
     a2a_sdk_handler.addFilter(A2aSdkFilter())
     http_handler = _file_handler(_LOG_HTTP_CLIENTS, level, formatter)
     http_handler.addFilter(HttpClientsFilter())
-    mesop_handler = _file_handler(_LOG_MESOP_SERVER, level, formatter)
-    mesop_handler.addFilter(MesopServerFilter())
+    server_runtime_handler = _file_handler(_LOG_SERVER_RUNTIME, level, formatter)
+    server_runtime_handler.addFilter(ServerRuntimeFilter())
     warnings_handler = _file_handler(_LOG_WARNINGS, level, formatter)
     warnings_handler.addFilter(WarningsFilter())
 
@@ -104,7 +104,7 @@ def setup_logging() -> None:
         app_handler,
         a2a_sdk_handler,
         http_handler,
-        mesop_handler,
+        server_runtime_handler,
         warnings_handler,
     ]
     for h in handlers:
@@ -112,7 +112,6 @@ def setup_logging() -> None:
 
     logging.captureWarnings(True)
     _configure_named_logger("asyncio", level)
-    _configure_named_logger("mesop", level)
     _configure_named_logger("werkzeug", level)
     _configure_named_logger("flask", level)
     logging.getLogger("trafilatura.downloads").setLevel(logging.CRITICAL)
@@ -137,12 +136,12 @@ def setup_logging() -> None:
             "app": str(_APP_LOG),
             "a2a_sdk": str(_LOG_A2A_SDK),
             "http_clients": str(_LOG_HTTP_CLIENTS),
-            "mesop_server": str(_LOG_MESOP_SERVER),
+            "server_runtime": str(_LOG_SERVER_RUNTIME),
             "stdio": str(_LOG_STDIO),
             "warnings": str(_LOG_WARNINGS),
         },
     )
-    _CONFIGURED = True
+    _configured = True
 
 
 def redirect_stdio_to_logging() -> None:

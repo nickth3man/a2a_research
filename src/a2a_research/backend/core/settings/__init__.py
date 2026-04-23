@@ -19,27 +19,34 @@ from pathlib import Path
 from dotenv import dotenv_values
 
 from .settings_core import AppSettings
-from .settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
+from .settings_dotenv_keys import EXPECTED_DOTENV_KEYS
 from .settings_llm import LLMSettings
-from .settings_validation import _validate_dotenv_keys as _vd
+from .settings_validation import validate_dotenv_keys as _vd
 from .settings_workflow import WorkflowConfig
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[5]
 _ENV_FILE = _PROJECT_ROOT / ".env"
+ENV_FILE = _ENV_FILE
 
 
 def _validate_dotenv_keys() -> None:
-    _vd(_EXPECTED_DOTENV_KEYS)
+    validate_dotenv_keys()
+
+
+def validate_dotenv_keys() -> None:
+    _vd(EXPECTED_DOTENV_KEYS)
 
 
 settings = AppSettings()
 
 __all__ = [
     "_ENV_FILE",
+    "ENV_FILE",
     "AppSettings",
     "LLMSettings",
     "WorkflowConfig",
     "_validate_dotenv_keys",
+    "validate_dotenv_keys",
     "dotenv_values",
     "settings",
 ]

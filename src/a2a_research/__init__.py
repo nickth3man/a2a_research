@@ -1,20 +1,14 @@
-"""A2A Research — 5-agent web research system orchestrated via the
+"""A2A Research — multi-agent web research system orchestrated via the
 A2A protocol.
 
-Pipeline (in-process A2A, using ``a2a-sdk``):
-
-    Planner (pocketflow)
-      → FactChecker (langgraph StateGraph loop)
-            ↔ Searcher (smolagents + Tavily + DuckDuckGo)
-            ↔ Reader   (smolagents + trafilatura)
-      → Synthesizer (pydantic_ai, structured ReportOutput)
+Core runtime combines typed settings, agent-to-agent dispatch, and a
+FastAPI gateway for the full research pipeline.
 
 Entrypoints:
 
-- :func:`a2a_research.workflow.run_research_sync` — run the pipeline on a
-  query.
-- :mod:`a2a_research.ui.app` — Mesop web UI.
-- :mod:`a2a_research.a2a` — registry + client for agent-to-agent dispatch.
+- :mod:`a2a_research.backend.entrypoints.api` — FastAPI gateway.
+- :mod:`a2a_research.backend.entrypoints.launcher` — standalone agent
+  launcher.
 
 Configuration is environment-driven; see ``a2a_research.settings`` and
 ``.env.example``.

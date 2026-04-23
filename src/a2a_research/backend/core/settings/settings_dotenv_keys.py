@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from .settings_llm import LLMSettings
-from .settings_validation import _expected_prefixed_keys
+from .settings_validation import expected_prefixed_keys
 from .settings_workflow import WorkflowConfig
 
-_EXPECTED_DOTENV_KEYS = {
+EXPECTED_DOTENV_KEYS = {
     "LLM_PROVIDER",
     "LOG_LEVEL",
     "WORKFLOW_TIMEOUT",
@@ -39,6 +39,6 @@ _EXPECTED_DOTENV_KEYS = {
     "SYNTHESIZER_URL",
     "CRITIC_URL",
     "POSTPROCESSOR_URL",
-    *_expected_prefixed_keys(LLMSettings),
-    *_expected_prefixed_keys(WorkflowConfig),
+    *expected_prefixed_keys(LLMSettings),
+    *expected_prefixed_keys(WorkflowConfig),
 }

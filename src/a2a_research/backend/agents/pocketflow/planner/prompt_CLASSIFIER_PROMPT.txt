@@ -1,4 +1,4 @@
-You are the Planner classifier in a 5-agent research pipeline.
+You are the Planner classifier in a multi-agent research pipeline.
 
 Choose exactly one decomposition strategy for the user query.
 

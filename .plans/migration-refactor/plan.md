@@ -3,7 +3,7 @@
 ## Context
 
 The codebase has two workflow engines living side-by-side:
-- **v1 coordinator** (`coordinator.py`, `coordinator_drive.py`, etc.) — a simple 5-agent sequential pipeline. The API (`api.py`) currently calls this one.
+- **v1 coordinator** (`coordinator.py`, `coordinator_drive.py`, etc.) — a simple sequential pipeline. The API (`api.py`) currently calls this one.
 - **v2 engine** (`workflow_engine.py`, `engine.py`, `engine_setup.py`, `engine_loop.py`, etc.) — a 12-agent claim-centric DAG engine. Exists but is **not wired to the API**.
 
 The target (`flow.md`) maps exactly onto the v2 engine's structure, extended with: structured `ErrorEnvelope` diagnostics, a richer SSE event vocabulary (`warning`, `retrying`, `degraded_mode`, `final_diagnostics`), back-channel agent payloads (CLR↔PRE, PLN↔CLR, FAC↔PLN, ADV↔FAC, etc.), registry snapshots, and a context bus. Git tracks history — no versioning suffixes needed anywhere.

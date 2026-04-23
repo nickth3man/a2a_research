@@ -5,8 +5,7 @@ Single source of truth for:
 - agents/     (per-agent I/O and session mutation)
 - workflow/   (top-level orchestrator state)
 - a2a/        (A2A client payloads, cards, and task helpers)
-- ui/         (Mesop ``@stateclass`` fields — keep nested models
-               concrete for Mesop serialization)
+- ui/         (UI-facing state and serialized payloads)
 """
 
 from __future__ import annotations

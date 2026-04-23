@@ -7,10 +7,11 @@ import json
 import logging
 import os
 import threading
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 _EVENT_COUNTER = itertools.count(1)
 
@@ -46,9 +47,9 @@ class HttpClientsFilter:
 
 
 @dataclass(frozen=True)
-class MesopServerFilter:
+class ServerRuntimeFilter:
     _roots: frozenset[str] = frozenset(
-        {"mesop", "flask", "werkzeug", "uvicorn"}
+        {"flask", "werkzeug", "uvicorn"}
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -63,20 +64,30 @@ class WarningsFilter:
 
 
 def _normalize_log_value(value: Any) -> Any:
+    sentinel = object()
+
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, Path):
         return str(value)
-    if isinstance(value, dict):
-        return {
-            str(key): _normalize_log_value(val) for key, val in value.items()
-        }
-    if isinstance(value, (list, tuple, set)):
-        return [_normalize_log_value(item) for item in value]
-    if hasattr(value, "value"):
-        return _normalize_log_value(value.value)
-    if hasattr(value, "model_dump"):
-        return _normalize_log_value(value.model_dump())
+    if isinstance(value, Mapping):
+        mapping = cast("dict[Any, Any]", value)
+        normalized_dict: dict[str, Any] = {}
+        for key, dict_value in mapping.items():
+            normalized_dict[str(key)] = _normalize_log_value(dict_value)
+        return normalized_dict
+    if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+        items = cast("Iterable[Any]", value)
+        return [_normalize_log_value(item) for item in items]
+
+    enum_value = getattr(value, "value", sentinel)
+    if enum_value is not sentinel:
+        return _normalize_log_value(enum_value)
+
+    model_dump = getattr(value, "model_dump", sentinel)
+    if callable(model_dump):
+        return _normalize_log_value(model_dump())
+
     if hasattr(value, "__dict__"):
         return _normalize_log_value(vars(value))
     return repr(value)
@@ -112,7 +123,7 @@ def build_formatter() -> logging.Formatter:
 __all__ = [
     "A2aSdkFilter",
     "HttpClientsFilter",
-    "MesopServerFilter",
+    "ServerRuntimeFilter",
     "PrefixFilter",
     "WarningsFilter",
     "build_formatter",

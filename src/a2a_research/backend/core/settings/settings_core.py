@@ -2,34 +2,35 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .settings_core_agents import AgentEndpointsMixin
-from .settings_dotenv_keys import _EXPECTED_DOTENV_KEYS
+from .settings_dotenv_keys import EXPECTED_DOTENV_KEYS
 from .settings_llm import LLMSettings
-from .settings_validation import _validate_dotenv_keys
+from .settings_validation import validate_dotenv_keys
 from .settings_workflow import WorkflowConfig
 
 __all__ = ["AppSettings"]
 
 
-def _build_llm_settings() -> LLMSettings:
-    from a2a_research.backend.core.settings import _ENV_FILE
+def _env_file() -> Path:
+    return Path(__file__).resolve().parents[5] / ".env"
 
+
+def _build_llm_settings() -> LLMSettings:
     return cast(
-        "LLMSettings", cast("Any", LLMSettings)(_env_file=str(_ENV_FILE))
+        "LLMSettings", cast("Any", LLMSettings)(_env_file=str(_env_file()))
     )
 
 
 def _build_workflow_settings() -> WorkflowConfig:
-    from a2a_research.backend.core.settings import _ENV_FILE
-
     return cast(
         "WorkflowConfig",
-        cast("Any", WorkflowConfig)(_env_file=str(_ENV_FILE)),
+        cast("Any", WorkflowConfig)(_env_file=str(_env_file())),
     )
 
 
@@ -42,9 +43,7 @@ class AppSettings(AgentEndpointsMixin, BaseSettings):
     )
 
     def __init__(self, **data: Any) -> None:
-        from a2a_research.backend.core.settings import _ENV_FILE
-
-        super().__init__(_env_file=str(_ENV_FILE), **data)
+        super().__init__(_env_file=str(_env_file()), **data)
 
     log_level: str = Field(
         default="DEBUG",
@@ -86,7 +85,7 @@ class AppSettings(AgentEndpointsMixin, BaseSettings):
 
     @model_validator(mode="after")
     def validate_dotenv_contract(self) -> AppSettings:
-        _validate_dotenv_keys(_EXPECTED_DOTENV_KEYS)
+        validate_dotenv_keys(EXPECTED_DOTENV_KEYS)
         return self
 
     @model_validator(mode="after")

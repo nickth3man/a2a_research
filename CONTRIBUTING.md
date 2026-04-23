@@ -94,7 +94,7 @@ uv run pytest --cov=src/a2a_research
 - **`workflow/`** — PocketFlow runtime (nodes, flows, builders, coordinators)
 - **`agents/`** — Agent invocation functions
 - **`rag/`** — ChromaDB ingestion and retrieval
-- **`ui/`** — Mesop web application
+- **`frontend/`** — React + Vite web application
 - **`models/`** — Shared Pydantic domain types
 
 If you add a new agent, you must register it in **four** places:

@@ -16,7 +16,6 @@ updates:
         patterns:
           - "pocketflow"
           - "pydantic*"
-          - "mesop"
           - "chromadb"
           - "openai"
           - "anthropic"
