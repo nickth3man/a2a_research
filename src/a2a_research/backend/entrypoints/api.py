@@ -200,27 +200,30 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
         client = _a2a.A2AClient(_a2a.get_registry())
         session.budget_consumed = BudgetConsumption()
         try:
-            await asyncio.wait_for(
-                drive(session, client, req.query, budget_from_settings()),
-                timeout=settings.workflow_timeout,
-            )
-        except TimeoutError:
-            session.error = (
-                f"Workflow timed out after {settings.workflow_timeout:.0f}s"
-                " — partial results below."
-            )
-            mark_running_failed(session)
-            logger.warning(
-                "api.workflow.timeout session_id=%s", session.id
-            )
-        except Exception as exc:
-            session.error = str(exc)
-            mark_running_failed(session)
-            logger.exception(
-                "api.workflow.error session_id=%s", session.id
-            )
-        queue.put_nowait(None)
-        return session
+            try:
+                await asyncio.wait_for(
+                    drive(session, client, req.query, budget_from_settings()),
+                    timeout=settings.workflow_timeout,
+                )
+            except TimeoutError:
+                session.error = (
+                    f"Workflow timed out after {settings.workflow_timeout:.0f}s"
+                    " — partial results below."
+                )
+                mark_running_failed(session)
+                logger.warning(
+                    "api.workflow.timeout session_id=%s", session.id
+                )
+            except Exception as exc:
+                session.error = str(exc)
+                mark_running_failed(session)
+                logger.exception(
+                    "api.workflow.error session_id=%s", session.id
+                )
+            return session
+        finally:
+            queue.put_nowait(None)
+            Bus.unregister(session.id)
 
     task = asyncio.create_task(_run())
     _sessions[session.id] = task

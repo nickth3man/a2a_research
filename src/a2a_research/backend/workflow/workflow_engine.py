@@ -52,33 +52,35 @@ async def run_workflow_async(
     session.budget_consumed = BudgetConsumption()
 
     try:
-        await asyncio.wait_for(
-            drive(session, client, query, budget),
-            timeout=settings.workflow_timeout,
-        )
-    except TimeoutError:
-        session.error = (
-            f"Workflow timed out after {settings.workflow_timeout:.0f}s "
-            "— partial results below."
-        )
-        mark_running_failed(session)
-        logger.warning("workflow timed out session_id=%s", session.id)
-    except Exception as exc:
-        session.error = str(exc)
-        mark_running_failed(session)
-        logger.exception("workflow failed session_id=%s", session.id)
+        try:
+            await asyncio.wait_for(
+                drive(session, client, query, budget),
+                timeout=settings.workflow_timeout,
+            )
+        except TimeoutError:
+            session.error = (
+                f"Workflow timed out after {settings.workflow_timeout:.0f}s "
+                "— partial results below."
+            )
+            mark_running_failed(session)
+            logger.warning("workflow timed out session_id=%s", session.id)
+        except Exception as exc:
+            session.error = str(exc)
+            mark_running_failed(session)
+            logger.exception("workflow failed session_id=%s", session.id)
 
-    elapsed_ms = (perf_counter() - started) * 1000
-    logger.info(
-        "workflow done session_id=%s elapsed_ms=%.1f error=%s",
-        session.id,
-        elapsed_ms,
-        session.error,
-    )
-    if progress_queue is not None:
-        progress_queue.put_nowait(None)
-        Bus.unregister(session.id)
-    return session
+        elapsed_ms = (perf_counter() - started) * 1000
+        logger.info(
+            "workflow done session_id=%s elapsed_ms=%.1f error=%s",
+            session.id,
+            elapsed_ms,
+            session.error,
+        )
+        return session
+    finally:
+        if progress_queue is not None:
+            progress_queue.put_nowait(None)
+            Bus.unregister(session.id)
 
 
 def run_workflow_sync(query: str) -> ResearchSession:
