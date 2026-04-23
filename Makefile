@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean serve htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer frontend-install frontend-dev frontend-build frontend-lint
+.PHONY: help install dev test watch lint format format-check typecheck typecheck-ty check all clean serve htmlcov serve-all serve-planner serve-searcher serve-reader serve-fact-checker serve-synthesizer serve-clarifier frontend-install frontend-dev frontend-build frontend-lint
 
 	help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,6 +74,9 @@ serve-fact-checker: ## Start FactChecker HTTP service
 
 serve-synthesizer: ## Start Synthesizer HTTP service
 	uv run python -m a2a_research.backend.agents.pydantic_ai.synthesizer
+
+serve-clarifier: ## Start Clarifier HTTP service
+	uv run python -m a2a_research.backend.agents.pocketflow.clarifier
 
 htmlcov: ## Generate HTML coverage report
 	uv run pytest --cov=src/a2a_research --cov-report=html
