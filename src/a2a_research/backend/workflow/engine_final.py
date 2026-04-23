@@ -7,7 +7,10 @@ from typing import TYPE_CHECKING
 from a2a_research.backend.core.models import AgentRole, AgentStatus
 from a2a_research.backend.core.progress import ProgressPhase
 from a2a_research.backend.workflow.agents import run_agent as _run_agent
-from a2a_research.backend.workflow.coerce import coerce_report
+from a2a_research.backend.workflow.coerce import (
+    claims_from_state,
+    coerce_report,
+)
 from a2a_research.backend.workflow.status import emit_step, set_status
 
 if TYPE_CHECKING:
@@ -47,12 +50,14 @@ async def run_final_stages(
     set_status(
         session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…"
     )
+    verified_claims = claims_from_state(claim_state) if claim_state else []
     syn_result = await _run_agent(
         session,
         client,
         AgentRole.SYNTHESIZER,
         {
             "query": query,
+            "claims": [c.model_dump(mode="json") for c in verified_claims],
             "claim_state": (
                 claim_state.model_dump(mode="json") if claim_state else {}
             ),

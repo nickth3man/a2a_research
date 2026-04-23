@@ -12,7 +12,10 @@ from a2a_research.backend.core.models.errors import (
 )
 from a2a_research.backend.core.progress import ProgressPhase
 from a2a_research.backend.workflow.agents import run_agent as _run_agent
-from a2a_research.backend.workflow.coerce import coerce_report
+from a2a_research.backend.workflow.coerce import (
+    claims_from_state,
+    coerce_report,
+)
 from a2a_research.backend.workflow.status import emit_envelope, emit_step
 
 if TYPE_CHECKING:
@@ -66,12 +69,14 @@ async def run_snapshot_stage(
     claim_state = session.claim_state
     if claim_state is None:
         return False
+    snapshot_claims = claims_from_state(claim_state)
     snapshot_result = await _run_agent(
         session,
         client,
         AgentRole.SYNTHESIZER,
         {
             "query": query,
+            "claims": [c.model_dump(mode="json") for c in snapshot_claims],
             "claim_state": claim_state.model_dump(mode="json"),
             "evidence": [
                 e.model_dump(mode="json") for e in accumulated_evidence
