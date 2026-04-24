@@ -8,10 +8,15 @@ resolution-markers = [
     "python_full_version < '3.13'",
 ]
 
+[manifest]
+members = [
+    "a2a-research",
+]
+
 [[package]]
 name = "a2a-research"
 version = "0.2.0"
-source = { editable = "." }
+source = { editable = "apps/api" }
 dependencies = [
     { name = "a2a-sdk" },
     { name = "ddgs" },

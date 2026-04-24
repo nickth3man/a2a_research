@@ -6,6 +6,7 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       - id: check-json
+        exclude: ^apps/web/tsconfig.*\.json$
       - id: check-toml
       - id: check-added-large-files
         args: ["--maxkb=1000"]
@@ -22,9 +23,9 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^(src/|tests/)/
+        files: ^apps/api/(src|tests)/
       - id: ruff-format
-        files: ^(src/|tests/)/
+        files: ^apps/api/(src|tests)/
 
   - repo: local
     hooks:
@@ -33,16 +34,32 @@ repos:
         entry: uv run mypy
         language: system
         types: [python]
-        files: ^src/
+        files: ^apps/api/src/
         pass_filenames: false
-        args: ["src/"]
+        args: ["--config-file", "apps/api/pyproject.toml", "apps/api/src/"]
         verbose: true
       - id: ty
         name: ty
         entry: uv run ty check
         language: system
         types: [python]
-        files: ^src/
+        files: ^apps/api/src/
         pass_filenames: false
-        args: ["src/"]
+        args: ["apps/api/src/"]
         verbose: true
+
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        files: ^apps/web/.*\.(ts|tsx|json|md|css|html)$
+        types_or: [javascript, jsx, ts, tsx, json, markdown, css, html]
+
+  - repo: local
+    hooks:
+      - id: eslint-web
+        name: eslint (apps/web)
+        entry: bash -c 'args=(); for f in "$@"; do args+=("${f#apps/web/}"); done; exec pnpm -C apps/web exec eslint -- "${args[@]}"' _
+        language: system
+        files: ^apps/web/.*\.(ts|tsx)$
+        pass_filenames: true

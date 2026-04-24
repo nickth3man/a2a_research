@@ -7,87 +7,71 @@ A multi-agent A2A research and verification pipeline. The backend is built with 
 - **Backend:** Python 3.11+, FastAPI, uv (package manager), hatchling (build)
 - **Agent frameworks:** PocketFlow, LangGraph, Pydantic AI, smolagents
 - **Frontend:** React 19, Vite 8, TypeScript 6, ESLint 9
+- **Monorepo:** pnpm workspaces, Turborepo
 - **Testing:** pytest, ruff, mypy, ty
 
 ## Quick Start
 
-1. **Install dependencies and activate dev tools**
+1. **Install all workspace dependencies**
    ```bash
-   make dev
+   pnpm install
    ```
 
-2. **Configure environment variables**
+2. **Install Python dependencies**
+   ```bash
+   cd apps/api
+   uv sync --all-groups
+   ```
+
+3. **Configure environment variables**
    ```bash
    cp .env.example .env
    # Edit .env and add your API keys (OpenRouter, Tavily, Brave, etc.)
    ```
 
-3. **Run tests**
+4. **Run tests**
    ```bash
-   make test
+   turbo run test
    ```
 
-4. **Start the backend**
+5. **Start the API and frontend**
    ```bash
-   make serve
+   turbo run dev
    ```
 
-5. **Start the frontend** (in a separate terminal)
-   ```bash
-   make frontend-dev
-   ```
+The API runs on `http://localhost:8000` and the Vite dev server starts on `http://localhost:5173`.
 
-The unified backend runs on `http://localhost:8000` and the Vite dev server starts on its default port (usually `http://localhost:5173`).
+## Turbo Commands
 
-## Makefile Commands
-
-### Setup
+### Development
 
 | Command | Description |
 |---------|-------------|
-| `make install` | Install Python package with uv |
-| `make dev` | Full dev setup (install + pre-commit hooks) |
-| `make frontend-install` | Install frontend dependencies |
-
-### Development Servers
-
-| Command | Description |
-|---------|-------------|
-| `make serve` | Start unified backend (FastAPI + all agents on port 8000) |
-| `make serve-all` | Start planner/searcher/reader/fact-checker/synthesizer on separate ports |
-| `make serve-planner` | Start Planner HTTP service standalone |
-| `make serve-clarifier` | Start Clarifier HTTP service standalone |
-| `make serve-searcher` | Start Searcher HTTP service standalone |
-| `make serve-reader` | Start Reader HTTP service standalone |
-| `make serve-fact-checker` | Start FactChecker HTTP service standalone |
-| `make serve-synthesizer` | Start Synthesizer HTTP service standalone |
-| `make frontend-dev` | Start Vite dev server for the React frontend |
-| `make frontend-build` | Build production frontend bundle |
+| `pnpm install` | Install all workspace dependencies |
+| `turbo run dev` | Start API and frontend concurrently |
+| `turbo run build` | Build frontend |
+| `turbo run generate` | Generate TypeScript client from OpenAPI spec |
 
 ### Quality & Testing
 
 | Command | Description |
 |---------|-------------|
-| `make test` | Run pytest suite with coverage |
-| `make watch` | Run pytest in watch mode |
-| `make lint` | Run ruff linter and auto-fix issues |
-| `make format` | Format code with ruff |
-| `make typecheck` | Run mypy type checker |
-| `make typecheck-ty` | Run ty type checker |
-| `make check` | Run all quality checks (lint + typecheck + typecheck-ty + format-check) |
-| `make all` | Run tests + all quality checks (CI-ready) |
-| `make frontend-lint` | Lint frontend code |
+| `turbo run test` | Run Python test suite |
+| `turbo run lint` | Run ruff (Python) + eslint (frontend) |
 
-### Utilities
+### Python-specific (from `apps/api/`)
 
 | Command | Description |
 |---------|-------------|
-| `make clean` | Remove build artifacts and cache directories |
-| `make htmlcov` | Generate HTML coverage report |
+| `uv run pytest` | Run pytest suite with coverage |
+| `uv run ruff check src/ tests/` | Run ruff linter |
+| `uv run ruff format src/ tests/` | Format code with ruff |
+| `uv run mypy src/` | Run mypy type checker |
+| `uv run uvicorn a2a_research.backend.entrypoints.api:app --reload` | Start API server |
 
 ## Service & Port Topology
 
-All 12 agents are mounted on the unified backend (`make serve`):
+All 12 agents are mounted on the unified backend (`turbo run dev`):
 
 | Agent | Mount path | Framework |
 |-------|-----------|-----------|
@@ -104,21 +88,12 @@ All 12 agents are mounted on the unified backend (`make serve`):
 | Critic | `/agents/critic` | stub |
 | Postprocessor | `/agents/postprocessor` | stub |
 
-When running standalone (`make serve-all`), the five fully-implemented agents each run on their own port:
-
-| Agent | Port (default) |
-|-------|---------------|
-| Planner | `10001` |
-| Searcher | `10002` |
-| Reader | `10003` |
-| Fact Checker | `10004` |
-| Synthesizer | `10005` |
-
 ## Frontend / Backend Workflow
 
-- The **backend** (`src/a2a_research/backend/`) exposes a FastAPI application that coordinates the multi-agent pipeline.
-- The **frontend** (`frontend/`) is a standard Vite + React app that communicates with the backend.
-- Both can be started independently during development.
+- The **backend** (`apps/api/src/a2a_research/backend/`) exposes a FastAPI application that coordinates the multi-agent pipeline.
+- The **frontend** (`apps/web/`) is a standard Vite + React app that communicates with the backend via the auto-generated TypeScript client.
+- The **contracts** (`packages/contracts/`) package provides a typed SDK generated from the backend's OpenAPI spec.
+- Both API and frontend can be started together with `turbo run dev` or independently.
 
 ## Environment Setup
 
@@ -134,14 +109,25 @@ The `.env.example` file documents all available configuration options, including
 
 ```
 .
-├── src/a2a_research/          # Python source
-│   └── backend/               # FastAPI app, agents, workflow, models
-├── frontend/                  # React + Vite + TypeScript frontend
-├── tests/                     # pytest test suite
-├── Makefile                   # Dev commands
-├── pyproject.toml             # Python project config (uv + hatchling)
-├── .env.example               # Environment variable template
-└── CONTRIBUTING.md            # Detailed contributor guide
+├── apps/
+│   ├── api/                    # Python backend (FastAPI)
+│   │   ├── src/a2a_research/   # Python source code
+│   │   ├── tests/              # pytest test suite
+│   │   ├── pyproject.toml      # Python project config
+│   │   └── package.json        # Turborepo task scripts
+│   └── web/                    # React frontend (Vite)
+│       ├── src/                # React + TypeScript source
+│       └── package.json        # Frontend dependencies
+├── packages/
+│   └── contracts/              # Auto-generated TypeScript client
+│       ├── src/                # Generated SDK from OpenAPI
+│       └── package.json        # @hey-api/openapi-ts codegen
+├── turbo.json                  # Turborepo pipeline config
+├── pnpm-workspace.yaml         # Workspace package definitions
+├── package.json                # Root workspace config
+├── pyproject.toml              # Root uv workspace config
+├── .env.example                # Environment variable template
+└── CONTRIBUTING.md             # Detailed contributor guide
 ```
 
 ## Contributing

@@ -1,0 +1,24 @@
+{
+  "name": "@a2a/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "openapi-ts"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "^0.67.0",
+    "@hey-api/client-fetch": "^0.10.0",
+    "typescript": "~6.0.2"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/types.gen.ts",
+      "default": "./src/index.ts"
+    },
+    "./client": {
+      "types": "./src/client.ts",
+      "default": "./src/client.ts"
+    }
+  }
+}

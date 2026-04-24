@@ -1,0 +1,10 @@
+{
+  "name": "@a2a/api",
+  "private": true,
+  "scripts": {
+    "dev": "uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload",
+    "test": "uv run pytest",
+    "lint": "uv run ruff check src/ tests/",
+    "typecheck": "uv run mypy src/"
+  }
+}

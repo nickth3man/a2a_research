@@ -1,0 +1,15 @@
+{
+  "name": "@a2a/root",
+  "private": true,
+  "devDependencies": {
+    "turbo": "^2"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "generate": "turbo run generate"
+  },
+  "packageManager": "pnpm@10.30.3"
+}

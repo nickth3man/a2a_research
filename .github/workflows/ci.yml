@@ -14,14 +14,41 @@ permissions:
   contents: read
 
 jobs:
-  lint:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      contracts: ${{ steps.filter.outputs.contracts }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'apps/api/**'
+            frontend:
+              - 'apps/web/**'
+            contracts:
+              - 'packages/contracts/**'
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: [changes]
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout repository
+        if: needs.changes.outputs.python == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
       - name: Set up uv
+        if: needs.changes.outputs.python == 'true'
         uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           version: "0.6.14"
@@ -29,41 +56,53 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
+        if: needs.changes.outputs.python == 'true'
         run: uv python install 3.11
 
       - name: Install lint dependencies
+        if: needs.changes.outputs.python == 'true'
         run: |
           uv sync --group lint
           uv cache prune --ci
 
       - name: Lint with Ruff
+        if: needs.changes.outputs.python == 'true'
         run: uv run ruff check src/ tests/
 
       - name: Check formatting with Ruff
+        if: needs.changes.outputs.python == 'true'
         run: uv run ruff format --check src/ tests/
 
       - name: Type check with mypy
+        if: needs.changes.outputs.python == 'true'
         run: uv run mypy src/
 
       - name: Type check with ty
+        if: needs.changes.outputs.python == 'true'
         run: uv run ty check src/
 
       - name: Verify lockfile is up to date
+        if: needs.changes.outputs.python == 'true'
         run: uv lock --check
 
   test:
     runs-on: ubuntu-latest
+    needs: [changes]
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/api
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
-
     steps:
       - name: Checkout repository
+        if: needs.changes.outputs.python == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up uv
+        if: needs.changes.outputs.python == 'true'
         uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           version: "0.6.14"
@@ -71,18 +110,21 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Set up Python ${{ matrix.python-version }}
+        if: needs.changes.outputs.python == 'true'
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install test dependencies
+        if: needs.changes.outputs.python == 'true'
         run: |
           uv sync --group test
           uv cache prune --ci
 
       - name: Run tests
+        if: needs.changes.outputs.python == 'true'
         run: uv run pytest --cov-report=xml
 
       - name: Upload coverage to Codecov
-        if: matrix.python-version == '3.11'
+        if: needs.changes.outputs.python == 'true' && matrix.python-version == '3.11'
         uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           files: ./coverage.xml
@@ -91,7 +133,7 @@ jobs:
           verbose: true
 
       - name: Upload coverage artifact
-        if: matrix.python-version == '3.11'
+        if: needs.changes.outputs.python == 'true' && matrix.python-version == '3.11'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-${{ matrix.python-version }}
@@ -99,12 +141,18 @@ jobs:
 
   security:
     runs-on: ubuntu-latest
+    needs: [changes]
     timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - name: Checkout repository
+        if: needs.changes.outputs.python == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up uv
+        if: needs.changes.outputs.python == 'true'
         uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
         with:
           version: "0.6.14"
@@ -112,41 +160,109 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Set up Python
+        if: needs.changes.outputs.python == 'true'
         run: uv python install 3.11
 
       - name: Install dependencies
+        if: needs.changes.outputs.python == 'true'
         run: |
           uv sync --all-groups
           uv cache prune --ci
 
       - name: Run bandit security linter
+        if: needs.changes.outputs.python == 'true'
         run: uv run bandit -r src/ -q --severity-level medium --confidence-level high
 
       - name: Run pip-audit
+        if: needs.changes.outputs.python == 'true'
         run: uv run pip-audit
 
   frontend:
     runs-on: ubuntu-latest
+    needs: [changes]
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: frontend
+        working-directory: apps/web
     steps:
       - name: Checkout repository
+        if: needs.changes.outputs.frontend == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Install pnpm
+        if: needs.changes.outputs.frontend == 'true'
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f2226a9389bd195a6d0 # v4.1.1
+
       - name: Set up Node.js
+        if: needs.changes.outputs.frontend == 'true'
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          cache: "pnpm"
+          cache-dependency-path: apps/web/package.json
 
       - name: Install dependencies
-        run: npm ci
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm install
 
       - name: Lint frontend
-        run: npm run lint
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm run lint
 
       - name: Build frontend
-        run: npm run build
+        if: needs.changes.outputs.frontend == 'true'
+        run: pnpm run build
+
+  contracts:
+    runs-on: ubuntu-latest
+    needs: [changes]
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - name: Checkout repository
+        if: needs.changes.outputs.python == 'true'
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up uv
+        if: needs.changes.outputs.python == 'true'
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          version: "0.6.14"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        if: needs.changes.outputs.python == 'true'
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        if: needs.changes.outputs.python == 'true'
+        run: |
+          uv sync --all-groups
+          uv cache prune --ci
+
+      - name: Start API server
+        if: needs.changes.outputs.python == 'true'
+        run: |
+          uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+
+      - name: Install pnpm
+        if: needs.changes.outputs.python == 'true'
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f2226a9389bd195a6d0 # v4.1.1
+
+      - name: Set up Node.js
+        if: needs.changes.outputs.python == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Generate TypeScript client
+        if: needs.changes.outputs.python == 'true'
+        working-directory: packages/contracts
+        run: |
+          pnpm install
+          pnpm generate

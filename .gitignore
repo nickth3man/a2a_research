@@ -46,6 +46,10 @@ venv.bak/
 .uv-cache/
 uv-cache/
 
+# JavaScript / frontend tooling
+node_modules/
+.turbo/
+
 # Additional IDEs
 .fleet/
 .zed/
@@ -55,6 +59,7 @@ uv-cache/
 .tox/
 .nox/
 .dmypy.json
+.sisyphus/
 
 # Windows
 *.stackdump
