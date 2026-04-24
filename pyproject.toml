@@ -61,6 +61,8 @@ exclude = [
     ".mypy_cache",
     ".ruff_cache",
     ".pytest_cache",
+    "debug_*.py",
+    "test_monkey*.py",
 ]
 
 [tool.ruff.lint]
