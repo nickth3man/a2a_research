@@ -61,6 +61,8 @@ exclude = [
     ".mypy_cache",
     ".ruff_cache",
     ".pytest_cache",
+    "debug_*.py",
+    "test_monkey*.py",
 ]
 
 [tool.ruff.lint]
@@ -126,6 +128,10 @@ filterwarnings = [
     # as random xdist failures in unrelated async tests. Same workaround used by
     # aiogram, home-assistant/supervisor, Prefect, gunicorn, litestar, etc.
     "ignore::pytest.PytestUnraisableExceptionWarning",
+    # lark (via rfc3987_syntax→jsonschema→mcp→pydantic_ai) imports the
+    # deprecated sre_parse stdlib shim on Python 3.12; not our code to fix.
+    # lark also imports sre_constants, sre_compile via the same chain.
+    "ignore:module 'sre_.*' is deprecated:DeprecationWarning",
 ]
 
 [tool.mypy]

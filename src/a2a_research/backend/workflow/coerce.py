@@ -26,6 +26,7 @@ from a2a_research.backend.tools import PageContent, WebHit
 logger = get_logger(__name__)
 
 __all__ = [
+    "claims_from_state",
     "coerce_claim_state",
     "coerce_claims",
     "coerce_dag",
@@ -97,6 +98,8 @@ def coerce_claim_state(
     if isinstance(raw, ClaimState):
         state = raw
     elif isinstance(raw, dict):
+        if not raw:
+            return None
         try:
             state = ClaimState.model_validate(raw)
         except ValidationError:
@@ -183,6 +186,24 @@ def coerce_report(raw: Any) -> ReportOutput | None:
         except ValidationError:
             pass
     return None
+
+
+def claims_from_state(claim_state: ClaimState) -> list[Claim]:
+    """Return original claims with their verification verdicts merged in."""
+    result: list[Claim] = []
+    for claim in claim_state.original_claims:
+        v = claim_state.verification.get(claim.id)
+        if v is not None:
+            sources = v.supporting_evidence_ids or claim.sources
+            claim = claim.model_copy(
+                update={
+                    "verdict": v.verdict,
+                    "confidence": v.confidence,
+                    "sources": sources,
+                }
+            )
+        result.append(claim)
+    return result
 
 
 def merge_verified_claims_into_state(

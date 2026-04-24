@@ -23,7 +23,20 @@ class TestAppSettings:
         env_file = tmp_path / ".env"
         env_file.write_text("BAD_KEY=value\n")
 
-        with patch("a2a_research.backend.core.settings._ENV_FILE", env_file):
+        with (
+            patch(
+                "a2a_research.backend.core.settings._ENV_FILE",
+                env_file,
+            ),
+            patch(
+                "a2a_research.backend.core.settings.ENV_FILE",
+                env_file,
+            ),
+            patch(
+                "a2a_research.backend.core.settings.settings_core._env_file",
+                return_value=env_file,
+            ),
+        ):
             settings = AppSettings()
 
         assert "Unknown keys in .env: BAD_KEY" in caplog.text
@@ -78,7 +91,18 @@ class TestAppSettings:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch(
+                "a2a_research.backend.core.settings._ENV_FILE",
+                empty_env,
+            ),
+            patch(
+                "a2a_research.backend.core.settings.ENV_FILE",
+                empty_env,
+            ),
+            patch(
+                "a2a_research.backend.core.settings.settings_core._env_file",
+                return_value=empty_env,
+            ),
             patch(
                 "a2a_research.backend.core.settings.dotenv_values",
                 return_value={},

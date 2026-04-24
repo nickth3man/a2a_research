@@ -110,9 +110,9 @@ class TestSetupLogging:
         with patches[0], patches[1], patches[2]:
             import a2a_research.backend.core.logging.app_logging as logging_mod
 
-            original = logging_mod._CONFIGURED
+            original = logging_mod._configured
             try:
-                logging_mod._CONFIGURED = False
+                logging_mod._configured = False
                 setup_logging()
                 handler_count = len(logging.getLogger().handlers)
                 setup_logging()
@@ -123,7 +123,7 @@ class TestSetupLogging:
                     root.removeHandler(handler)
                 for handler in existing_handlers:
                     root.addHandler(handler)
-                logging_mod._CONFIGURED = original
+                logging_mod._configured = original
 
     def test_get_logger_triggers_setup(self, tmp_path: Path) -> None:
         def make_file_handler(
@@ -155,9 +155,9 @@ class TestSetupLogging:
         with patches[0], patches[1], patches[2]:
             import a2a_research.backend.core.logging.app_logging as logging_mod
 
-            original = logging_mod._CONFIGURED
+            original = logging_mod._configured
             try:
-                logging_mod._CONFIGURED = False
+                logging_mod._configured = False
                 logger = get_logger("test.module")
                 assert isinstance(logger, logging.Logger)
                 assert logger.name == "test.module"
@@ -167,4 +167,4 @@ class TestSetupLogging:
                     root.removeHandler(handler)
                 for handler in existing_handlers:
                     root.addHandler(handler)
-                logging_mod._CONFIGURED = original
+                logging_mod._configured = original

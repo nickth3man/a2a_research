@@ -96,3 +96,7 @@ notes/
 *.bak
 *.orig
 *.rej
+
+# Debug / throwaway scripts (repo root only)
+/debug_*.py
+/test_monkey*.py

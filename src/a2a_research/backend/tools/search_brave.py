@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import time as _time
 from typing import Any
 
 import httpx
@@ -23,16 +25,29 @@ _BRAVE_PROVIDER = "brave"
 _BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 _BRAVE_MIN_INTERVAL_SEC = 1.1
 _BRAVE_MAX_RETRIES = 3
-_brave_lock = asyncio.Lock()
+_brave_lock = threading.Lock()
 _brave_last_call_ts = 0.0
 
 
 async def _brave_throttle() -> None:
+    """Rate-limit Brave requests to _BRAVE_MIN_INTERVAL_SEC between calls.
+
+    Uses a threading.Lock (not asyncio.Lock) so it works across event loops
+    created by asyncio.to_thread → new_event_loop in the smolagents path.
+    The slot-reservation pattern ensures correct serialization without holding
+    the lock across the async sleep.
+    """
     global _brave_last_call_ts
-    now = asyncio.get_event_loop().time()
-    gap = now - _brave_last_call_ts
-    if gap < _BRAVE_MIN_INTERVAL_SEC:
-        delay = _BRAVE_MIN_INTERVAL_SEC - gap
+    delay = 0.0
+    with _brave_lock:
+        now = _time.monotonic()
+        gap = now - _brave_last_call_ts
+        if gap < _BRAVE_MIN_INTERVAL_SEC:
+            delay = _BRAVE_MIN_INTERVAL_SEC - gap
+            _brave_last_call_ts = now + delay
+        else:
+            _brave_last_call_ts = now
+    if delay > 0:
         emit_rate_limit(
             AgentRole.SEARCHER,
             provider="brave",
@@ -43,7 +58,6 @@ async def _brave_throttle() -> None:
             session_id=current_session_id(),
         )
         await asyncio.sleep(delay)
-    _brave_last_call_ts = asyncio.get_event_loop().time()
 
 
 def _parse_retry_after(headers: httpx.Headers, attempt: int) -> float:
@@ -75,17 +89,16 @@ async def search_brave(
     try:
         async with httpx.AsyncClient() as client:
             for attempt in range(_BRAVE_MAX_RETRIES + 1):
-                async with _brave_lock:
-                    await _brave_throttle()
-                    response = await client.get(
-                        _BRAVE_SEARCH_URL,
-                        params={"q": query, "count": count},
-                        headers={
-                            "Accept": "application/json",
-                            "X-Subscription-Token": api_key,
-                        },
-                        timeout=30.0,
-                    )
+                await _brave_throttle()
+                response = await client.get(
+                    _BRAVE_SEARCH_URL,
+                    params={"q": query, "count": count},
+                    headers={
+                        "Accept": "application/json",
+                        "X-Subscription-Token": api_key,
+                    },
+                    timeout=30.0,
+                )
                 text = response.text
                 if (
                     response.status_code != 429

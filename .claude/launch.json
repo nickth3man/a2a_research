@@ -1,54 +1,31 @@
 {
-  "version": "0.0.1",
+  "version": "0.2.0",
   "configurations": [
     {
-      "name": "Frontend (Vite)",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "name": "Backend (unified)",
+      "type": "process",
+      "command": "uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload",
+      "description": "FastAPI gateway + all 12 agents mounted at /agents/* on port 8000"
+    },
+    {
+      "name": "Frontend",
+      "type": "process",
+      "command": "npm run dev",
       "cwd": "frontend",
-      "port": 5173
+      "description": "Vite dev server (default port 5173)"
     },
     {
-      "name": "API Gateway (FastAPI)",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "uvicorn", "a2a_research.backend.entrypoints.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"],
-      "port": 8000
-    },
+      "name": "Backend agents (standalone)",
+      "type": "process",
+      "command": "uv run python -m a2a_research.backend.entrypoints.launcher",
+      "description": "Run planner/searcher/reader/fact-checker/synthesizer on separate ports"
+    }
+  ],
+  "compounds": [
     {
-      "name": "Agents – All",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.entrypoints.launcher"],
-      "port": 10001
-    },
-    {
-      "name": "Agent – Planner",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.pocketflow.planner"],
-      "port": 10001
-    },
-    {
-      "name": "Agent – Searcher",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.smolagents.searcher"],
-      "port": 10002
-    },
-    {
-      "name": "Agent – Reader",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.smolagents.reader"],
-      "port": 10003
-    },
-    {
-      "name": "Agent – FactChecker",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.langgraph.fact_checker"],
-      "port": 10004
-    },
-    {
-      "name": "Agent – Synthesizer",
-      "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "-m", "a2a_research.backend.agents.pydantic_ai.synthesizer"],
-      "port": 10005
+      "name": "Full Stack",
+      "configurations": ["Backend (unified)", "Frontend"],
+      "description": "Start backend + frontend together"
     }
   ]
 }

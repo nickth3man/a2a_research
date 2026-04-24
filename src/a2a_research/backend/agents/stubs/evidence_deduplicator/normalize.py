@@ -34,7 +34,6 @@ def normalize_pages_to_evidence(
                     "publisher_id": publisher_id,
                     "syndication_cluster_id": None,
                     "published_at": None,
-                    "fetched_at": "",
                     "content_hash": ev_id,
                     "main_text": content,
                     "quoted_passages": [

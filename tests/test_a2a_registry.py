@@ -49,7 +49,7 @@ class TestAgentRegistryGetUrl:
 
     def test_custom_planner_url(self) -> None:
         reg = AgentRegistry(planner_url="http://custom:9999")
-        assert reg.get_url(AgentRole.PLANNER) == "http://custom:9999"
+        assert reg.get_url(AgentRole.PLANNER) == "http://custom:9999/"
 
     def test_all_roles_have_url(self) -> None:
         reg = AgentRegistry()

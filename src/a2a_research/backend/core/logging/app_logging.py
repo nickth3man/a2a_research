@@ -28,8 +28,8 @@ from .exception_logging import install_exception_hooks
 from .logging_formatters import (
     A2aSdkFilter,
     HttpClientsFilter,
-    ServerRuntimeFilter,
     PrefixFilter,
+    ServerRuntimeFilter,
     WarningsFilter,
     build_formatter,
     log_event,
@@ -93,7 +93,9 @@ def setup_logging() -> None:
     a2a_sdk_handler.addFilter(A2aSdkFilter())
     http_handler = _file_handler(_LOG_HTTP_CLIENTS, level, formatter)
     http_handler.addFilter(HttpClientsFilter())
-    server_runtime_handler = _file_handler(_LOG_SERVER_RUNTIME, level, formatter)
+    server_runtime_handler = _file_handler(
+        _LOG_SERVER_RUNTIME, level, formatter
+    )
     server_runtime_handler.addFilter(ServerRuntimeFilter())
     warnings_handler = _file_handler(_LOG_WARNINGS, level, formatter)
     warnings_handler.addFilter(WarningsFilter())

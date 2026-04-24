@@ -15,10 +15,21 @@ from a2a_research.backend.agents.langgraph.fact_checker import (
 from a2a_research.backend.agents.pocketflow.planner import (
     nodes as planner_nodes,
 )
+from a2a_research.backend.agents.pocketflow.planner import (
+    nodes_base as planner_nodes_base,
+)
 from a2a_research.backend.agents.pydantic_ai.synthesizer import (
     agent as synth_agent,
 )
-from a2a_research.backend.agents.smolagents.reader import core as reader_core
+from a2a_research.backend.agents.smolagents.reader import (
+    agent as reader_agent,
+)
+from a2a_research.backend.agents.smolagents.reader import (
+    core as reader_core,
+)
+from a2a_research.backend.agents.smolagents.searcher import (
+    agent as searcher_agent,
+)
 from a2a_research.backend.agents.smolagents.searcher import (
     core as searcher_core,
 )
@@ -73,6 +84,30 @@ def _configure_success_path(
     )
     monkeypatch.setattr(planner_nodes, "get_llm", lambda: planner_model)
     monkeypatch.setattr(
+        planner_nodes_base,
+        "get_llm",
+        lambda: planner_model,
+    )
+    searcher_agent.reset_agent_cache()
+    monkeypatch.setattr(
+        searcher_agent,
+        "build_agent",
+        lambda: _FakeJSONAgent(
+            {
+                "queries_used": ["JWST launch date"],
+                "hits": [
+                    {
+                        "url": "https://nasa.example/jwst",
+                        "title": "NASA JWST",
+                        "snippet": "launched 2021",
+                        "source": "tavily",
+                        "score": 0.9,
+                    }
+                ],
+            }
+        ),
+    )
+    monkeypatch.setattr(
         searcher_core,
         "build_agent",
         lambda: _FakeJSONAgent(
@@ -87,6 +122,25 @@ def _configure_success_path(
                         "score": 0.9,
                     }
                 ],
+            }
+        ),
+    )
+    reader_agent.reset_agent_cache()
+    monkeypatch.setattr(
+        reader_agent,
+        "build_agent",
+        lambda: _FakeJSONAgent(
+            {
+                "pages": [
+                    {
+                        "url": "https://nasa.example/jwst",
+                        "title": "NASA JWST",
+                        "markdown": (
+                            "# NASA\n\nJWST launched December 25, 2021."
+                        ),
+                        "word_count": 6,
+                    }
+                ]
             }
         ),
     )

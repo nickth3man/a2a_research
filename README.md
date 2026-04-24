@@ -54,7 +54,13 @@ The unified backend runs on `http://localhost:8000` and the Vite dev server star
 | Command | Description |
 |---------|-------------|
 | `make serve` | Start unified backend (FastAPI + all agents on port 8000) |
-| `make serve-all` | Start all agent services on separate ports (standalone mode) |
+| `make serve-all` | Start planner/searcher/reader/fact-checker/synthesizer on separate ports |
+| `make serve-planner` | Start Planner HTTP service standalone |
+| `make serve-clarifier` | Start Clarifier HTTP service standalone |
+| `make serve-searcher` | Start Searcher HTTP service standalone |
+| `make serve-reader` | Start Reader HTTP service standalone |
+| `make serve-fact-checker` | Start FactChecker HTTP service standalone |
+| `make serve-synthesizer` | Start Synthesizer HTTP service standalone |
 | `make frontend-dev` | Start Vite dev server for the React frontend |
 | `make frontend-build` | Build production frontend bundle |
 
@@ -62,7 +68,7 @@ The unified backend runs on `http://localhost:8000` and the Vite dev server star
 
 | Command | Description |
 |---------|-------------|
-| `make test` | Run pytest suite (excludes live API integration tests) |
+| `make test` | Run pytest suite with coverage |
 | `make watch` | Run pytest in watch mode |
 | `make lint` | Run ruff linter and auto-fix issues |
 | `make format` | Format code with ruff |
@@ -71,14 +77,6 @@ The unified backend runs on `http://localhost:8000` and the Vite dev server star
 | `make check` | Run all quality checks (lint + typecheck + typecheck-ty + format-check) |
 | `make all` | Run tests + all quality checks (CI-ready) |
 | `make frontend-lint` | Lint frontend code |
-
-### Live API Tests
-
-| Command | Description |
-|---------|-------------|
-| `make test-live-brave` | Run Brave live API tests |
-| `make test-live-tavily` | Run Tavily live API tests |
-| `make test-live` | Run all live API tests |
 
 ### Utilities
 
@@ -89,22 +87,32 @@ The unified backend runs on `http://localhost:8000` and the Vite dev server star
 
 ## Service & Port Topology
 
-By default, all agents are mounted on the unified backend:
+All 12 agents are mounted on the unified backend (`make serve`):
 
-- **Backend:** `http://localhost:8000`
-  - Planner: `/agents/planner`
-  - Searcher: `/agents/searcher`
-  - Reader: `/agents/reader`
-  - FactChecker: `/agents/fact-checker`
-  - Synthesizer: `/agents/synthesizer`
+| Agent | Mount path | Framework |
+|-------|-----------|-----------|
+| Preprocessor | `/agents/preprocessor` | stub |
+| Clarifier | `/agents/clarifier` | PocketFlow |
+| Planner | `/agents/planner` | PocketFlow |
+| Searcher | `/agents/searcher` | smolagents |
+| Ranker | `/agents/ranker` | stub |
+| Reader | `/agents/reader` | smolagents |
+| Evidence Deduplicator | `/agents/evidence-deduplicator` | stub |
+| Fact Checker | `/agents/fact-checker` | LangGraph |
+| Adversary | `/agents/adversary` | stub |
+| Synthesizer | `/agents/synthesizer` | Pydantic AI |
+| Critic | `/agents/critic` | stub |
+| Postprocessor | `/agents/postprocessor` | stub |
 
-When running standalone (`make serve-all`), each agent runs on its own port:
+When running standalone (`make serve-all`), the five fully-implemented agents each run on their own port:
 
-- Planner: `10001`
-- Searcher: `10002`
-- Reader: `10003`
-- FactChecker: `10004`
-- Synthesizer: `10005`
+| Agent | Port (default) |
+|-------|---------------|
+| Planner | `10001` |
+| Searcher | `10002` |
+| Reader | `10003` |
+| Fact Checker | `10004` |
+| Synthesizer | `10005` |
 
 ## Frontend / Backend Workflow
 

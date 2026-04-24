@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import threading
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,9 +48,7 @@ class HttpClientsFilter:
 
 @dataclass(frozen=True)
 class ServerRuntimeFilter:
-    _roots: frozenset[str] = frozenset(
-        {"flask", "werkzeug", "uvicorn"}
-    )
+    _roots: frozenset[str] = frozenset({"flask", "werkzeug", "uvicorn"})
 
     def filter(self, record: logging.LogRecord) -> bool:
         base = record.name.split(".", 1)[0]
@@ -77,16 +75,16 @@ def _normalize_log_value(value: Any) -> Any:
             normalized_dict[str(key)] = _normalize_log_value(dict_value)
         return normalized_dict
     if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
-        items = cast("Iterable[Any]", value)
-        return [_normalize_log_value(item) for item in items]
+        return [_normalize_log_value(item) for item in value]
 
     enum_value = getattr(value, "value", sentinel)
     if enum_value is not sentinel:
         return _normalize_log_value(enum_value)
 
     model_dump = getattr(value, "model_dump", sentinel)
-    if callable(model_dump):
-        return _normalize_log_value(model_dump())
+    if model_dump is not sentinel and callable(model_dump):
+        model_dump_func = cast("Callable[[], Any]", model_dump)
+        return _normalize_log_value(model_dump_func())
 
     if hasattr(value, "__dict__"):
         return _normalize_log_value(vars(value))
@@ -123,8 +121,8 @@ def build_formatter() -> logging.Formatter:
 __all__ = [
     "A2aSdkFilter",
     "HttpClientsFilter",
-    "ServerRuntimeFilter",
     "PrefixFilter",
+    "ServerRuntimeFilter",
     "WarningsFilter",
     "build_formatter",
     "log_event",

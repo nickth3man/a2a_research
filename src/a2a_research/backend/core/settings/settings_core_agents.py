@@ -6,7 +6,8 @@ from pydantic import Field, field_validator
 
 
 def _normalize_agent_url(url: str) -> str:
-    """Ensure mounted agent URLs always target the canonical trailing-slash path."""
+    """Ensure mounted agent URLs always target the canonical
+    trailing-slash path."""
 
     return url.rstrip("/") + "/"
 

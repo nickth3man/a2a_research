@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException
@@ -17,17 +16,18 @@ from a2a_research.backend.core.progress.progress_utils import (
     drain_progress_while_running,
 )
 from a2a_research.backend.entrypoints.agent_mounts import mount_agents
+from a2a_research.backend.entrypoints.api_serializers import (
+    PHASE_TO_EVENT,
+    serialize_progress,
+    serialize_result,
+    sse,
+)
 from a2a_research.backend.workflow.status import mark_running_failed
-from a2a_research.backend.workflow.workflow_engine import run_workflow_async
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from a2a_research.backend.core.models.claims import Claim
-    from a2a_research.backend.core.models.errors import ErrorEnvelope
-    from a2a_research.backend.core.models.reports import WebSource
     from a2a_research.backend.core.models.session import ResearchSession
-    from a2a_research.backend.core.progress.progress_types import ProgressEvent
 
 logger = get_logger(__name__)
 
@@ -41,111 +41,6 @@ app.add_middleware(
 )
 
 _sessions: dict[str, asyncio.Task[ResearchSession]] = {}
-
-_ROLE_NORM: dict[str, str] = {"evidence_deduplicator": "deduplicator"}
-
-# SSE phases that map to non-progress event names
-_PHASE_TO_EVENT: dict[str, str] = {
-    "warning": "warning",
-    "retrying": "retrying",
-    "degraded_mode": "degraded_mode",
-    "final_diagnostics": "final_diagnostics",
-}
-
-
-def _normalize_role(role: str | None) -> str | None:
-    if role is None:
-        return None
-    return _ROLE_NORM.get(role, role)
-
-
-def _normalize_verdict(verdict: str) -> str:
-    if verdict in ("SUPPORTED", "REFUTED"):
-        return verdict
-    return "UNVERIFIABLE"
-
-
-def _sse(event: str, data: dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
-
-
-def _serialize_envelope(envelope: ErrorEnvelope) -> dict[str, Any]:
-    return {
-        "role": _normalize_role(str(envelope.role) if envelope.role else None),
-        "code": envelope.code,
-        "severity": envelope.severity,
-        "retryable": envelope.retryable,
-        "root_cause": envelope.root_cause,
-        "remediation": envelope.remediation,
-        "trace_id": envelope.trace_id,
-    }
-
-
-def _serialize_progress(event: ProgressEvent) -> dict[str, Any]:
-    data: dict[str, Any] = {
-        "type": "progress",
-        "session_id": event.session_id,
-        "phase": event.phase,
-        "role": _normalize_role(str(event.role) if event.role else None),
-        "step_index": event.step_index,
-        "total_steps": event.total_steps,
-        "substep_label": event.substep_label,
-        "substep_index": event.substep_index,
-        "substep_total": event.substep_total,
-        "detail": event.detail,
-        "elapsed_ms": event.elapsed_ms,
-    }
-    if event.envelope is not None:
-        data["envelope"] = _serialize_envelope(event.envelope)
-    return data
-
-
-def _serialize_claim(claim: Claim) -> dict[str, Any]:
-    return {
-        "text": claim.text,
-        "verdict": _normalize_verdict(str(claim.verdict)),
-        "confidence": claim.confidence,
-        "sources": list(claim.sources),
-        "evidence": (
-            claim.evidence_snippets[0] if claim.evidence_snippets else None
-        ),
-    }
-
-
-def _serialize_source(source: WebSource) -> dict[str, str]:
-    return {"url": source.url, "title": source.title}
-
-
-def _serialize_result(session: ResearchSession) -> dict[str, Any]:
-    return {
-        "type": "result",
-        "session_id": session.id,
-        "report": session.final_report,
-        "sources": [_serialize_source(s) for s in session.sources],
-        "claims": [_serialize_claim(c) for c in session.claims],
-        "diagnostics": [
-            _serialize_envelope(e) for e in session.error_ledger
-        ],
-        "error": session.error,
-    }
-
-
-async def _run_workflow(
-    session_id: str,
-    query: str,
-    queue: asyncio.Queue[Any],
-) -> ResearchSession:
-    logger.info(
-        "api.workflow.start session_id=%s query=%r", session_id, query
-    )
-    # run_workflow_async creates its own session; we need it to use the
-    # already-registered queue. Register before calling so the engine
-    # picks it up on Bus.get().
-    session = await run_workflow_async(query, progress_queue=queue)
-    logger.info(
-        "api.workflow.done session_id=%s error=%s", session_id, session.error
-    )
-    return session
 
 
 class ResearchRequest(BaseModel):
@@ -163,19 +58,6 @@ async def health() -> dict[str, str]:
 
 @app.post("/api/research", response_model=ResearchResponse)
 async def start_research(req: ResearchRequest) -> ResearchResponse:
-    # Pre-generate a placeholder session_id for the SSE route; the real
-    # session id is assigned inside run_workflow_async. We use a queue
-    # handshake: the queue is registered by run_workflow_async using its
-    # internal session id, so we let it drive. We store the task keyed
-    # by a temporary key and update after the session id is known.
-    #
-    # Simpler approach: create a dedicated queue here; run_workflow_async
-    # accepts an optional progress_queue and registers it internally.
-    # We expose the session_id from the ResearchSession returned by the task.
-    # But the SSE client needs the session_id before the task finishes.
-    #
-    # Solution: create session id first here using ResearchSession, register
-    # queue, then pass query + pre-created queue to engine.
     from a2a_research.backend.core.models import ResearchSession
     from a2a_research.backend.workflow.definitions import STEP_INDEX
 
@@ -186,8 +68,6 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
     queue: asyncio.Queue[Any] = asyncio.Queue()
     Bus.register(session.id, queue)
 
-    # Run the workflow, passing the pre-registered queue so the engine
-    # reuses it rather than creating a new one.
     async def _run() -> ResearchSession:
         import a2a_research.backend.core.a2a as _a2a
         from a2a_research.backend.core.models import BudgetConsumption
@@ -207,7 +87,8 @@ async def start_research(req: ResearchRequest) -> ResearchResponse:
                 )
             except TimeoutError:
                 session.error = (
-                    f"Workflow timed out after {settings.workflow_timeout:.0f}s"
+                    f"Workflow timed out after "
+                    f"{settings.workflow_timeout:.0f}s"
                     " — partial results below."
                 )
                 mark_running_failed(session)
@@ -238,7 +119,7 @@ async def _stream_events(
     queue = Bus.get(session_id)
 
     if task is None or queue is None:
-        yield _sse(
+        yield sse(
             "app-error",
             {
                 "type": "error",
@@ -251,13 +132,13 @@ async def _stream_events(
     try:
         async for event in drain_progress_while_running(queue, task):
             phase = str(event.phase) if event.phase else ""
-            sse_event = _PHASE_TO_EVENT.get(phase, "progress")
-            yield _sse(sse_event, _serialize_progress(event))
+            sse_event = PHASE_TO_EVENT.get(phase, "progress")
+            yield sse(sse_event, serialize_progress(event))
 
         try:
             session = await task
         except Exception as exc:
-            yield _sse(
+            yield sse(
                 "app-error",
                 {
                     "type": "error",
@@ -269,7 +150,7 @@ async def _stream_events(
             return
 
         if session.error:
-            yield _sse(
+            yield sse(
                 "app-error",
                 {
                     "type": "error",
@@ -278,7 +159,7 @@ async def _stream_events(
                 },
             )
 
-        yield _sse("result", _serialize_result(session))
+        yield sse("result", serialize_result(session))
         _sessions.pop(session_id, None)
     finally:
         Bus.unregister(session_id)

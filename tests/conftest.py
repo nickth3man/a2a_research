@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load repo ``.env`` first so real keys win over the placeholders below. Pytest

@@ -77,6 +77,12 @@ async def drive(
         provenance_tree,
     )
 
+    # Populate session.claims from verified claim_state for the API serializer.
+    if claim_state and claim_state.original_claims:
+        from a2a_research.backend.workflow.coerce import claims_from_state
+
+        session.claims = claims_from_state(claim_state)
+
     emit_step(
         session.id, None, ProgressPhase.STEP_COMPLETED, "workflow_completed"
     )
