@@ -63,6 +63,20 @@ interface ErrorMsg {
   message: string;
 }
 
+const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
+
+
+function authHeaders(): HeadersInit {
+  return API_KEY ? { "X-API-Key": API_KEY } : {};
+}
+
+
+function streamUrl(sessionId: string): string {
+  const base = `/api/research/${sessionId}/stream`;
+  if (!API_KEY) return base;
+  return `${base}?api_key=${encodeURIComponent(API_KEY)}`;
+}
+
 async function readErrorMessage(resp: Response): Promise<string> {
   try {
     const payload = (await resp.json()) as {
@@ -92,7 +106,7 @@ export async function startResearch(
   try {
     resp = await fetch("/api/research", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ query }),
       signal: ctrl.signal,
     });
@@ -116,7 +130,7 @@ export async function startResearch(
     cb.onError("Invalid response from research API");
     return { cleanup: () => {}, session_id: "" };
   }
-  const es = new EventSource(`/api/research/${session_id}/stream`);
+  const es = new EventSource(streamUrl(session_id));
 
   const handleProgress = (e: MessageEvent) => {
     try {

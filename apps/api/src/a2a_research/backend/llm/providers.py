@@ -179,7 +179,9 @@ class OpenRouterChatModel:
             _raise_provider_error(exc, model=self._model, endpoint=endpoint)
 
         _log_request_success(started_at, "chat", self._model, endpoint)
-        assert response is not None
+        if response is None:
+            msg = "Provider returned no response."
+            raise ProviderRequestError(msg)
         content = response.choices[0].message.content or ""
         usage = getattr(response, "usage", None)
         prompt_tokens = (

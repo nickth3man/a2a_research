@@ -91,7 +91,7 @@ All 12 agents are mounted on the unified backend (`turbo run dev`):
 ## Frontend / Backend Workflow
 
 - The **backend** (`apps/api/src/a2a_research/backend/`) exposes a FastAPI application that coordinates the multi-agent pipeline.
-- The **frontend** (`apps/web/`) is a standard Vite + React app that communicates with the backend via the auto-generated TypeScript client.
+- The **frontend** (`apps/web/`) is a standard Vite + React app that communicates with the backend through a small SSE/fetch service layer.
 - The **contracts** (`packages/contracts/`) package provides a typed SDK generated from the backend's OpenAPI spec.
 - Both API and frontend can be started together with `turbo run dev` or independently.
 
@@ -102,6 +102,13 @@ Copy `.env.example` to `.env` and fill in at least:
 - `LLM_API_KEY` — OpenRouter or other OpenAI-compatible API key
 - `TAVILY_API_KEY` — Tavily search API key
 - `BRAVE_API_KEY` — Brave Search API key
+
+Optional gateway hardening settings:
+
+- `API_KEY` — shared key for `/api/research` endpoints; leave blank for local unauthenticated development
+- `VITE_API_KEY` — browser-visible copy of `API_KEY`; required by the Vite frontend when `API_KEY` is set
+- `MAX_CONCURRENT_SESSIONS` — per-process cap for active research workflows
+- `SESSION_TTL_SECONDS` — time before abandoned sessions are pruned
 
 The `.env.example` file documents all available configuration options, including workflow settings (`WF_*` variables), agent ports, and telemetry toggles.
 

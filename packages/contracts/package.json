@@ -17,8 +17,8 @@
       "default": "./src/index.ts"
     },
     "./client": {
-      "types": "./src/client.ts",
-      "default": "./src/client.ts"
+      "types": "./src/client.gen.ts",
+      "default": "./src/client.gen.ts"
     }
   }
 }

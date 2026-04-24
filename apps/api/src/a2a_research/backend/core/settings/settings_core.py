@@ -53,6 +53,30 @@ class AppSettings(AgentEndpointsMixin, BaseSettings):
         default=180.0,
         description="Workflow timeout seconds (env: WORKFLOW_TIMEOUT).",
     )
+    api_key: str = Field(
+        default="",
+        description=(
+            "Optional gateway API key (env: API_KEY). When set, "
+            "research endpoints require the X-API-Key header."
+        ),
+    )
+    max_concurrent_sessions: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+        description=(
+            "Maximum concurrently running research sessions "
+            "(env: MAX_CONCURRENT_SESSIONS)."
+        ),
+    )
+    session_ttl_seconds: float = Field(
+        default=900.0,
+        ge=30.0,
+        description=(
+            "Seconds to retain completed or abandoned research sessions "
+            "before pruning (env: SESSION_TTL_SECONDS)."
+        ),
+    )
     tavily_api_key: str = Field(
         default="",
         description="Tavily API key (env: TAVILY_API_KEY).",

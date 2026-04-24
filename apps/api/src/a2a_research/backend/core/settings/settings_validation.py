@@ -37,7 +37,8 @@ def validate_dotenv_keys(expected_keys: set[str]) -> None:
         rendered = ", ".join(sorted(unknown_keys))
         logging.getLogger(__name__).warning(
             "Unknown keys in .env: %s. "
-            "Allowed keys: LOG_LEVEL, "
+            "Allowed keys: API_KEY, LOG_LEVEL, "
+            "MAX_CONCURRENT_SESSIONS, SESSION_TTL_SECONDS, "
             "WORKFLOW_TIMEOUT, TAVILY_API_KEY, "
             "BRAVE_API_KEY, SEARCH_MAX_RESULTS, "
             "SEARCHER_MAX_STEPS, RESEARCH_MAX_ROUNDS, "

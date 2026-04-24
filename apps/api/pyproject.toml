@@ -181,8 +181,9 @@ typeCheckingMode = "strict"
 pythonVersion = "3.11"
 
 [tool.coverage.run]
-source = ["a2a_research"]
+source = ["src/a2a_research"]
 relative_files = true
+data_file = ".coverage"
 omit = ["tests/*", "*/conftest.py"]
 
 [tool.coverage.report]

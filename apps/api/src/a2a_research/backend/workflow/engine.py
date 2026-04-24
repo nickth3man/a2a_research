@@ -52,7 +52,9 @@ async def drive(
     _committed_interpretation, _claims, _dag, seed_queries = setup
 
     claim_state = session.claim_state
-    assert claim_state is not None
+    if claim_state is None:
+        msg = "Workflow setup completed without initializing claim_state."
+        raise RuntimeError(msg)
     (
         claim_state,
         accumulated_evidence,

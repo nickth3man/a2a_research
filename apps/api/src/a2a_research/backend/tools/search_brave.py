@@ -122,7 +122,11 @@ async def search_brave(
                     session_id=current_session_id(),
                 )
                 await asyncio.sleep(delay)
-            assert response is not None
+            if response is None:
+                return (
+                    [],
+                    "Brave request failed before receiving a response",
+                )
             if response.status_code != 200:
                 log_fn = (
                     logger.info

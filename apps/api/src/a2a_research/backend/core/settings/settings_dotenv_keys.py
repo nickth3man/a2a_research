@@ -8,7 +8,10 @@ from .settings_workflow import WorkflowConfig
 
 EXPECTED_DOTENV_KEYS = {
     "LLM_PROVIDER",
+    "API_KEY",
     "LOG_LEVEL",
+    "MAX_CONCURRENT_SESSIONS",
+    "SESSION_TTL_SECONDS",
     "WORKFLOW_TIMEOUT",
     "TAVILY_API_KEY",
     "BRAVE_API_KEY",

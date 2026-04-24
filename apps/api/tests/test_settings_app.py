@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import pytest
@@ -14,6 +15,9 @@ from a2a_research.backend.core.settings import (
     LLMSettings,
     WorkflowConfig,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class TestAppSettings:
@@ -81,9 +85,14 @@ class TestAppSettings:
     ) -> None:
         env_file = tmp_path / ".env"
         env_file.write_text("LLM_PROVIDER=openrouter\nLLM_API_KEY=secret\n")
+        validate_dotenv_keys_name = "_validate_dotenv_keys"
+        validate_dotenv_keys = cast(
+            "Callable[[], None]",
+            getattr(settings_module, validate_dotenv_keys_name),
+        )
 
         with patch("a2a_research.backend.core.settings._ENV_FILE", env_file):
-            settings_module._validate_dotenv_keys()
+            validate_dotenv_keys()
 
         assert "Unknown keys in .env" not in caplog.text
 
@@ -120,6 +129,9 @@ class TestAppSettings:
             s = AppSettings()
         assert s.research_max_rounds == 5
         assert s.search_max_results == 5
+        assert s.api_key == ""
+        assert s.max_concurrent_sessions == 5
+        assert s.session_ttl_seconds == 900.0
         assert s.tavily_api_key == "t"
         assert s.brave_api_key == "b"
 

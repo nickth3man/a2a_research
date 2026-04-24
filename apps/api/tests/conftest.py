@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # imports this module before ``a2a_research.settings``; without this,
 # ``setdefault`` would pin test placeholders and override ``.env`` for
 # Pydantic.
-_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(_ENV_FILE)
 
 # :mod:`a2a_research.settings` loads a singleton on import; credentials must

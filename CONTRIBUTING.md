@@ -31,8 +31,8 @@ This project is a **pnpm + Turborepo monorepo** with the following layout:
 ### Architecture Overview
 
 - **`apps/api/`** — Python backend built with FastAPI. Contains the multi-agent pipeline, workflow orchestration, RAG, and all agent implementations. Uses `uv` for Python dependency management.
-- **`apps/web/`** — React 19 + Vite 8 + TypeScript frontend. Communicates with the backend via the auto-generated client.
-- **`packages/contracts/`** — Auto-generated TypeScript SDK from the backend's OpenAPI spec. Consumed by `apps/web/` as a workspace dependency (`@a2a/contracts`).
+- **`apps/web/`** — React 19 + Vite 8 + TypeScript frontend. Communicates with the backend through a small SSE/fetch service layer.
+- **`packages/contracts/`** — Auto-generated TypeScript SDK from the backend's OpenAPI spec. Available as the `@a2a/contracts` workspace package for typed API integrations.
 
 ## Development Setup
 
@@ -63,6 +63,9 @@ This project is a **pnpm + Turborepo monorepo** with the following layout:
    cp .env.example .env
    # Edit .env and set your API keys
    ```
+
+   If you set backend gateway auth with `API_KEY`, also set `VITE_API_KEY`
+   to the same value so the Vite frontend can authenticate browser requests.
 
 5. **Generate the TypeScript client** (requires the API to be running)
    ```bash
@@ -183,7 +186,7 @@ The `packages/contracts/` package auto-generates a TypeScript SDK from the backe
 turbo run generate
 ```
 
-This runs `openapi-ts` in `packages/contracts/`, producing typed client code in `packages/contracts/src/`. The generated types and SDK functions are imported by `apps/web/` via the `@a2a/contracts` workspace dependency.
+This runs `openapi-ts` in `packages/contracts/`, producing typed client code in `packages/contracts/src/`. The generated package is available to workspace apps via the `@a2a/contracts` dependency.
 
 ## Project Conventions
 
