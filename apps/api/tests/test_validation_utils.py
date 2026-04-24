@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
-from a2a_research.backend.core.utils.validation import to_float, to_str_list
+from core import to_float, to_str_list
 
 
 class TestToStrList:
