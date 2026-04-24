@@ -57,7 +57,11 @@ async def run_rank_stage(
             },
             "session_id": session.id,
             "trace_id": session.trace_id,
-            **(back_channel or {}),
+            **{
+                k: v
+                for k, v in (back_channel or {}).items()
+                if k not in {"session_id", "trace_id"}
+            },
         },
     )
     ranked_urls = [str(url) for url in (rank_result.get("ranked_urls") or [])]
