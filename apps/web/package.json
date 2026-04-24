@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "knip": "knip --reporter compact"
   },
   "dependencies": {
     "@a2a/contracts": "workspace:*",
@@ -26,6 +30,11 @@
     "globals": "^17.5.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.9"
+    "vite": "^8.0.9",
+    "vitest": "^3.2.0",
+    "@vitest/coverage-v8": "^3.2.0",
+    "knip": "^5.50.0",
+    "jsdom": "^26.1.0",
+    "@testing-library/jest-dom": "^6.6.3"
   }
 }

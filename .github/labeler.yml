@@ -1,0 +1,18 @@
+python:
+  - changed-files:
+    - any-glob-to-any-file: 'apps/api/**'
+typescript:
+  - changed-files:
+    - any-glob-to-any-file: 'apps/web/**'
+contracts:
+  - changed-files:
+    - any-glob-to-any-file: 'packages/contracts/**'
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['**/package.json', '**/pyproject.toml', '**/uv.lock', '**/pnpm-lock.yaml']
+github-actions:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**'
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['**/*.md', 'docs/**']

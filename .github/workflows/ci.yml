@@ -217,6 +217,15 @@ jobs:
         if: needs.changes.outputs.frontend == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
+      - name: Cache Turbo builds
+        if: needs.changes.outputs.frontend == 'true'
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/turbo.json') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
+
       - name: Install pnpm
         if: needs.changes.outputs.frontend == 'true'
         uses: pnpm/action-setup@a7487c7e89a18df4991f7f2226a9389bd195a6d0 # v4.1.1
@@ -235,11 +244,11 @@ jobs:
 
       - name: Lint frontend
         if: needs.changes.outputs.frontend == 'true'
-        run: pnpm run lint
+        run: turbo run lint --filter='...[origin/main...HEAD]'
 
       - name: Build frontend
         if: needs.changes.outputs.frontend == 'true'
-        run: pnpm run build
+        run: turbo run build --filter='...[origin/main...HEAD]'
 
   contracts:
     runs-on: ubuntu-latest
@@ -252,6 +261,15 @@ jobs:
       - name: Checkout repository
         if: needs.changes.outputs.python == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Cache Turbo builds
+        if: needs.changes.outputs.python == 'true'
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ hashFiles('**/turbo.json') }}
+          restore-keys: |
+            turbo-${{ runner.os }}-
 
       - name: Set up uv
         if: needs.changes.outputs.python == 'true'
@@ -293,4 +311,21 @@ jobs:
         working-directory: packages/contracts
         run: |
           pnpm install
-          pnpm generate
+          turbo run generate --filter='...[origin/main...HEAD]'
+
+  ci-gate:
+    if: ${{ !cancelled() }}
+    needs: [pre-commit, lint, test, security, frontend, contracts]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check all jobs
+        run: |
+          if [ "${{ needs.pre-commit.result }}" = "failure" ] || \
+             [ "${{ needs.lint.result }}" = "failure" ] || \
+             [ "${{ needs.test.result }}" = "failure" ] || \
+             [ "${{ needs.security.result }}" = "failure" ] || \
+             [ "${{ needs.frontend.result }}" = "failure" ] || \
+             [ "${{ needs.contracts.result }}" = "failure" ]; then
+            echo "One or more required jobs failed"
+            exit 1
+          fi
