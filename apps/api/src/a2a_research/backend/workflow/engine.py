@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-import logfire
 from time import perf_counter
 from typing import TYPE_CHECKING
+
+import logfire
 
 from a2a_research.backend.core.logging.app_logging import get_logger
 from a2a_research.backend.core.progress import ProgressPhase
@@ -34,7 +35,9 @@ async def drive(
     from a2a_research.backend.workflow.engine_loop import run_evidence_loop
     from a2a_research.backend.workflow.engine_setup import run_setup_stages
 
-    with logfire.span("workflow.drive", session_id=session.id, query=query[:100]):
+    with logfire.span(
+        "workflow.drive", session_id=session.id, query=query[:100]
+    ):
         workflow_start = perf_counter()
 
         # Emit registry snapshot so frontend/bus sees agent capability map
@@ -81,12 +84,16 @@ async def drive(
             provenance_tree,
         )
 
-        # Populate session.claims from verified claim_state for the API serializer.
+        # Populate session.claims from verified claim_state
+        # for the API serializer.
         if claim_state and claim_state.original_claims:
             from a2a_research.backend.workflow.coerce import claims_from_state
 
             session.claims = claims_from_state(claim_state)
 
         emit_step(
-            session.id, None, ProgressPhase.STEP_COMPLETED, "workflow_completed"
+            session.id,
+            None,
+            ProgressPhase.STEP_COMPLETED,
+            "workflow_completed",
         )

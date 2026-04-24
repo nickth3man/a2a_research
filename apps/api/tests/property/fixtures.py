@@ -28,7 +28,6 @@ from a2a_research.backend.core.models.workflow import (
     WorkflowBudget,
 )
 
-
 # ---------------------------------------------------------------------------
 # Primitive helpers
 # ---------------------------------------------------------------------------
@@ -66,9 +65,15 @@ def claim_strategy(draw: st.DrawFn) -> Claim:
     """Generate a valid Claim with constrained fields."""
     claim_id = draw(_claim_id)
     text = draw(_short_text)
-    max_age = draw(st.one_of(st.none(), st.integers(min_value=1, max_value=365)))
+    max_age = draw(
+        st.one_of(st.none(), st.integers(min_value=1, max_value=365))
+    )
     strict = draw(st.booleans())
-    confidence = draw(st.floats(min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False))
+    confidence = draw(
+        st.floats(
+            min_value=0.0, max_value=1.0, allow_nan=False, allow_infinity=False
+        )
+    )
     verdict = draw(verdict_strategy())
     sources = draw(st.lists(_short_text, max_size=5))
     snippets = draw(st.lists(_short_text, max_size=5))
@@ -114,7 +119,9 @@ def dag_strategy(draw: st.DrawFn) -> ClaimDAG:
     if node_count >= 2:
         edge_count = draw(st.integers(min_value=0, max_value=node_count - 1))
         for _ in range(edge_count):
-            parent_idx = draw(st.integers(min_value=0, max_value=node_count - 2))
+            parent_idx = draw(
+                st.integers(min_value=0, max_value=node_count - 2)
+            )
             child_idx = draw(
                 st.integers(min_value=parent_idx + 1, max_value=node_count - 1)
             )
@@ -143,8 +150,10 @@ def budget_strategy(draw: st.DrawFn) -> BudgetConsumption:
         tokens_consumed=draw(st.integers(min_value=0, max_value=500_000)),
         wall_seconds=draw(
             st.floats(
-                min_value=0.0, max_value=3600.0,
-                allow_nan=False, allow_infinity=False,
+                min_value=0.0,
+                max_value=3600.0,
+                allow_nan=False,
+                allow_infinity=False,
             )
         ),
         http_calls=draw(st.integers(min_value=0, max_value=200)),
@@ -166,8 +175,10 @@ def workflow_budget_strategy(draw: st.DrawFn) -> WorkflowBudget:
         max_tokens=draw(st.integers(min_value=1000, max_value=1_000_000)),
         max_wall_seconds=draw(
             st.floats(
-                min_value=1.0, max_value=7200.0,
-                allow_nan=False, allow_infinity=False,
+                min_value=1.0,
+                max_value=7200.0,
+                allow_nan=False,
+                allow_infinity=False,
             )
         ),
         max_http_calls=draw(st.integers(min_value=1, max_value=500)),

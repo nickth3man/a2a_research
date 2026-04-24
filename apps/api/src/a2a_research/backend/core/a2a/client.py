@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from a2a.client import Client as SDKClient
 from a2a.client import ClientConfig, create_client
-from a2a.server.context import ServerCallContext
 from a2a.types import Message, SendMessageRequest, Task
 
 from a2a_research.backend.core.a2a.client_helpers import (
@@ -19,6 +18,7 @@ from a2a_research.backend.core.a2a.client_helpers import (
     extract_data_payload_or_warn,
     extract_data_payloads,
     extract_text,
+    handle_in_process_send,
 )
 from a2a_research.backend.core.a2a.registry import AgentRegistry, get_registry
 from a2a_research.backend.core.logging.app_logging import get_logger, log_event
@@ -127,32 +127,7 @@ class A2AClient:
         )
         if self._registry.has_handler(role):
             handler = self._registry.get_handler(role)
-            result_local = await handler.on_message_send(
-                request, ServerCallContext()
-            )
-            task_state: str | None = None
-            task_id_out: str | None = None
-            if isinstance(result_local, Task):
-                st = getattr(
-                    getattr(result_local, "status", None), "state", None
-                )
-                task_state = str(st) if st is not None else None
-                task_id_out = (
-                    str(result_local.id)
-                    if getattr(result_local, "id", None)
-                    else None
-                )
-            log_event(
-                logger,
-                logging.INFO,
-                "a2a.response",
-                role=role.value,
-                url="in_process",
-                result_type=type(result_local).__name__,
-                task_state=task_state,
-                task_id=task_id_out,
-            )
-            return cast("Task | Message", result_local)
+            return await handle_in_process_send(handler, request, role, logger)
         try:
             client = await self._get_sdk_client(role)
             result: Task | Message | None = None

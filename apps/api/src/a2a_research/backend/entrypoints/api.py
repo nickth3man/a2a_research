@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import logfire
-from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
@@ -12,37 +10,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from a2a_research.backend.core.logging.app_logging import get_logger
-from a2a_research.backend.core.telemetry import configure_telemetry
 from a2a_research.backend.core.progress import Bus
-from a2a_research.backend.core.progress.progress_utils import (
-    drain_progress_while_running,
-)
 from a2a_research.backend.core.settings import settings
+from a2a_research.backend.core.telemetry import configure_telemetry
 from a2a_research.backend.entrypoints.agent_mounts import mount_agents
 from a2a_research.backend.entrypoints.api_models import (
     ResearchRequest,
     ResearchResponse,
 )
-from a2a_research.backend.entrypoints.api_serializers import (
-    PHASE_TO_EVENT,
-    serialize_progress,
-    serialize_result,
-    sse,
+from a2a_research.backend.entrypoints.session_manager import (
+    get_session_task,
+    prune_expired_sessions,
+    register_session,
+    running_session_count,
 )
+from a2a_research.backend.entrypoints.streaming import stream_events
 from a2a_research.backend.workflow.status import mark_running_failed
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
     from a2a_research.backend.core.models.session import ResearchSession
 
-logger = get_logger(__name__)
-
 configure_telemetry()
-
+logger = get_logger(__name__)
 app = FastAPI(title="A2A Research Gateway")
-
-logfire.instrument_fastapi(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,34 +41,12 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
-_sessions: dict[str, asyncio.Task[ResearchSession]] = {}
-_session_created_at: dict[str, float] = {}
-
-
-def _prune_expired_sessions() -> None:
-    now = monotonic()
-    expired = [
-        session_id
-        for session_id, created_at in _session_created_at.items()
-        if now - created_at > settings.session_ttl_seconds
-    ]
-    for session_id in expired:
-        task = _sessions.pop(session_id, None)
-        _session_created_at.pop(session_id, None)
-        Bus.unregister(session_id)
-        if task is not None and not task.done():
-            task.cancel()
-
-
-def _running_session_count() -> int:
-    _prune_expired_sessions()
-    return sum(1 for task in _sessions.values() if not task.done())
-
 
 async def require_api_key(
     x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     api_key: str | None = Query(default=None),
 ) -> None:
+    """Validate API key if configured."""
     if not settings.api_key:
         return
     if x_api_key == settings.api_key or api_key == settings.api_key:
@@ -91,6 +59,7 @@ async def require_api_key(
 
 @app.get("/api/health")
 async def health() -> dict[str, str]:
+    """Health check endpoint."""
     return {"status": "ok"}
 
 
@@ -98,17 +67,17 @@ async def health() -> dict[str, str]:
 async def start_research(
     req: ResearchRequest, _auth: None = Depends(require_api_key)
 ) -> ResearchResponse:
+    """Start a new research session."""
     from a2a_research.backend.core.models import ResearchSession
     from a2a_research.backend.workflow.definitions import STEP_INDEX
 
-    if _running_session_count() >= settings.max_concurrent_sessions:
+    if running_session_count() >= settings.max_concurrent_sessions:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many concurrent research sessions",
         )
 
-    query = req.query
-    session = ResearchSession(query=query)
+    session = ResearchSession(query=req.query)
     session.roles = list(STEP_INDEX.keys())
     session.ensure_agent_results()
 
@@ -118,7 +87,6 @@ async def start_research(
     async def _run() -> ResearchSession:
         import a2a_research.backend.core.a2a as _a2a
         from a2a_research.backend.core.models import BudgetConsumption
-        from a2a_research.backend.core.settings import settings
         from a2a_research.backend.workflow.definitions import (
             budget_from_settings,
         )
@@ -129,7 +97,7 @@ async def start_research(
         try:
             try:
                 await asyncio.wait_for(
-                    drive(session, client, query, budget_from_settings()),
+                    drive(session, client, req.query, budget_from_settings()),
                     timeout=settings.workflow_timeout,
                 )
             except TimeoutError:
@@ -154,85 +122,20 @@ async def start_research(
             Bus.unregister(session.id)
 
     task = asyncio.create_task(_run())
-    _sessions[session.id] = task
-    _session_created_at[session.id] = monotonic()
-
+    register_session(session.id, task)
     return ResearchResponse(session_id=session.id)
-
-
-async def _stream_events(
-    session_id: str,
-) -> AsyncGenerator[str, None]:
-    task = _sessions.get(session_id)
-    queue = Bus.get(session_id)
-
-    if task is None or queue is None:
-        yield sse(
-            "app-error",
-            {
-                "type": "error",
-                "session_id": session_id,
-                "message": "Session not found",
-            },
-        )
-        return
-
-    completed = False
-    try:
-        async for event in drain_progress_while_running(queue, task):
-            phase = str(event.phase) if event.phase else ""
-            sse_event = PHASE_TO_EVENT.get(phase, "progress")
-            yield sse(sse_event, serialize_progress(event))
-
-        try:
-            session = await task
-        except Exception as exc:
-            yield sse(
-                "app-error",
-                {
-                    "type": "error",
-                    "session_id": session_id,
-                    "message": str(exc),
-                },
-            )
-            _sessions.pop(session_id, None)
-            _session_created_at.pop(session_id, None)
-            return
-
-        if session.error:
-            yield sse(
-                "app-error",
-                {
-                    "type": "error",
-                    "session_id": session_id,
-                    "message": session.error,
-                },
-            )
-
-        yield sse("result", serialize_result(session))
-        _sessions.pop(session_id, None)
-        _session_created_at.pop(session_id, None)
-        completed = True
-    except asyncio.CancelledError:
-        if not task.done():
-            task.cancel()
-        _sessions.pop(session_id, None)
-        _session_created_at.pop(session_id, None)
-        raise
-    finally:
-        if completed or session_id not in _sessions:
-            Bus.unregister(session_id)
 
 
 @app.get("/api/research/{session_id}/stream")
 async def stream_research(
     session_id: str, _auth: None = Depends(require_api_key)
 ) -> StreamingResponse:
-    _prune_expired_sessions()
-    if session_id not in _sessions:
+    """Stream research progress via SSE."""
+    prune_expired_sessions()
+    if get_session_task(session_id) is None:
         raise HTTPException(status_code=404, detail="Session not found")
     return StreamingResponse(
-        _stream_events(session_id),
+        stream_events(session_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

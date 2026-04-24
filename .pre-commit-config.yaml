@@ -47,6 +47,13 @@ repos:
         pass_filenames: false
         args: ["apps/api/src/"]
         verbose: true
+      - id: pylint-api
+        name: pylint (apps/api module length)
+        entry: bash -c 'cd apps/api && args=(); for f in "$@"; do args+=("${f#apps/api/}"); done; exec uv run pylint "${args[@]}"' _
+        language: system
+        types: [python]
+        files: ^apps/api/(src|tests)/.*\.py$
+        pass_filenames: true
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8

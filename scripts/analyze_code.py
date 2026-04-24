@@ -41,7 +41,7 @@ def analyze_python_file(path):
     content = path.read_text(encoding='utf-8', errors='ignore')
     lines = content.split('\n')
     file_len = len(lines)
-    
+
     file_data = {
         'path': str(path),
         'lang': 'python',
@@ -50,14 +50,14 @@ def analyze_python_file(path):
         'classes': 0,
         'complexity_score': 0,
     }
-    
+
     # Track functions and classes
     stack = []  # (type, name, start_line, indent, params)
-    
+
     for i, line in enumerate(lines):
         indent = count_indent(line)
         stripped = line.strip()
-        
+
         # Pop stack if dedented
         while stack and stack[-1][3] >= indent:
             item = stack.pop()
@@ -80,40 +80,40 @@ def analyze_python_file(path):
                     'start': item[2],
                 })
                 file_data['classes'] += 1
-        
+
         # Match def
         m = PY_DEF_RE.match(line)
         if m:
             params = [p.strip() for p in m.group(3).split(',') if p.strip() and p.strip() not in ('self', 'cls', '*', '**')]
             stack.append(('func', m.group(2), i, indent, len(params)))
-        
+
         # Match class
         m = PY_CLASS_RE.match(line)
         if m:
             stack.append(('class', m.group(2), i, indent, 0))
-        
+
         # Complexity indicators in function context
         if any(s[0] == 'func' for s in stack):
             for kw in CONTROL_FLOW:
                 if re.search(r'\b' + kw + r'\b', stripped):
                     file_data['complexity_score'] += 1
-        
+
         # Deep nesting
         if indent >= 24 and stripped and not stripped.startswith('#'):
             results['issues']['deep_nesting'].append(f"{path}:{i+1} ({indent//4} levels)")
-        
+
         # TODO/FIXME/HACK
         m = TODO_RE.search(line)
         if m:
             results['issues']['todos'].append(f"{path}:{i+1} [{m.group(1)}] {m.group(2).strip()}")
-        
+
         # Magic numbers (simple heuristic)
         if stripped and not stripped.startswith('#'):
             nums = MAGIC_NUM_RE.findall(stripped)
             for n in nums:
                 if n not in ('0', '1', '2', '100', '404', '500', '200', '401', '403', '429') and not n.startswith('0.'):
                     results['issues']['magic_numbers'].append(f"{path}:{i+1} = {n}")
-    
+
     # Close remaining stack
     while stack:
         item = stack.pop()
@@ -134,14 +134,14 @@ def analyze_python_file(path):
                 'start': item[2],
             })
             file_data['classes'] += 1
-    
+
     results['files'].append(file_data)
 
 def analyze_ts_file(path):
     content = path.read_text(encoding='utf-8', errors='ignore')
     lines = content.split('\n')
     file_len = len(lines)
-    
+
     file_data = {
         'path': str(path),
         'lang': 'typescript',
@@ -150,15 +150,15 @@ def analyze_ts_file(path):
         'classes': 0,
         'complexity_score': 0,
     }
-    
+
     stack = []
     brace_depth = 0
     in_comment = False
-    
+
     for i, line in enumerate(lines):
         stripped = line.strip()
         indent = count_indent(line)
-        
+
         # Handle multiline comments
         if '/*' in stripped:
             in_comment = True
@@ -167,10 +167,10 @@ def analyze_ts_file(path):
             continue
         if in_comment or stripped.startswith('//') or stripped.startswith('*'):
             continue
-        
+
         # Simple brace tracking
         brace_depth += stripped.count('{') - stripped.count('}')
-        
+
         # Pop stack based on brace depth
         while stack and stack[-1][3] >= brace_depth:
             item = stack.pop()
@@ -192,40 +192,40 @@ def analyze_ts_file(path):
                     'start': item[2],
                 })
                 file_data['classes'] += 1
-        
+
         # Match function declarations
         m = TS_DEF_RE.match(line)
         if m:
             params = [p.strip() for p in m.group(3).split(',') if p.strip()]
             stack.append(('func', m.group(2), i, brace_depth, len(params)))
-        
+
         # Match class
         m = TS_CLASS_RE.match(line)
         if m:
             stack.append(('class', m.group(2), i, brace_depth, 0))
-        
+
         # Match methods (simplified)
         if not m:
             m = TS_METHOD_RE.match(line)
             if m and m.group(2) not in ('if', 'while', 'for', 'switch', 'catch'):
                 params = [p.strip() for p in m.group(3).split(',') if p.strip()]
                 stack.append(('func', m.group(2), i, brace_depth, len(params)))
-        
+
         # Complexity
         if any(s[0] == 'func' for s in stack):
             for kw in CONTROL_FLOW:
                 if re.search(r'\b' + kw + r'\b', stripped):
                     file_data['complexity_score'] += 1
-        
+
         # Deep nesting (indent based)
         if indent >= 24 and stripped and not stripped.startswith('//'):
             results['issues']['deep_nesting'].append(f"{path}:{i+1} ({indent//2} levels)")
-        
+
         # TODO/FIXME/HACK
         m = TODO_RE.search(line)
         if m:
             results['issues']['todos'].append(f"{path}:{i+1} [{m.group(1)}] {m.group(2).strip()}")
-    
+
     while stack:
         item = stack.pop()
         if item[0] == 'func':
@@ -245,23 +245,23 @@ def analyze_ts_file(path):
                 'start': item[2],
             })
             file_data['classes'] += 1
-    
+
     results['files'].append(file_data)
 
 def analyze_test_file(path):
     content = path.read_text(encoding='utf-8', errors='ignore')
     lines = content.split('\n')
-    
+
     test_count = 0
     assertion_count = 0
-    
+
     for line in lines:
         stripped = line.strip()
         if re.search(r'\bdef\s+test_', stripped):
             test_count += 1
         if re.search(r'\bassert\b', stripped) or re.search(r'\.assert\w*\(', stripped) or re.search(r'\.assert_\w+\(', stripped):
             assertion_count += 1
-    
+
     results['tests'].append({
         'path': str(path),
         'lines': len(lines),

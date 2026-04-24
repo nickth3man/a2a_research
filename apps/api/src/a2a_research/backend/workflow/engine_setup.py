@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 import logfire
 
 from a2a_research.backend.core.models import AgentRole, AgentStatus
@@ -100,7 +101,10 @@ async def run_setup_stages(
             "planner_started",
         )
         set_status(
-            session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…"
+            session,
+            AgentRole.PLANNER,
+            AgentStatus.RUNNING,
+            "Decomposing query…",
         )
         plan_result = await _run_agent(
             session,
@@ -112,7 +116,9 @@ async def run_setup_stages(
                 "session_id": session.id,
                 "trace_id": session.trace_id,
                 # Back-channel from CLR
-                "ambiguity_constraints": clarify_result.get("ambiguity_notes", ""),
+                "ambiguity_constraints": clarify_result.get(
+                    "ambiguity_notes", ""
+                ),
                 "interpretation_rationale": clarify_result.get(
                     "rejected_interpretations", []
                 ),

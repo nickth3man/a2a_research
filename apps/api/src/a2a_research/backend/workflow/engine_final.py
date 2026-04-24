@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 import logfire
 
 from a2a_research.backend.core.models import AgentRole, AgentStatus
@@ -39,8 +40,10 @@ async def run_final_stages(
     """Run synthesize, critique, and postprocess stages."""
 
     with logfire.span("workflow.final_stages", session_id=session.id):
+
         def diagnostics_dump() -> list[dict[str, object]]:
             return [e.model_dump(mode="json") for e in session.error_ledger]
+
         # ── Final Synthesize ─────────────────────────────────────────────
         emit_step(
             session.id,
@@ -49,7 +52,10 @@ async def run_final_stages(
             "synthesizer_started",
         )
         set_status(
-            session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…"
+            session,
+            AgentRole.SYNTHESIZER,
+            AgentStatus.RUNNING,
+            "Writing report…",
         )
         verified_claims = claims_from_state(claim_state) if claim_state else []
         syn_result = await _run_agent(
@@ -83,12 +89,16 @@ async def run_final_stages(
             session,
             AgentRole.SYNTHESIZER,
             AgentStatus.COMPLETED if report else AgentStatus.FAILED,
-            "Report synthesized." if report else "Failed to synthesize report.",
+            "Report synthesized."
+            if report
+            else "Failed to synthesize report.",
         )
         emit_step(
             session.id,
             AgentRole.SYNTHESIZER,
-            ProgressPhase.STEP_COMPLETED if report else ProgressPhase.STEP_FAILED,
+            ProgressPhase.STEP_COMPLETED
+            if report
+            else ProgressPhase.STEP_FAILED,
             "synthesizer_completed" if report else "synthesizer_failed",
         )
 
@@ -102,7 +112,9 @@ async def run_final_stages(
                 {
                     "report": report.model_dump(mode="json"),
                     "claim_state": (
-                        claim_state.model_dump(mode="json") if claim_state else {}
+                        claim_state.model_dump(mode="json")
+                        if claim_state
+                        else {}
                     ),
                     "evidence": [
                         e.model_dump(mode="json") for e in accumulated_evidence

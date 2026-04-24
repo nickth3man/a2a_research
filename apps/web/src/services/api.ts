@@ -65,11 +65,9 @@ interface ErrorMsg {
 
 const API_KEY = import.meta.env.VITE_API_KEY as string | undefined;
 
-
 function authHeaders(): HeadersInit {
   return API_KEY ? { "X-API-Key": API_KEY } : {};
 }
-
 
 function streamUrl(sessionId: string): string {
   const base = `/api/research/${sessionId}/stream`;

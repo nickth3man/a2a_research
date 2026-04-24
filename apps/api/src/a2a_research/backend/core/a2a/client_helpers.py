@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import logging
+from typing import Any, cast
 
-from a2a.types import Message, StreamResponse, Task
+from a2a.server.context import ServerCallContext
+from a2a.types import Message, SendMessageRequest, StreamResponse, Task
 
 from a2a_research.backend.core.a2a.proto import (
     ROLE_USER,
@@ -13,7 +15,7 @@ from a2a_research.backend.core.a2a.proto import (
     get_text_part,
     make_message,
 )
-from a2a_research.backend.core.logging.app_logging import get_logger
+from a2a_research.backend.core.logging.app_logging import get_logger, log_event
 
 logger = get_logger(__name__)
 
@@ -92,6 +94,35 @@ def _payload_preview(
         return [], 0, ""
     rendered = json.dumps(payload, default=str, indent=2, sort_keys=True)
     return sorted(payload.keys()), len(rendered.encode("utf-8")), rendered
+
+
+async def handle_in_process_send(
+    handler: Any,
+    request: SendMessageRequest,
+    role: Any,
+    py_logger: Any,
+) -> Task | Message:
+    """Dispatch to an in-process registry handler and log the response."""
+    result_local = await handler.on_message_send(request, ServerCallContext())
+    task_state: str | None = None
+    task_id_out: str | None = None
+    if isinstance(result_local, Task):
+        st = getattr(getattr(result_local, "status", None), "state", None)
+        task_state = str(st) if st is not None else None
+        task_id_out = (
+            str(result_local.id) if getattr(result_local, "id", None) else None
+        )
+    log_event(
+        py_logger,
+        logging.INFO,
+        "a2a.response",
+        role=role.value,
+        url="in_process",
+        result_type=type(result_local).__name__,
+        task_state=task_state,
+        task_id=task_id_out,
+    )
+    return cast("Task | Message", result_local)
 
 
 def _accumulate_stream(

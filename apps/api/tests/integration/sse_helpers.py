@@ -5,14 +5,21 @@ streams emitted by the FastAPI gateway.
 
 Usage::
 
-    from tests.integration.sse_helpers import collect_sse_events, assert_sse_event
+    from tests.integration.sse_helpers import (
+        collect_sse_events,
+        assert_sse_event
+    )
 
     # Collect all events from a streaming response
     events = collect_sse_events(response)
     assert len(events) >= 1
 
     # Assert a specific event
-    assert_sse_event(events[0], expected_event="result", expected_data={"session_id": "..."})
+    assert_sse_event(
+        events[0],
+        expected_event="result",
+        expected_data={"session_id": "..."}
+    )
 """
 
 from __future__ import annotations
@@ -27,7 +34,9 @@ def collect_sse_events(
     response: httpx.Response,
     max_events: int = 10,
 ) -> list[tuple[str, dict[str, Any]]]:
-    """Parse SSE stream from an httpx response into a list of (event, data) tuples.
+    """Parse SSE stream from an httpx response.
+
+    Returns a list of (event, data) tuples.
 
     Handles the standard SSE format emitted by :func:`api_serializers.sse`::
 
@@ -58,7 +67,11 @@ def collect_sse_events(
             current_event = line[len("event:") :].strip()
         elif line.startswith("data:"):
             current_data = line[len("data:") :].strip()
-        elif line == "" and current_event is not None and current_data is not None:
+        elif (
+            line == ""
+            and current_event is not None
+            and current_data is not None
+        ):
             try:
                 parsed = json.loads(current_data)
             except json.JSONDecodeError:
@@ -70,7 +83,11 @@ def collect_sse_events(
                 break
 
     # Flush any trailing event (no trailing blank line)
-    if current_event is not None and current_data is not None and len(events) < max_events:
+    if (
+        current_event is not None
+        and current_data is not None
+        and len(events) < max_events
+    ):
         try:
             parsed = json.loads(current_data)
         except json.JSONDecodeError:
@@ -89,9 +106,11 @@ def assert_sse_event(
     """Assert that an SSE event tuple matches expectations.
 
     Args:
-        event: A ``(event_name, data_dict)`` tuple from :func:`collect_sse_events`.
+        event: A ``(event_name, data_dict)`` tuple
+            from :func:`collect_sse_events`.
         expected_event: If provided, assert the event name matches exactly.
-        expected_data: If provided, assert the data dict is a superset of these keys.
+        expected_data: If provided, assert the data dict
+            is a superset of these keys.
 
     Raises:
         AssertionError: If the event does not match expectations.
@@ -115,7 +134,8 @@ def assert_sse_event(
     if expected_data is not None:
         for key, value in expected_data.items():
             assert key in data, (
-                f"Expected key '{key}' in SSE data, got keys: {list(data.keys())}"
+                f"Expected key '{key}' in SSE data, "
+                f"got keys: {list(data.keys())}"
             )
             if value is not None:
                 assert data[key] == value, (
@@ -145,7 +165,8 @@ def stream_with_timeout(
         url: URL path to stream from.
         max_events: Maximum number of SSE events to collect.
         timeout_sec: Timeout in seconds for the streaming request.
-        **kwargs: Additional keyword arguments forwarded to ``client.stream()``.
+        **kwargs: Additional keyword arguments forwarded
+            to ``client.stream()``.
 
     Returns:
         List of ``(event_name, data_dict)`` tuples.
@@ -154,7 +175,10 @@ def stream_with_timeout(
 
         from httpx import Client
 
-        with Client(transport=ASGITransport(app=app), base_url="http://test") as c:
+        with Client(
+            transport=ASGITransport(app=app),
+            base_url="http://test"
+        ) as c:
             events = stream_with_timeout(c, "GET", "/api/research/abc/stream")
         assert events[-1][0] == "result"
     """

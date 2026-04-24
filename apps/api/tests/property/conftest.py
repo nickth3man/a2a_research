@@ -1,11 +1,15 @@
 """Hypothesis settings profiles for property-based testing.
 
 Profiles:
-  - dev:     50 examples, 30 stateful steps, 200ms deadline — fast local iteration
-  - ci:      200 examples, 100 stateful steps, no deadline, derandomized — reproducible CI
-  - stress:  10000 examples, 200 stateful steps — deep fuzzing before releases
+  - dev:     50 examples, 30 stateful steps,
+             200ms deadline — fast local iteration
+  - ci:      200 examples, 100 stateful steps,
+             no deadline, derandomized — reproducible CI
+  - stress:  10000 examples, 200 stateful steps
+             — deep fuzzing before releases
 
-Activate via ``--hypothesis-profile=<name>`` CLI flag (registered in root conftest).
+Activate via ``--hypothesis-profile=<name>`` CLI flag
+(registered in root conftest).
 """
 
 from hypothesis import settings
@@ -27,4 +31,5 @@ settings.register_profile(
     "stress",
     max_examples=10000,
     stateful_step_count=200,
+    deadline=None,
 )

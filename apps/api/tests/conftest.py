@@ -24,6 +24,7 @@ os.environ.setdefault("LOGFIRE_IGNORE_NO_CONFIG", "1")
 
 import pytest  # noqa: E402
 
+
 @pytest.fixture(autouse=True)
 def reset_global_singletons():
     """Reset module-level singletons between tests to prevent state leakage."""

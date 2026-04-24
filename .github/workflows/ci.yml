@@ -69,6 +69,10 @@ jobs:
         if: needs.changes.outputs.python == 'true'
         run: uv run ruff check src/ tests/
 
+      - name: Module length (Pylint too-many-lines)
+        if: needs.changes.outputs.python == 'true'
+        run: uv run pylint src/a2a_research tests
+
       - name: Check formatting with Ruff
         if: needs.changes.outputs.python == 'true'
         run: uv run ruff format --check src/ tests/
