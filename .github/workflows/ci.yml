@@ -121,7 +121,7 @@ jobs:
 
       - name: Run tests
         if: needs.changes.outputs.python == 'true'
-        run: uv run pytest --cov-report=xml
+        run: uv run pytest --cov-report=xml --cov-fail-under=85
 
       - name: Upload coverage to Codecov
         if: needs.changes.outputs.python == 'true' && matrix.python-version == '3.11'

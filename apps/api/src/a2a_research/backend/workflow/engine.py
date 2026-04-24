@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logfire
 from time import perf_counter
 from typing import TYPE_CHECKING
 
@@ -33,58 +34,59 @@ async def drive(
     from a2a_research.backend.workflow.engine_loop import run_evidence_loop
     from a2a_research.backend.workflow.engine_setup import run_setup_stages
 
-    workflow_start = perf_counter()
+    with logfire.span("workflow.drive", session_id=session.id, query=query[:100]):
+        workflow_start = perf_counter()
 
-    # Emit registry snapshot so frontend/bus sees agent capability map
-    snapshot = client.build_registry_snapshot()
-    emit_step(
-        session.id,
-        None,
-        ProgressPhase.STEP_STARTED,
-        "registry_snapshot",
-        detail=json.dumps(snapshot),
-    )
+        # Emit registry snapshot so frontend/bus sees agent capability map
+        snapshot = client.build_registry_snapshot()
+        emit_step(
+            session.id,
+            None,
+            ProgressPhase.STEP_STARTED,
+            "registry_snapshot",
+            detail=json.dumps(snapshot),
+        )
 
-    setup = await run_setup_stages(session, client, query, budget)
-    if setup is None:
-        return
+        setup = await run_setup_stages(session, client, query, budget)
+        if setup is None:
+            return
 
-    _committed_interpretation, _claims, _dag, seed_queries = setup
+        _committed_interpretation, _claims, _dag, seed_queries = setup
 
-    claim_state = session.claim_state
-    if claim_state is None:
-        msg = "Workflow setup completed without initializing claim_state."
-        raise RuntimeError(msg)
-    (
-        claim_state,
-        accumulated_evidence,
-        provenance_tree,
-    ) = await run_evidence_loop(
-        session,
-        client,
-        query,
-        budget,
-        workflow_start,
-        claim_state,
-        seed_queries,
-    )
+        claim_state = session.claim_state
+        if claim_state is None:
+            msg = "Workflow setup completed without initializing claim_state."
+            raise RuntimeError(msg)
+        (
+            claim_state,
+            accumulated_evidence,
+            provenance_tree,
+        ) = await run_evidence_loop(
+            session,
+            client,
+            query,
+            budget,
+            workflow_start,
+            claim_state,
+            seed_queries,
+        )
 
-    await run_final_stages(
-        session,
-        client,
-        query,
-        budget,
-        claim_state,
-        accumulated_evidence,
-        provenance_tree,
-    )
+        await run_final_stages(
+            session,
+            client,
+            query,
+            budget,
+            claim_state,
+            accumulated_evidence,
+            provenance_tree,
+        )
 
-    # Populate session.claims from verified claim_state for the API serializer.
-    if claim_state and claim_state.original_claims:
-        from a2a_research.backend.workflow.coerce import claims_from_state
+        # Populate session.claims from verified claim_state for the API serializer.
+        if claim_state and claim_state.original_claims:
+            from a2a_research.backend.workflow.coerce import claims_from_state
 
-        session.claims = claims_from_state(claim_state)
+            session.claims = claims_from_state(claim_state)
 
-    emit_step(
-        session.id, None, ProgressPhase.STEP_COMPLETED, "workflow_completed"
-    )
+        emit_step(
+            session.id, None, ProgressPhase.STEP_COMPLETED, "workflow_completed"
+        )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import logfire
 
 from a2a_research.backend.core.models import AgentRole, AgentStatus
 from a2a_research.backend.core.progress import ProgressPhase
@@ -43,94 +44,95 @@ async def run_setup_stages(
     returns ``(committed_interpretation, claims, dag, seed_queries)``.
     """
 
-    # ── Preprocess ──────────────────────────────────────────────────
-    preprocess_result = await _run_agent(
-        session,
-        client,
-        AgentRole.PREPROCESSOR,
-        {
-            "query": query,
-            "session_id": session.id,
-            "trace_id": session.trace_id,
-        },
-    )
+    with logfire.span("workflow.setup", session_id=session.id):
+        # ── Preprocess ──────────────────────────────────────────────────
+        preprocess_result = await _run_agent(
+            session,
+            client,
+            AgentRole.PREPROCESSOR,
+            {
+                "query": query,
+                "session_id": session.id,
+                "trace_id": session.trace_id,
+            },
+        )
 
-    emit_preprocess_warning(session, preprocess_result)
+        emit_preprocess_warning(session, preprocess_result)
 
-    if should_abort_preprocessing(preprocess_result):
-        abort_for_preprocessing(session, query)
-        return None
+        if should_abort_preprocessing(preprocess_result):
+            abort_for_preprocessing(session, query)
+            return None
 
-    sanitized_query = preprocess_result.get("sanitized_query", query)
-    query_class = preprocess_result.get(
-        "query_class",
-        preprocess_result.get("class", "factual"),
-    )
-    domain_hints = preprocess_result.get("domain_hints", [])
+        sanitized_query = preprocess_result.get("sanitized_query", query)
+        query_class = preprocess_result.get(
+            "query_class",
+            preprocess_result.get("class", "factual"),
+        )
+        domain_hints = preprocess_result.get("domain_hints", [])
 
-    # ── Clarify (back-channel: PRE→CLR) ─────────────────────────────
-    clarify_result = await _run_agent(
-        session,
-        client,
-        AgentRole.CLARIFIER,
-        {
-            "query": sanitized_query,
-            "query_class": query_class,
-            "session_id": session.id,
-            "trace_id": session.trace_id,
-            # Back-channel from PRE
-            "normalization_rationale": preprocess_result.get(
-                "normalization_notes", ""
-            ),
-            "risky_spans": preprocess_result.get("risky_spans", []),
-            "domain_hints": domain_hints,
-        },
-    )
-    committed_interpretation = clarify_result.get(
-        "committed_interpretation", sanitized_query
-    )
+        # ── Clarify (back-channel: PRE→CLR) ─────────────────────────────
+        clarify_result = await _run_agent(
+            session,
+            client,
+            AgentRole.CLARIFIER,
+            {
+                "query": sanitized_query,
+                "query_class": query_class,
+                "session_id": session.id,
+                "trace_id": session.trace_id,
+                # Back-channel from PRE
+                "normalization_rationale": preprocess_result.get(
+                    "normalization_notes", ""
+                ),
+                "risky_spans": preprocess_result.get("risky_spans", []),
+                "domain_hints": domain_hints,
+            },
+        )
+        committed_interpretation = clarify_result.get(
+            "committed_interpretation", sanitized_query
+        )
 
-    # ── Plan (back-channel: CLR→PLN) ─────────────────────────────────
-    emit_step(
-        session.id,
-        AgentRole.PLANNER,
-        ProgressPhase.STEP_STARTED,
-        "planner_started",
-    )
-    set_status(
-        session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…"
-    )
-    plan_result = await _run_agent(
-        session,
-        client,
-        AgentRole.PLANNER,
-        {
-            "query": committed_interpretation,
-            "domain_hints": domain_hints,
-            "session_id": session.id,
-            "trace_id": session.trace_id,
-            # Back-channel from CLR
-            "ambiguity_constraints": clarify_result.get("ambiguity_notes", ""),
-            "interpretation_rationale": clarify_result.get(
-                "rejected_interpretations", []
-            ),
-        },
-    )
-    claims = coerce_claims(plan_result.get("claims", []))
-    dag = coerce_dag(plan_result.get("claim_dag", {}), claims=claims)
-    seed_queries = [
-        str(q)
-        for q in plan_result.get("seed_queries", [])
-        if isinstance(q, str)
-    ]
+        # ── Plan (back-channel: CLR→PLN) ─────────────────────────────────
+        emit_step(
+            session.id,
+            AgentRole.PLANNER,
+            ProgressPhase.STEP_STARTED,
+            "planner_started",
+        )
+        set_status(
+            session, AgentRole.PLANNER, AgentStatus.RUNNING, "Decomposing query…"
+        )
+        plan_result = await _run_agent(
+            session,
+            client,
+            AgentRole.PLANNER,
+            {
+                "query": committed_interpretation,
+                "domain_hints": domain_hints,
+                "session_id": session.id,
+                "trace_id": session.trace_id,
+                # Back-channel from CLR
+                "ambiguity_constraints": clarify_result.get("ambiguity_notes", ""),
+                "interpretation_rationale": clarify_result.get(
+                    "rejected_interpretations", []
+                ),
+            },
+        )
+        claims = coerce_claims(plan_result.get("claims", []))
+        dag = coerce_dag(plan_result.get("claim_dag", {}), claims=claims)
+        seed_queries = [
+            str(q)
+            for q in plan_result.get("seed_queries", [])
+            if isinstance(q, str)
+        ]
 
-    if not claims:
-        fail_for_empty_plan(session, query)
-        return None
+        if not claims:
+            fail_for_empty_plan(session, query)
+            return None
 
-    min_claims = getattr(budget, "min_claims_threshold", 2)
-    warn_for_low_claim_coverage(session, len(claims), min_claims)
-    finalize_plan(session, claims, dag)
-    initialize_claim_state(session, claims, dag)
+        min_claims = getattr(budget, "min_claims_threshold", 2)
+        warn_for_low_claim_coverage(session, len(claims), min_claims)
+        finalize_plan(session, claims, dag)
+        initialize_claim_state(session, claims, dag)
 
-    return committed_interpretation, claims, dag, seed_queries
+        return committed_interpretation, claims, dag, seed_queries

@@ -19,10 +19,10 @@ load_dotenv(_ENV_FILE)
 os.environ.setdefault("LLM_API_KEY", "test-llm-key-placeholder")
 os.environ.setdefault("TAVILY_API_KEY", "test-tavily-key-placeholder")
 os.environ.setdefault("BRAVE_API_KEY", "test-brave-key-placeholder")
+os.environ.setdefault("LOGFIRE_IGNORE_NO_CONFIG", "1")
 
 
 import pytest  # noqa: E402
-
 
 @pytest.fixture(autouse=True)
 def reset_global_singletons():

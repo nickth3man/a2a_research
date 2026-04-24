@@ -35,6 +35,7 @@ dependencies = [
     "ddgs>=9.14.1",
     "trafilatura>=2.0.0",
     "uvicorn[standard]>=0.45.0",
+    "logfire[fastapi]>=3.0.0",
 ]
 
 [project.urls]
@@ -102,6 +103,7 @@ test = [
     "pytest-xdist>=3.8.0",
     "pytest-watch>=4.2.0",
     "hypothesis>=6.152.1",
+    "httpx-sse>=0.4.0",
 ]
 lint = [
     "ruff>=0.15.11",
@@ -188,4 +190,6 @@ omit = ["tests/*", "*/conftest.py"]
 
 [tool.coverage.report]
 show_missing = true
+skip_covered = false
+fail_under = 85
 precision = 1

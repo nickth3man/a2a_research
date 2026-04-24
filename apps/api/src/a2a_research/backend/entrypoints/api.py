@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logfire
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
@@ -11,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
 from a2a_research.backend.core.logging.app_logging import get_logger
+from a2a_research.backend.core.telemetry import configure_telemetry
 from a2a_research.backend.core.progress import Bus
 from a2a_research.backend.core.progress.progress_utils import (
     drain_progress_while_running,
@@ -36,7 +38,11 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+configure_telemetry()
+
 app = FastAPI(title="A2A Research Gateway")
+
+logfire.instrument_fastapi(app)
 
 app.add_middleware(
     CORSMiddleware,

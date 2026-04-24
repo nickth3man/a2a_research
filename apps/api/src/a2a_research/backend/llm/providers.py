@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from time import perf_counter
+import logfire
 from typing import Any, TypeVar, cast
 
 from openai import AsyncOpenAI
@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError
 
 from a2a_research.backend.core.logging.app_logging import get_logger
 from a2a_research.backend.core.settings import settings
-
+from a2a_research.backend.llm.protocol import ChatModelProtocol, ChatResponse
 logger = get_logger(__name__)
 StructuredOutputT = TypeVar("StructuredOutputT", bound=BaseModel)
 
@@ -34,16 +34,6 @@ class ProviderRequestError(RuntimeError):
 class ProviderRateLimitError(ProviderRequestError):
     """Transient upstream rate limit error."""
 
-
-@dataclass
-class ChatResponse:
-    """Simple response wrapper compatible with the existing agent interface."""
-
-    content: str
-    prompt_tokens: int | None = None
-    completion_tokens: int | None = None
-    finish_reason: str = ""
-    model: str = ""
 
 
 def parse_structured_response(
@@ -168,15 +158,22 @@ class OpenRouterChatModel:
         endpoint = f"{_base_url_to_str(self._base_url)}/chat/completions"
         started_at = _log_request_start("chat", self._model, endpoint)
         response: Any = None
-        try:
-            response = await client.chat.completions.create(
-                model=self._model,
-                messages=cast("Any", messages),
-                temperature=0.3,
-            )
-        except Exception as exc:
-            _log_request_failure(started_at, "chat", self._model, endpoint)
-            _raise_provider_error(exc, model=self._model, endpoint=endpoint)
+        with logfire.span(
+            "llm.invoke",
+            gen_ai_system="openrouter",
+            gen_ai_operation="chat",
+            gen_ai_request_model=self._model,
+            gen_ai_request_temperature=0.3,
+        ):
+            try:
+                response = await client.chat.completions.create(
+                    model=self._model,
+                    messages=cast("Any", messages),
+                    temperature=0.3,
+                )
+            except Exception as exc:
+                _log_request_failure(started_at, "chat", self._model, endpoint)
+                _raise_provider_error(exc, model=self._model, endpoint=endpoint)
 
         _log_request_success(started_at, "chat", self._model, endpoint)
         if response is None:
@@ -204,10 +201,10 @@ class OpenRouterChatModel:
         )
 
 
-_llm: OpenRouterChatModel | None = None
+_llm: ChatModelProtocol | None = None
 
 
-def get_llm() -> OpenRouterChatModel:
+def get_llm() -> ChatModelProtocol:
     global _llm
     if _llm is None:
         _llm = OpenRouterChatModel()

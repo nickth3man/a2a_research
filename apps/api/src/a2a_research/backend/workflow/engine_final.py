@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+import logfire
 
 from a2a_research.backend.core.models import AgentRole, AgentStatus
 from a2a_research.backend.core.progress import ProgressPhase
@@ -37,118 +38,118 @@ async def run_final_stages(
 ) -> None:
     """Run synthesize, critique, and postprocess stages."""
 
-    def diagnostics_dump() -> list[dict[str, object]]:
-        return [e.model_dump(mode="json") for e in session.error_ledger]
-
-    # ── Final Synthesize ─────────────────────────────────────────────
-    emit_step(
-        session.id,
-        AgentRole.SYNTHESIZER,
-        ProgressPhase.STEP_STARTED,
-        "synthesizer_started",
-    )
-    set_status(
-        session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…"
-    )
-    verified_claims = claims_from_state(claim_state) if claim_state else []
-    syn_result = await _run_agent(
-        session,
-        client,
-        AgentRole.SYNTHESIZER,
-        {
-            "query": query,
-            "claims": [c.model_dump(mode="json") for c in verified_claims],
-            "claim_state": (
-                claim_state.model_dump(mode="json") if claim_state else {}
-            ),
-            "evidence": [
-                e.model_dump(mode="json") for e in accumulated_evidence
-            ],
-            "provenance_tree": provenance_tree.model_dump(mode="json"),
-            "tentative_report": (
-                session.tentative_report.model_dump(mode="json")
-                if session.tentative_report
-                else None
-            ),
-            "session_id": session.id,
-            "trace_id": session.trace_id,
-            "diagnostics": diagnostics_dump(),
-        },
-    )
-    report = coerce_report(syn_result.get("report"))
-    session.report = report
-    session.final_report = report.to_markdown() if report else ""
-    set_status(
-        session,
-        AgentRole.SYNTHESIZER,
-        AgentStatus.COMPLETED if report else AgentStatus.FAILED,
-        "Report synthesized." if report else "Failed to synthesize report.",
-    )
-    emit_step(
-        session.id,
-        AgentRole.SYNTHESIZER,
-        ProgressPhase.STEP_COMPLETED if report else ProgressPhase.STEP_FAILED,
-        "synthesizer_completed" if report else "synthesizer_failed",
-    )
-
-    # ── Critique ─────────────────────────────────────────────────────
-    critique_passed = True
-    if report:
-        crit_result = await _run_agent(
+    with logfire.span("workflow.final_stages", session_id=session.id):
+        def diagnostics_dump() -> list[dict[str, object]]:
+            return [e.model_dump(mode="json") for e in session.error_ledger]
+        # ── Final Synthesize ─────────────────────────────────────────────
+        emit_step(
+            session.id,
+            AgentRole.SYNTHESIZER,
+            ProgressPhase.STEP_STARTED,
+            "synthesizer_started",
+        )
+        set_status(
+            session, AgentRole.SYNTHESIZER, AgentStatus.RUNNING, "Writing report…"
+        )
+        verified_claims = claims_from_state(claim_state) if claim_state else []
+        syn_result = await _run_agent(
             session,
             client,
-            AgentRole.CRITIC,
+            AgentRole.SYNTHESIZER,
             {
-                "report": report.model_dump(mode="json"),
+                "query": query,
+                "claims": [c.model_dump(mode="json") for c in verified_claims],
                 "claim_state": (
                     claim_state.model_dump(mode="json") if claim_state else {}
                 ),
                 "evidence": [
                     e.model_dump(mode="json") for e in accumulated_evidence
                 ],
+                "provenance_tree": provenance_tree.model_dump(mode="json"),
+                "tentative_report": (
+                    session.tentative_report.model_dump(mode="json")
+                    if session.tentative_report
+                    else None
+                ),
                 "session_id": session.id,
                 "trace_id": session.trace_id,
                 "diagnostics": diagnostics_dump(),
             },
         )
-        critique_passed = bool(crit_result.get("passed", True))
-        session.critique = crit_result.get("critique", "")
-        iteration_count = int(crit_result.get("iteration_count", 0))
+        report = coerce_report(syn_result.get("report"))
+        session.report = report
+        session.final_report = report.to_markdown() if report else ""
+        set_status(
+            session,
+            AgentRole.SYNTHESIZER,
+            AgentStatus.COMPLETED if report else AgentStatus.FAILED,
+            "Report synthesized." if report else "Failed to synthesize report.",
+        )
+        emit_step(
+            session.id,
+            AgentRole.SYNTHESIZER,
+            ProgressPhase.STEP_COMPLETED if report else ProgressPhase.STEP_FAILED,
+            "synthesizer_completed" if report else "synthesizer_failed",
+        )
 
-        if (
-            not critique_passed
-            and iteration_count < budget.max_critic_revision_loops
-        ):
-            session.budget_consumed.critic_revision_loops += 1
+        # ── Critique ─────────────────────────────────────────────────────
+        critique_passed = True
+        if report:
+            crit_result = await _run_agent(
+                session,
+                client,
+                AgentRole.CRITIC,
+                {
+                    "report": report.model_dump(mode="json"),
+                    "claim_state": (
+                        claim_state.model_dump(mode="json") if claim_state else {}
+                    ),
+                    "evidence": [
+                        e.model_dump(mode="json") for e in accumulated_evidence
+                    ],
+                    "session_id": session.id,
+                    "trace_id": session.trace_id,
+                    "diagnostics": diagnostics_dump(),
+                },
+            )
+            critique_passed = bool(crit_result.get("passed", True))
+            session.critique = crit_result.get("critique", "")
+            iteration_count = int(crit_result.get("iteration_count", 0))
 
-    # ── Postprocess ──────────────────────────────────────────────────
-    post_result = await _run_agent(
-        session,
-        client,
-        AgentRole.POSTPROCESSOR,
-        {
-            "report": report.model_dump(mode="json") if report else {},
-            "claim_state": (
-                claim_state.model_dump(mode="json") if claim_state else {}
-            ),
-            "provenance_tree": provenance_tree.model_dump(mode="json"),
-            "output_formats": ["markdown", "json"],
-            "citation_style": "hyperlinked_footnotes",
-            "warnings": [] if critique_passed else [session.critique],
-            "session_id": session.id,
-            "trace_id": session.trace_id,
-            "diagnostics": diagnostics_dump(),
-        },
-    )
-    session.formatted_outputs = post_result.get("formatted_outputs", {})
-    if session.formatted_outputs.get("markdown"):
-        session.final_report = session.formatted_outputs["markdown"]
+            if (
+                not critique_passed
+                and iteration_count < budget.max_critic_revision_loops
+            ):
+                session.budget_consumed.critic_revision_loops += 1
 
-    # ── Emit final_diagnostics SSE ───────────────────────────────────
-    emit_step(
-        session.id,
-        None,
-        ProgressPhase.FINAL_DIAGNOSTICS,
-        "workflow_complete",
-        detail=f"error_count={len(session.error_ledger)}",
-    )
+        # ── Postprocess ──────────────────────────────────────────────────
+        post_result = await _run_agent(
+            session,
+            client,
+            AgentRole.POSTPROCESSOR,
+            {
+                "report": report.model_dump(mode="json") if report else {},
+                "claim_state": (
+                    claim_state.model_dump(mode="json") if claim_state else {}
+                ),
+                "provenance_tree": provenance_tree.model_dump(mode="json"),
+                "output_formats": ["markdown", "json"],
+                "citation_style": "hyperlinked_footnotes",
+                "warnings": [] if critique_passed else [session.critique],
+                "session_id": session.id,
+                "trace_id": session.trace_id,
+                "diagnostics": diagnostics_dump(),
+            },
+        )
+        session.formatted_outputs = post_result.get("formatted_outputs", {})
+        if session.formatted_outputs.get("markdown"):
+            session.final_report = session.formatted_outputs["markdown"]
+
+        # ── Emit final_diagnostics SSE ───────────────────────────────────
+        emit_step(
+            session.id,
+            None,
+            ProgressPhase.FINAL_DIAGNOSTICS,
+            "workflow_complete",
+            detail=f"error_count={len(session.error_ledger)}",
+        )
