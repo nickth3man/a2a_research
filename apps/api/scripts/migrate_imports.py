@@ -32,17 +32,17 @@ from libcst import CSTTransformer
 
 # ── Mapping: old prefix -> new prefix ────────────────────────────────────
 IMPORT_MAP: dict[str, str] = {
-    "a2a_research.models": "a2a_research.backend.core.models",
-    "a2a_research.logging": "a2a_research.backend.core.logging",
-    "a2a_research.progress": "a2a_research.backend.core.progress",
-    "a2a_research.settings": "a2a_research.backend.core.settings",
-    "a2a_research.utils": "a2a_research.backend.core.utils",
-    "a2a_research.a2a": "a2a_research.backend.core.a2a",
-    "a2a_research.agents": "a2a_research.backend.agents",
-    "a2a_research.workflow": "a2a_research.backend.workflow",
-    "a2a_research.tools": "a2a_research.backend.tools",
-    "a2a_research.llm": "a2a_research.backend.llm",
-    "a2a_research.entrypoints": "a2a_research.backend.entrypoints",
+    "a2a_research.models": "core.models",
+    "a2a_research.logging": "core.logging",
+    "a2a_research.progress": "core.progress",
+    "a2a_research.settings": "core.settings",
+    "a2a_research.utils": "core.utils",
+    "a2a_research.a2a": "core.a2a",
+    "a2a_research.agents": "agents",
+    "a2a_research.workflow": "workflow",
+    "a2a_research.tools": "tools",
+    "a2a_research.llm": "llm",
+    "a2a_research.entrypoints": "entrypoints",
 }
 
 # Sort by longest prefix first so sub-module paths match before parents.
