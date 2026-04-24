@@ -91,23 +91,23 @@ jobs:
 
       - name: Lint with Ruff
         if: needs.changes.outputs.python == 'true'
-        run: uv run ruff check src/ tests/
+        run: uv run ruff check agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
       - name: Module length (Pylint too-many-lines)
         if: needs.changes.outputs.python == 'true'
-        run: uv run pylint src/a2a_research tests
+        run: uv run pylint agents core entrypoints llm tools workflow tests
 
       - name: Check formatting with Ruff
         if: needs.changes.outputs.python == 'true'
-        run: uv run ruff format --check src/ tests/
+        run: uv run ruff format --check agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
       - name: Type check with mypy
         if: needs.changes.outputs.python == 'true'
-        run: uv run mypy src/
+        run: uv run mypy agents/ core/ entrypoints/ llm/ tools/ workflow/
 
       - name: Type check with ty
         if: needs.changes.outputs.python == 'true'
-        run: uv run ty check src/
+        run: uv run ty check agents/ core/ entrypoints/ llm/ tools/ workflow/
 
       - name: Verify lockfile is up to date
         if: needs.changes.outputs.python == 'true'

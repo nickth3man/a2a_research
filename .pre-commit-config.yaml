@@ -23,36 +23,36 @@ repos:
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
-        files: ^apps/api/(src|tests)/
+        files: ^apps/api/(agents|core|entrypoints|llm|tools|workflow|tests)/
       - id: ruff-format
-        files: ^apps/api/(src|tests)/
+        files: ^apps/api/(agents|core|entrypoints|llm|tools|workflow|tests)/
 
   - repo: local
     hooks:
       - id: mypy
         name: mypy
-        entry: uv run mypy
+        entry: bash -c 'cd apps/api && exec uv run mypy --config-file pyproject.toml agents/ core/ entrypoints/ llm/ tools/ workflow/'
         language: system
         types: [python]
-        files: ^apps/api/src/
+        files: ^apps/api/(agents|core|entrypoints|llm|tools|workflow)/
         pass_filenames: false
-        args: ["--config-file", "apps/api/pyproject.toml", "apps/api/src/"]
+        args: []
         verbose: true
       - id: ty
         name: ty
-        entry: uv run ty check
+        entry: bash -c 'cd apps/api && exec uv run ty check agents/ core/ entrypoints/ llm/ tools/ workflow/'
         language: system
         types: [python]
-        files: ^apps/api/src/
+        files: ^apps/api/(agents|core|entrypoints|llm|tools|workflow)/
         pass_filenames: false
-        args: ["apps/api/src/"]
+        args: []
         verbose: true
       - id: pylint-api
         name: pylint (apps/api module length)
         entry: bash -c 'cd apps/api && args=(); for f in "$@"; do args+=("${f#apps/api/}"); done; exec uv run pylint "${args[@]}"' _
         language: system
         types: [python]
-        files: ^apps/api/(src|tests)/.*\.py$
+        files: ^apps/api/(agents|core|entrypoints|llm|tools|workflow|tests)/.*\.py$
         pass_filenames: true
 
   - repo: https://github.com/pre-commit/mirrors-prettier
