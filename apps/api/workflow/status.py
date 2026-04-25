@@ -32,9 +32,10 @@ def set_status(
     role: AgentRole,
     status: AgentStatus,
     message: str,
+    elapsed_ms: float | None = None,
 ) -> None:
     session.agent_results[role] = AgentResult(
-        role=role, status=status, message=message
+        role=role, status=status, message=message, elapsed_ms=elapsed_ms
     )
 
 
@@ -45,6 +46,7 @@ def emit_step(
     label: str,
     detail: str = "",
     envelope: ErrorEnvelope | None = None,
+    elapsed_ms: float | None = None,
 ) -> None:
     step_index = STEP_INDEX.get(role, TOTAL_STEPS) if role else TOTAL_STEPS
     emit(
@@ -56,6 +58,7 @@ def emit_step(
         label,
         detail=detail,
         envelope=envelope,
+        elapsed_ms=elapsed_ms,
     )
 
 

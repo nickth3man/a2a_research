@@ -32,6 +32,7 @@ class AgentResult(BaseModel):
     role: AgentRole
     status: AgentStatus = AgentStatus.PENDING
     message: str = ""
+    elapsed_ms: float | None = None
     claims: list[Claim] = Field(default_factory=list)
     raw_content: str = ""
     citations: list[str] = Field(default_factory=list)

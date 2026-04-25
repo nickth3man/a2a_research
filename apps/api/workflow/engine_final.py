@@ -84,6 +84,8 @@ async def run_final_stages(
         report = coerce_report(syn_result.get("report"))
         session.report = report
         session.final_report = report.to_markdown() if report else ""
+        existing = session.agent_results.get(AgentRole.SYNTHESIZER)
+        syn_elapsed_ms = existing.elapsed_ms if existing else None
         set_status(
             session,
             AgentRole.SYNTHESIZER,
@@ -91,6 +93,7 @@ async def run_final_stages(
             "Report synthesized."
             if report
             else "Failed to synthesize report.",
+            elapsed_ms=syn_elapsed_ms,
         )
         emit_step(
             session.id,
@@ -99,6 +102,7 @@ async def run_final_stages(
             if report
             else ProgressPhase.STEP_FAILED,
             "synthesizer_completed" if report else "synthesizer_failed",
+            elapsed_ms=syn_elapsed_ms,
         )
 
         # ── Critique ─────────────────────────────────────────────────────

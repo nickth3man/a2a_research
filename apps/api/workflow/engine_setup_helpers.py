@@ -136,18 +136,22 @@ def finalize_plan(
     claims: list[Claim],
     dag: ClaimDAG,
 ) -> None:
+    existing = session.agent_results.get(AgentRole.PLANNER)
+    elapsed_ms = existing.elapsed_ms if existing else None
     set_status(
         session,
         AgentRole.PLANNER,
         AgentStatus.COMPLETED,
         f"Extracted {len(claims)} claim(s), "
         f"DAG: {len(dag.nodes)} nodes, {len(dag.edges)} edges.",
+        elapsed_ms=elapsed_ms,
     )
     emit_step(
         session.id,
         AgentRole.PLANNER,
         ProgressPhase.STEP_COMPLETED,
         "planner_completed",
+        elapsed_ms=elapsed_ms,
     )
 
 

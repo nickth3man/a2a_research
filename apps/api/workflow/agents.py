@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
 from core import get_logger
@@ -48,6 +49,8 @@ async def run_agent(
     set_status(session, role, AgentStatus.RUNNING, f"Calling {role.value}…")
 
     try:
+        t0 = perf_counter()
+
         task = await asyncio.wait_for(
             client.send(
                 role, payload=agent_payload, from_role=AgentRole.PLANNER
@@ -76,5 +79,8 @@ async def run_agent(
         return {}
 
     data = payload(task)
-    set_status(session, role, AgentStatus.COMPLETED, "Done.")
+    elapsed = (perf_counter() - t0) * 1000
+    set_status(
+        session, role, AgentStatus.COMPLETED, "Done.", elapsed_ms=elapsed
+    )
     return data

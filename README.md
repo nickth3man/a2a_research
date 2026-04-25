@@ -58,6 +58,8 @@ The API runs on `http://localhost:8000` and the Vite dev server starts on `http:
 |---------|-------------|
 | `turbo run test` | Run Python test suite |
 | `turbo run lint` | Run ruff (Python) + eslint (frontend) |
+| `pnpm e2e:install` | One-time: download Playwright Chromium browser |
+| `pnpm e2e` | Run Playwright end-to-end tests (auto-starts API + web) |
 
 ### Python-specific (from `apps/api/`)
 
