@@ -67,7 +67,7 @@ The API runs on `http://localhost:8000` and the Vite dev server starts on `http:
 | `uv run ruff check src/ tests/` | Run ruff linter |
 | `uv run ruff format src/ tests/` | Format code with ruff |
 | `uv run mypy src/` | Run mypy type checker |
-| `uv run uvicorn a2a_research.backend.entrypoints.api:app --reload` | Start API server |
+| `uv run uvicorn entrypoints.api:app --reload` | Start API server |
 
 ## Service & Port Topology
 
@@ -90,7 +90,7 @@ All 12 agents are mounted on the unified backend (`turbo run dev`):
 
 ## Frontend / Backend Workflow
 
-- The **backend** (`apps/api/src/a2a_research/backend/`) exposes a FastAPI application that coordinates the multi-agent pipeline.
+- The **backend** (`apps/api/`) exposes a FastAPI application that coordinates the multi-agent pipeline.
 - The **frontend** (`apps/web/`) is a standard Vite + React app that communicates with the backend through a small SSE/fetch service layer.
 - The **contracts** (`packages/contracts/`) package provides a typed SDK generated from the backend's OpenAPI spec.
 - Both API and frontend can be started together with `turbo run dev` or independently.
@@ -118,7 +118,12 @@ The `.env.example` file documents all available configuration options, including
 .
 ├── apps/
 │   ├── api/                    # Python backend (FastAPI)
-│   │   ├── src/a2a_research/   # Python source code
+│   │   ├── agents/              # Agent implementations
+│   │   ├── core/                # Core models, settings, logging
+│   │   ├── entrypoints/         # FastAPI app and launcher
+│   │   ├── llm/                 # LLM provider integrations
+│   │   ├── tools/               # Search and fetch utilities
+│   │   ├── workflow/             # Research workflow engine
 │   │   ├── tests/              # pytest test suite
 │   │   ├── pyproject.toml      # Python project config
 │   │   └── package.json        # Turborepo task scripts

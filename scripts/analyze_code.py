@@ -1,8 +1,6 @@
-import os
 import re
-import sys
 from pathlib import Path
-from collections import defaultdict, Counter
+from collections import defaultdict
 
 # Target patterns
 TARGETS = {

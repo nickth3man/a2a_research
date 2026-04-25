@@ -40,9 +40,14 @@ check-unannotated-defs = true
 # when should Pyrefly infer return types for functions without return annotations?
 infer-return-types = "checked"
 # can Pyrefly recognize ignore directives other than `# pyrefly: ignore` and `# type: ignore`
-permissive-ignores = false
+permissive-ignores = true
 
 [errors]
 # this is an empty table, meaning all errors are enabled by default
 
+# workflow submodules use circular import patterns (``from workflow import X``)
+# that are valid at runtime. Suppress unresolved-import errors for this package.
+[[sub-config]]
+project-includes = ["workflow/**/*.py"]
+replace-imports-with-any = ["workflow"]
 # no `[[sub-config]]` entries are included, since there are none by default

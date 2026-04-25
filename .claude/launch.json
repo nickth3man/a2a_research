@@ -4,7 +4,7 @@
     {
       "name": "Backend (unified)",
       "type": "process",
-      "command": "uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload",
+      "command": "uv run uvicorn entrypoints.api:app --host 0.0.0.0 --port 8000 --reload",
       "description": "FastAPI gateway + all 12 agents mounted at /agents/* on port 8000"
     },
     {
@@ -17,7 +17,7 @@
     {
       "name": "Backend agents (standalone)",
       "type": "process",
-      "command": "uv run python -m a2a_research.backend.entrypoints.launcher",
+      "command": "uv run python -m entrypoints.launcher",
       "description": "Run planner/searcher/reader/fact-checker/synthesizer on separate ports"
     }
   ],

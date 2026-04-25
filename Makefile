@@ -22,16 +22,16 @@ lint: ## Run linters via turbo (ruff + eslint)
 	pnpm turbo run lint
 
 format: ## Format Python code with ruff
-	cd apps/api && uv run ruff format src/ tests/
+	cd apps/api && uv run ruff format agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
 format-check: ## Check Python formatting without modifying files
-	cd apps/api && uv run ruff format --check src/ tests/
+	cd apps/api && uv run ruff format --check agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
 typecheck: ## Run mypy type checker
-	cd apps/api && uv run mypy src/
+	cd apps/api && uv run mypy agents/ core/ entrypoints/ llm/ tools/ workflow/
 
 typecheck-ty: ## Run ty type checker
-	cd apps/api && uv run ty check src/
+	cd apps/api && uv run ty check agents/ core/ entrypoints/ llm/ tools/ workflow/
 
 check: lint typecheck typecheck-ty format-check ## Run all quality checks (no tests)
 all: test check ## Run tests + all quality checks (CI-ready)
