@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from a2a_research.backend.agents.pocketflow.clarifier import clarify
-from a2a_research.backend.agents.pocketflow.clarifier import (
+from agents.pocketflow.clarifier import clarify
+from agents.pocketflow.clarifier import (
     nodes as clarifier_nodes,
 )
 

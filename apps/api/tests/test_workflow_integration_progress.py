@@ -6,19 +6,19 @@ import asyncio
 
 import pytest
 
-from a2a_research.backend.core.models import AgentRole
-from a2a_research.backend.core.progress import (
+from core import AgentRole
+from core.progress import (
     ProgressEvent,
     ProgressPhase,
     drain_progress_while_running,
 )
-from a2a_research.backend.workflow import run_research_async
 from tests.workflow_integration_fixtures import (
     _configure_success_path,
 )
 from tests.workflow_integration_helpers import (
     _install_http_services,
 )
+from workflow import run_research_async
 
 
 @pytest.mark.asyncio

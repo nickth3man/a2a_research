@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, cast
 import httpx
 import pytest
 
-from a2a_research.backend.tools import fetch as fetch_module
-from a2a_research.backend.tools.fetch import (
+from tools import fetch as fetch_module
+from tools.fetch import (
     PageContent,
     fetch_and_extract,
     fetch_many,

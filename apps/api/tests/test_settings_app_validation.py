@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.backend.core.settings import AppSettings, WorkflowConfig
+from core import AppSettings, WorkflowConfig
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,9 +21,9 @@ class TestAppSettingsValidation:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch("core.settings._ENV_FILE", empty_env),
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict(
@@ -35,9 +35,9 @@ class TestAppSettingsValidation:
         ):
             AppSettings()
         with (
-            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch("core.settings._ENV_FILE", empty_env),
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict(
@@ -49,9 +49,9 @@ class TestAppSettingsValidation:
         ):
             AppSettings()
         with (
-            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch("core.settings._ENV_FILE", empty_env),
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict(
@@ -71,9 +71,9 @@ class TestAppSettingsValidation:
         empty_env = tmp_path / ".env"
         empty_env.write_text("")
         with (
-            patch("a2a_research.backend.core.settings._ENV_FILE", empty_env),
+            patch("core.settings._ENV_FILE", empty_env),
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict(

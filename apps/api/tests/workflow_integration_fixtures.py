@@ -9,31 +9,31 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from a2a_research.backend.agents.langgraph.fact_checker import (
+from agents.langgraph.fact_checker import (
     verify_route as fc_verify,
 )
-from a2a_research.backend.agents.pocketflow.planner import (
+from agents.pocketflow.planner import (
     nodes as planner_nodes,
 )
-from a2a_research.backend.agents.pocketflow.planner import (
+from agents.pocketflow.planner import (
     nodes_base as planner_nodes_base,
 )
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pydantic_ai.synthesizer import (
     agent as synth_agent,
 )
-from a2a_research.backend.agents.smolagents.reader import (
+from agents.smolagents.reader import (
     agent as reader_agent,
 )
-from a2a_research.backend.agents.smolagents.reader import (
+from agents.smolagents.reader import (
     core as reader_core,
 )
-from a2a_research.backend.agents.smolagents.searcher import (
+from agents.smolagents.searcher import (
     agent as searcher_agent,
 )
-from a2a_research.backend.agents.smolagents.searcher import (
+from agents.smolagents.searcher import (
     core as searcher_core,
 )
-from a2a_research.backend.core.models import ReportOutput
+from core import ReportOutput
 
 
 def _llm_stub(payload: dict[str, Any]) -> Any:

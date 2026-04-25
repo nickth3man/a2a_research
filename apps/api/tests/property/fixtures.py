@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import hypothesis.strategies as st
 
-from a2a_research.backend.core.models.claims import (
+from core import Verdict
+from core.models.claims import (
     Claim,
     ClaimDAG,
     ClaimDependency,
     FreshnessWindow,
 )
-from a2a_research.backend.core.models.enums import Verdict
-from a2a_research.backend.core.models.workflow import (
+from core.models.workflow import (
     BudgetConsumption,
     WorkflowBudget,
 )

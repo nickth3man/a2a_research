@@ -7,7 +7,67 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.backend.core.settings import WorkflowConfig
+from core import WorkflowConfig
+from core.settings.settings_workflow_core import WorkflowConfigCore
+from core.settings.settings_workflow_ext import WorkflowConfigExt
+from core.settings.settings_workflow_ext_defaults import (
+    DEFAULT_AB_TESTING_WEIGHTS,
+    DEFAULT_CHECKPOINT_STAGES,
+    DEFAULT_COST_ATTRIBUTION_TAGS,
+    DEFAULT_OUTPUT_FORMATS,
+    DEFAULT_TELEMETRY_TRACE_IDS,
+)
+
+
+class TestWorkflowConfigCore:
+    def _make(
+        self, env_overrides: dict[str, str] | None = None
+    ) -> WorkflowConfigCore:
+        with patch.dict("os.environ", env_overrides or {}, clear=False):
+            return WorkflowConfigCore()
+
+    def test_defaults(self) -> None:
+        c = self._make()
+        assert c.budget_max_rounds == 5
+        assert c.search_providers == ["tavily", "brave", "ddg"]
+        assert c.ranking_diversity_penalty == 0.3
+        assert c.evidence_chunk_size == 1000
+
+    def test_env_override(self) -> None:
+        c = self._make({"WF_BUDGET_MAX_ROUNDS": "9"})
+        assert c.budget_max_rounds == 9
+
+
+class TestWorkflowConfigExt:
+    def _make(
+        self, env_overrides: dict[str, str] | None = None
+    ) -> WorkflowConfigExt:
+        with patch.dict("os.environ", env_overrides or {}, clear=False):
+            return WorkflowConfigExt()
+
+    def test_defaults(self) -> None:
+        e = self._make()
+        assert e.adversary_enabled is True
+        assert e.output_formats == DEFAULT_OUTPUT_FORMATS
+        assert e.checkpointing_stages == DEFAULT_CHECKPOINT_STAGES
+        assert e.telemetry_trace_ids == DEFAULT_TELEMETRY_TRACE_IDS
+        assert e.cost_attribution_tags == DEFAULT_COST_ATTRIBUTION_TAGS
+        assert e.ab_testing_weights == DEFAULT_AB_TESTING_WEIGHTS
+
+    def test_ab_weights_validation(self) -> None:
+        with pytest.raises(ValidationError, match="sum to ~1.0"):
+            self._make({"WF_AB_TESTING_WEIGHTS": '{"a":0.1}'})
+
+    def test_ext_defaults_module_constants(self) -> None:
+        assert "plan" in DEFAULT_CHECKPOINT_STAGES
+        assert "session_id" in DEFAULT_TELEMETRY_TRACE_IDS
+        assert "claim_id" in DEFAULT_COST_ATTRIBUTION_TAGS
+        assert set(DEFAULT_AB_TESTING_WEIGHTS.keys()) == {
+            "claim_recall",
+            "citation_accuracy",
+            "latency",
+            "cost",
+        }
 
 
 class TestWorkflowConfig:

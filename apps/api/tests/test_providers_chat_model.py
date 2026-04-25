@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-import a2a_research.backend.llm.providers as providers_module
-from a2a_research.backend.llm.providers import (
+import llm.providers as providers_module
+from llm.providers import (
     ChatResponse,
     OpenRouterChatModel,
     ProviderRateLimitError,

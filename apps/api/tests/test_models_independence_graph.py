@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from a2a_research.backend.core.models import (
+from core.models import (
     EvidenceUnit,
     IndependenceGraph,
     Passage,
@@ -107,3 +107,29 @@ class TestIndependenceGraph:
     def test_citation_chains_stored(self):
         ig = IndependenceGraph(citation_chains={"chain_1": ["a", "b", "c"]})
         assert ig.citation_chains["chain_1"] == ["a", "b", "c"]
+
+    def test_update_adds_evidence_to_syndication_clusters(self):
+        """update() populates syndication_clusters when ev.syndication_cluster_id is set."""
+        ig = IndependenceGraph()
+        eu = EvidenceUnit(
+            url="https://x.com",
+            publisher_id="pub1",
+            syndication_cluster_id="cluster_a",
+        )
+        ig.update([eu])
+        assert "cluster_a" in ig.syndication_clusters
+        assert eu.id in ig.syndication_clusters["cluster_a"]
+
+    def test_update_avoids_duplicate_in_syndication_cluster(self):
+        """update() does not add duplicate evidence ids in syndication clusters."""
+        ig = IndependenceGraph(
+            syndication_clusters={"cluster_a": ["existing_id"]}
+        )
+        eu = EvidenceUnit(
+            id="existing_id",
+            url="https://x.com",
+            publisher_id="pub1",
+            syndication_cluster_id="cluster_a",
+        )
+        ig.update([eu])
+        assert ig.syndication_clusters["cluster_a"] == ["existing_id"]

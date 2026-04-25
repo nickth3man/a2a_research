@@ -5,6 +5,7 @@ from pathlib import Path
 
 MAX_LEN = 79
 
+
 def extract_prompts(py_file: Path) -> int:
     """Extract triple-quoted strings over 79 chars to .txt files.
     Returns number of extractions."""
@@ -25,8 +26,9 @@ def extract_prompts(py_file: Path) -> int:
             indent, var_name, _quote = m.groups()
             # Find the end of the triple-quoted string
             start = i
-            # Slice from opening """; do not use len('= ') — \s*=\s* can be 1–3+ chars
-            content_lines = [line[m.end(1):]]
+            # Slice from opening """; do not use len('= ') -
+            # \s*=\s* can be 1-3+ chars
+            content_lines = [line[m.end(1) :]]
             i += 1
             while i < len(lines):
                 if '"""' in lines[i] and lines[i].strip().endswith('"""'):
@@ -37,7 +39,7 @@ def extract_prompts(py_file: Path) -> int:
                 i += 1
 
             # Get the full content
-            full_content = ''.join(content_lines)
+            full_content = "".join(content_lines)
             # Check if it's a single line that's too long
             if len(full_content.strip()) <= 79 + len(indent) + len(var_name):
                 new_lines.extend(lines[start:i])
@@ -53,17 +55,19 @@ def extract_prompts(py_file: Path) -> int:
             txt_file.write_text(content, encoding="utf-8")
 
             # Replace with file read
-            new_lines.append(f'{indent}{var_name} = (')
-            new_lines.append(f'{indent}    Path(__file__).parent / "{txt_file.name}"')
+            new_lines.append(f"{indent}{var_name} = (")
+            new_lines.append(
+                f'{indent}    Path(__file__).parent / "{txt_file.name}"'
+            )
             new_lines.append(f'{indent}).read_text(encoding="utf-8")')
-            new_lines.append('\n')
+            new_lines.append("\n")
             changed += 1
         else:
             new_lines.append(line)
             i += 1
 
     if changed:
-        py_file.write_text(''.join(new_lines), encoding="utf-8")
+        py_file.write_text("".join(new_lines), encoding="utf-8")
 
     return changed
 

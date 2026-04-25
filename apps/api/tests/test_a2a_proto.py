@@ -6,7 +6,7 @@ from datetime import date, datetime
 
 from a2a.types import Part, Role
 
-from a2a_research.backend.core.a2a.proto import (
+from core.a2a.proto import (
     ROLE_AGENT,
     ROLE_USER,
     _serialize_for_proto,

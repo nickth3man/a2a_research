@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from a2a.types import AgentCard, AgentSkill
 
-from a2a_research.backend.core.a2a.compat import make_agent_card, make_skill
+from core import make_agent_card, make_skill
 
 
 class TestMakeSkill:

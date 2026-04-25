@@ -5,12 +5,12 @@ from __future__ import annotations
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 
-from a2a_research.backend.core.a2a.registry import (
+from core import AgentRole
+from core.a2a.registry import (
     AgentRegistry,
     get_registry,
     reset_registry,
 )
-from a2a_research.backend.core.models import AgentRole
 
 
 class _DummyExecutor(AgentExecutor):

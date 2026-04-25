@@ -6,15 +6,13 @@ import asyncio
 
 import pytest
 
-from a2a_research.backend.core.models import ResearchSession
-from a2a_research.backend.core.models.enums import AgentRole
-from a2a_research.backend.core.models.errors import (
+from core import AgentRole, Bus, ProgressPhase, ResearchSession
+from core.models.errors import (
     ErrorCode,
     ErrorEnvelope,
     ErrorSeverity,
 )
-from a2a_research.backend.core.progress import Bus, ProgressPhase
-from a2a_research.backend.workflow.status import emit_envelope, emit_step
+from workflow import emit_envelope, emit_step
 
 
 @pytest.fixture()

@@ -6,13 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
-import a2a_research.backend.core.logging.logging_formatters as _lf
-from a2a_research.backend.core.logging.app_logging import (
+import core.logging.logging_formatters as _lf
+from core import AgentRole, AgentStatus
+from core.logging.app_logging import (
     get_logger,
     log_event,
     setup_logging,
 )
-from a2a_research.backend.core.models import AgentRole, AgentStatus
 
 if TYPE_CHECKING:
     import pytest
@@ -94,21 +94,20 @@ class TestSetupLogging:
 
         patches = [
             patch(
-                "a2a_research.backend.core.logging.app_logging._LOG_DIR",
+                "core.logging.app_logging._LOG_DIR",
                 tmp_path / "logs",
             ),
             patch(
-                "a2a_research.backend.core.logging.app_logging._APP_LOG",
+                "core.logging.app_logging._APP_LOG",
                 tmp_path / "logs" / "app.log",
             ),
             patch(
-                "a2a_research.backend.core.logging"
-                ".app_logging.logging.FileHandler",
+                "core.logging.app_logging.logging.FileHandler",
                 side_effect=make_file_handler,
             ),
         ]
         with patches[0], patches[1], patches[2]:
-            import a2a_research.backend.core.logging.app_logging as logging_mod
+            import core.logging.app_logging as logging_mod
 
             original = logging_mod._configured
             try:
@@ -139,21 +138,20 @@ class TestSetupLogging:
 
         patches = [
             patch(
-                "a2a_research.backend.core.logging.app_logging._LOG_DIR",
+                "core.logging.app_logging._LOG_DIR",
                 tmp_path / "logs",
             ),
             patch(
-                "a2a_research.backend.core.logging.app_logging._APP_LOG",
+                "core.logging.app_logging._APP_LOG",
                 tmp_path / "logs" / "app.log",
             ),
             patch(
-                "a2a_research.backend.core.logging"
-                ".app_logging.logging.FileHandler",
+                "core.logging.app_logging.logging.FileHandler",
                 side_effect=make_file_handler,
             ),
         ]
         with patches[0], patches[1], patches[2]:
-            import a2a_research.backend.core.logging.app_logging as logging_mod
+            import core.logging.app_logging as logging_mod
 
             original = logging_mod._configured
             try:

@@ -35,7 +35,7 @@ async def async_client():
             assert resp.status_code == 200
             session_id = resp.json()["session_id"]
     """
-    from a2a_research.backend.entrypoints.api import app
+    from entrypoints import app
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(

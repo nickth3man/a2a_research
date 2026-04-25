@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from a2a_research.backend.core.models import ResearchSession
-from a2a_research.backend.core.models.enums import AgentRole
-from a2a_research.backend.core.models.errors import (
+from core import AgentRole, ResearchSession
+from core.models.errors import (
     ErrorCode,
     ErrorEnvelope,
     ErrorSeverity,

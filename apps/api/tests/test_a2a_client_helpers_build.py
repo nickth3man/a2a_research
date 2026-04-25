@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from a2a_research.backend.core.a2a.client_helpers import (
+from core.a2a.client_helpers import (
     _payload_preview,
     build_message,
 )

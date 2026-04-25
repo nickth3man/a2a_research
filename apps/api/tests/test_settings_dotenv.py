@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-import a2a_research.backend.core.settings as settings_module
+from core.settings import validate_dotenv_keys  # standalone function
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,8 +20,8 @@ class TestValidateDotenvKeys:
         env_file = tmp_path / ".env"
         env_file.write_text("UNKNOWN_KEY=value\nLLM_API_KEY=secret\n")
 
-        with patch("a2a_research.backend.core.settings.ENV_FILE", env_file):
-            settings_module.validate_dotenv_keys()
+        with patch("core.settings.ENV_FILE", env_file):
+            validate_dotenv_keys()
 
         assert "Unknown keys in .env: UNKNOWN_KEY" in caplog.text
 
@@ -29,8 +29,8 @@ class TestValidateDotenvKeys:
         env_file = tmp_path / ".env"
         env_file.write_text("WF_BUDGET_MAX_ROUNDS=3\nLLM_API_KEY=secret\n")
 
-        with patch("a2a_research.backend.core.settings.ENV_FILE", env_file):
-            settings_module.validate_dotenv_keys()
+        with patch("core.settings.ENV_FILE", env_file):
+            validate_dotenv_keys()
 
     def test_expected_keys_are_allowed(self, tmp_path: Path) -> None:
         env_file = tmp_path / ".env"
@@ -45,5 +45,5 @@ class TestValidateDotenvKeys:
             "SEARCH_MAX_RESULTS=5\n"
             "RESEARCH_MAX_ROUNDS=3\n"
         )
-        with patch("a2a_research.backend.core.settings.ENV_FILE", env_file):
-            settings_module.validate_dotenv_keys()
+        with patch("core.settings.ENV_FILE", env_file):
+            validate_dotenv_keys()

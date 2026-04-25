@@ -6,14 +6,13 @@ import httpx
 import pytest
 from a2a.types import Task
 
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pydantic_ai.synthesizer import (
     card as synth_card,
 )
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pydantic_ai.synthesizer import (
     main as synth_main,
 )
-from a2a_research.backend.core.a2a.client import extract_data_payloads
-from a2a_research.backend.core.models import ReportOutput
+from core import ReportOutput, extract_data_payloads
 from tests.http_harness import build_sdk_client, send_and_get_result
 
 

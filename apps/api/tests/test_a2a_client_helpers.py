@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from a2a.types import Artifact, Task
 
-from a2a_research.backend.core.a2a.client_helpers import (
+from core.a2a.client_helpers import (
     extract_data_payload_or_warn,
     extract_data_payloads,
     extract_text,
 )
-from a2a_research.backend.core.a2a.proto import (
+from core.a2a.proto import (
     make_data_part,
     make_message,
     make_text_part,

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.backend.core.models import AgentStatus
-from a2a_research.backend.workflow import run_research_async
+from core import AgentStatus
 from tests.workflow_integration_fixtures import (
     _configure_success_path,
 )
 from tests.workflow_integration_helpers import (
     _install_http_services,
 )
+from workflow import run_research_async
 
 
 @pytest.mark.asyncio

@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.backend.core.a2a.card_specs import CARD_SPECS
-from a2a_research.backend.core.models import AgentRole
+from core import CARD_SPECS, AgentRole
 
 ALL_ROLES = list(AgentRole)
 REQUIRED_FIELDS = {

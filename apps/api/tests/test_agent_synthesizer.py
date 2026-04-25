@@ -7,19 +7,19 @@ from typing import Any
 
 import pytest
 
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pydantic_ai.synthesizer import (
     SynthesizerExecutor,
 )
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pydantic_ai.synthesizer import (
     agent as synth_agent,
 )
-from a2a_research.backend.core.a2a import (
+from core.a2a import (
     A2AClient,
     AgentRegistry,
     extract_data_payloads,
     extract_text,
 )
-from a2a_research.backend.core.models import (
+from core.models import (
     AgentRole,
     Claim,
     ReportOutput,

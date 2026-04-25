@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.backend.tools import search as search_module
-from a2a_research.backend.tools.search import WebHit, web_search
+from tools import WebHit, web_search
+from tools import search as search_module
 
 
 @pytest.mark.asyncio
@@ -33,7 +33,7 @@ async def test_web_search_records_ddg_request_failure(
 
     monkeypatch.setattr(search_module, "_search_tavily", ok_tavily)
     monkeypatch.setattr(search_module, "_search_brave", ok_brave)
-    import a2a_research.backend.tools.search_ddg as ddg_module
+    import tools.search_ddg as ddg_module
 
     monkeypatch.setattr(ddg_module, "_search_ddg_sync", raising_ddg_sync)
 

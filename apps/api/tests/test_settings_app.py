@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 from unittest.mock import patch
 
 import pytest
 
-import a2a_research.backend.core.settings as settings_module
-from a2a_research.backend.core.settings import AppSettings, LLMSettings
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from core import AppSettings, LLMSettings
+from core.settings import (  # noqa: F401
+    _validate_dotenv_keys,
+    validate_dotenv_keys,
+)
 
 
 class TestAppSettings:
@@ -24,15 +23,15 @@ class TestAppSettings:
 
         with (
             patch(
-                "a2a_research.backend.core.settings._ENV_FILE",
+                "core.settings._ENV_FILE",
                 env_file,
             ),
             patch(
-                "a2a_research.backend.core.settings.ENV_FILE",
+                "core.settings.ENV_FILE",
                 env_file,
             ),
             patch(
-                "a2a_research.backend.core.settings.settings_core._env_file",
+                "core.settings.settings_core._env_file",
                 return_value=env_file,
             ),
         ):
@@ -45,18 +44,16 @@ class TestAppSettings:
         env_file = Path(__file__).resolve().parents[3] / ".env"
         if not env_file.exists():
             with (
+                patch("core.settings._ENV_FILE", env_file),
                 patch(
-                    "a2a_research.backend.core.settings._ENV_FILE", env_file
-                ),
-                patch(
-                    "a2a_research.backend.core.settings.dotenv_values",
+                    "core.settings.dotenv_values",
                     return_value={},
                 ),
             ):
                 settings = AppSettings()
         else:
             with patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ):
                 settings = AppSettings()
@@ -65,7 +62,7 @@ class TestAppSettings:
     def test_llm_settings_defaults(self) -> None:
         with (
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict("os.environ", {}, clear=True),
@@ -80,14 +77,10 @@ class TestAppSettings:
     ) -> None:
         env_file = tmp_path / ".env"
         env_file.write_text("LLM_PROVIDER=openrouter\nLLM_API_KEY=secret\n")
-        validate_dotenv_keys_name = "_validate_dotenv_keys"
-        validate_dotenv_keys = cast(
-            "Callable[[], None]",
-            getattr(settings_module, validate_dotenv_keys_name),
-        )
+        vdk = _validate_dotenv_keys
 
-        with patch("a2a_research.backend.core.settings._ENV_FILE", env_file):
-            validate_dotenv_keys()
+        with patch("core.settings._ENV_FILE", env_file):
+            vdk()
 
         assert "Unknown keys in .env" not in caplog.text
 
@@ -96,19 +89,19 @@ class TestAppSettings:
         empty_env.write_text("")
         with (
             patch(
-                "a2a_research.backend.core.settings._ENV_FILE",
+                "core.settings._ENV_FILE",
                 empty_env,
             ),
             patch(
-                "a2a_research.backend.core.settings.ENV_FILE",
+                "core.settings.ENV_FILE",
                 empty_env,
             ),
             patch(
-                "a2a_research.backend.core.settings.settings_core._env_file",
+                "core.settings.settings_core._env_file",
                 return_value=empty_env,
             ),
             patch(
-                "a2a_research.backend.core.settings.dotenv_values",
+                "core.settings.dotenv_values",
                 return_value={},
             ),
             patch.dict(

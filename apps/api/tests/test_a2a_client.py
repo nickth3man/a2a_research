@@ -18,23 +18,22 @@ from a2a.types import (
     TaskStatusUpdateEvent,
 )
 
-from a2a_research.backend.core.a2a.client import (
+from core import AgentRegistry, AgentRole
+from core.a2a.client import (
     A2AClient,
     build_message,
     extract_data_payloads,
 )
-from a2a_research.backend.core.a2a.compat import (
+from core.a2a.compat import (
     build_http_app,
     make_agent_card,
     make_skill,
 )
-from a2a_research.backend.core.a2a.proto import (
+from core.a2a.proto import (
     get_data_part,
     make_data_part,
     new_task,
 )
-from a2a_research.backend.core.a2a.registry import AgentRegistry
-from a2a_research.backend.core.models import AgentRole
 
 
 class EchoExecutor(AgentExecutor):
@@ -113,7 +112,7 @@ async def test_client_send_returns_task_with_artifact(
 ) -> None:
     import httpx
 
-    from a2a_research.backend.core.a2a import client as client_module
+    from core import client as client_module
 
     shared_client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=_echo_app()),
@@ -147,7 +146,7 @@ async def test_client_send_includes_handoff_from_when_from_role_provided(
 ) -> None:
     import httpx
 
-    from a2a_research.backend.core.a2a import client as client_module
+    from core import client as client_module
 
     shared_client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=_echo_app()),

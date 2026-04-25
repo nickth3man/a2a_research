@@ -5,13 +5,12 @@ from __future__ import annotations
 import pytest
 from a2a.types import AgentCard
 
-from a2a_research.backend.core.a2a.card_specs import CARD_SPECS
-from a2a_research.backend.core.a2a.cards import (
+from core import CARD_SPECS, AgentRole
+from core.a2a.cards import (
     AGENT_CARDS,
     build_cards,
     get_card,
 )
-from a2a_research.backend.core.models import AgentRole
 
 
 class TestBuildCards:

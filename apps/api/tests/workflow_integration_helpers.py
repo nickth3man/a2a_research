@@ -6,25 +6,25 @@ from typing import Any
 
 import pytest
 
-from a2a_research.backend.agents.langgraph.fact_checker import (
+from agents.langgraph.fact_checker import (
     main as fact_checker_main,
 )
-from a2a_research.backend.agents.pocketflow.planner import main as planner_main
-from a2a_research.backend.agents.pydantic_ai.synthesizer import (
+from agents.pocketflow.planner import main as planner_main
+from agents.pydantic_ai.synthesizer import (
     main as synth_main,
 )
-from a2a_research.backend.agents.smolagents.reader import main as reader_main
-from a2a_research.backend.agents.smolagents.searcher import (
+from agents.smolagents.reader import main as reader_main
+from agents.smolagents.searcher import (
     main as searcher_main,
 )
-from a2a_research.backend.core.a2a.registry import AgentRegistry
+from core import AgentRegistry
 from tests.http_harness import make_multi_app_client
 
 
 def _apps() -> dict[str, object]:
     from fastapi import FastAPI
 
-    from a2a_research.backend.entrypoints.agent_mounts import (
+    from entrypoints.agent_mounts import (
         mount_agents,
     )
 
@@ -48,10 +48,10 @@ def _apps() -> dict[str, object]:
 def _install_http_services(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Any:
-    from a2a_research.backend.core.a2a import (
+    from core import settings
+    from core.a2a import (
         client as client_mod,
     )
-    from a2a_research.backend.core.settings import settings
 
     shared_client = make_multi_app_client(_apps())
 
@@ -77,7 +77,7 @@ def _install_http_services(
     )
 
     # Rebuild agent cards with patched URLs
-    import a2a_research.backend.core.a2a.cards as cards_mod
+    import core.a2a.cards as cards_mod
 
     monkeypatch.setattr(cards_mod, "AGENT_CARDS", cards_mod.build_cards())
 
@@ -95,7 +95,7 @@ def _install_http_services(
     monkeypatch.setattr(client_mod.httpx, "AsyncClient", _client_factory)
     monkeypatch.setattr(client_mod, "get_registry", lambda: registry)
 
-    import a2a_research.backend.core.a2a as a2a_mod
+    import core.a2a as a2a_mod
 
     monkeypatch.setattr(a2a_mod, "get_registry", lambda: registry)
 

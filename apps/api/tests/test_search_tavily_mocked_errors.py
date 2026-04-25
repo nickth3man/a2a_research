@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.backend.tools import search as search_module
-from a2a_research.backend.tools.search import WebHit, web_search
 from tests.test_search_tavily_mocked import _empty_provider, _make_hit
+from tools import WebHit, web_search
+from tools import search as search_module
 
 
 @pytest.mark.asyncio

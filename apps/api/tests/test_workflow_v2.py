@@ -6,14 +6,14 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from a2a_research.backend.core.models import ResearchSession
-from a2a_research.backend.workflow import run_workflow_async
+from core import ResearchSession
+from workflow import run_workflow_async
 
 
 @pytest.mark.asyncio
 async def test_run_workflow_async_returns_session() -> None:
     with patch(
-        "a2a_research.backend.workflow.workflow_engine.drive",
+        "workflow.workflow_engine.drive",
         new_callable=AsyncMock,
     ) as mock_drive:
         session = await run_workflow_async("test query")
@@ -26,7 +26,7 @@ async def test_run_workflow_async_returns_session() -> None:
 @pytest.mark.asyncio
 async def test_run_workflow_async_sets_error_on_failure() -> None:
     with patch(
-        "a2a_research.backend.workflow.workflow_engine.drive",
+        "workflow.workflow_engine.drive",
         new_callable=AsyncMock,
         side_effect=RuntimeError("agent failed"),
     ):

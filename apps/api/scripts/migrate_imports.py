@@ -61,7 +61,7 @@ class ImportRewriter(CSTTransformer):
     """LibCST transformer that rewrites import statements."""
 
     # ── Handle  `from X import Y` ────────────────────────────────────
-    def leave_ImportFrom(
+    def leave_ImportFrom(  # noqa: N802
         self,
         original_node: cst.ImportFrom,
         updated_node: cst.ImportFrom,
@@ -83,7 +83,7 @@ class ImportRewriter(CSTTransformer):
         )
 
     # ── Handle  `import X` and `import X as Y` ──────────────────────
-    def leave_Import(
+    def leave_Import(  # noqa: N802
         self,
         original_node: cst.Import,
         updated_node: cst.Import,
@@ -122,7 +122,7 @@ def process_file(filepath: Path) -> bool:
     try:
         tree = cst.parse_module(source)
     except cst.ParserSyntaxError:
-        print(f"  SKIP (parse error): {filepath}", file=sys.stderr)
+        print(f"  SKIP (parse error): {filepath}", file=sys.stderr)  # noqa: T201
         return False
 
     new_tree = tree.visit(ImportRewriter())
@@ -160,16 +160,16 @@ def main() -> None:
 
     files = collect_files(args.paths)
     if not files:
-        print("No Python files found.", file=sys.stderr)
+        print("No Python files found.", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
     modified = 0
     for fp in files:
         if process_file(fp):
             modified += 1
-            print(f"  REWRITTEN: {fp}")
+            print(f"  REWRITTEN: {fp}")  # noqa: T201
 
-    print(f"\nDone. {modified}/{len(files)} file(s) modified.")
+    print(f"\nDone. {modified}/{len(files)} file(s) modified.")  # noqa: T201
 
 
 if __name__ == "__main__":

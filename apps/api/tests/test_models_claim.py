@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from a2a_research.backend.core.models import Claim, FreshnessWindow, Verdict
+from core import Claim, FreshnessWindow, Verdict
 
 
 class TestFreshnessWindow:

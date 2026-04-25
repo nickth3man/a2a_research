@@ -4,15 +4,14 @@ from __future__ import annotations
 
 import pytest
 
-from a2a_research.backend.llm.factory import create_chat_model
-from a2a_research.backend.llm.protocol import (
+from llm import OpenRouterChatModel, create_chat_model
+from llm.protocol import (
     ChatModelProtocol,
     ChatResponse,
 )
-from a2a_research.backend.llm.protocol import (
+from llm.protocol import (
     TestChatModel as ChatModelTestImpl,
 )
-from a2a_research.backend.llm.providers import OpenRouterChatModel
 
 
 class TestTestChatModel:

@@ -7,8 +7,8 @@ from contextlib import suppress
 
 import pytest
 
-from a2a_research.backend.core.models import AgentRole
-from a2a_research.backend.core.progress import (
+from core import AgentRole
+from core.progress import (
     Bus,
     ProgressEvent,
     ProgressPhase,
@@ -159,3 +159,39 @@ def test_create_progress_reporter_uses_call_soon_threadsafe() -> None:
     reporter(None)
 
     loop.call_soon_threadsafe.assert_called_once_with(queue.put_nowait, None)
+
+
+@pytest.mark.asyncio
+async def test_emit_tool_call_and_rate_limit_substeps() -> None:
+    from core.progress.progress_emit_core import emit_rate_limit, emit_tool_call
+
+    queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
+    Bus.register("session-tool", queue)
+    emit_tool_call(
+        AgentRole.SEARCHER,
+        "web_search",
+        args_preview="q" * 50,
+        result_preview="hits" * 30,
+        status="done",
+        session_id="session-tool",
+    )
+    ev1 = await asyncio.wait_for(queue.get(), timeout=0.5)
+    assert ev1 is not None
+    assert ev1.substep_label == "tool_call"
+    assert "tool=web_search" in (ev1.detail or "")
+
+    emit_rate_limit(
+        AgentRole.READER,
+        provider="api",
+        attempt=2,
+        max_attempts=5,
+        delay_sec=0.25,
+        reason="429",
+        session_id="session-tool",
+    )
+    ev2 = await asyncio.wait_for(queue.get(), timeout=0.5)
+    assert ev2 is not None
+    assert ev2.substep_label == "rate_limit"
+    assert "retry_in=0.25" in (ev2.detail or "")
+
+    Bus.unregister("session-tool")

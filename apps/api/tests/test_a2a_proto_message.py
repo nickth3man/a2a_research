@@ -6,7 +6,7 @@ import uuid
 
 from a2a.types import Message, Task, TaskState
 
-from a2a_research.backend.core.a2a.proto import (
+from core.a2a.proto import (
     ROLE_AGENT,
     ROLE_USER,
     get_data_part,

@@ -8,22 +8,22 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from a2a_research.backend.agents.pocketflow.planner import (
+from agents.pocketflow.planner import (
     PlannerExecutor,
     plan,
 )
-from a2a_research.backend.agents.pocketflow.planner import (
+from agents.pocketflow.planner import (
     nodes as planner_nodes,
 )
-from a2a_research.backend.agents.pocketflow.planner import (
+from agents.pocketflow.planner import (
     nodes_base as planner_nodes_base,
 )
-from a2a_research.backend.core.a2a import (
+from core import AgentRole
+from core.a2a import (
     A2AClient,
     AgentRegistry,
     extract_data_payloads,
 )
-from a2a_research.backend.core.models import AgentRole
 
 
 def _router_llm(

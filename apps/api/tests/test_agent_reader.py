@@ -6,14 +6,14 @@ import json
 
 import pytest
 
-from a2a_research.backend.agents.smolagents.reader import ReaderExecutor
-from a2a_research.backend.agents.smolagents.reader import core as reader_core
-from a2a_research.backend.core.a2a import (
+from agents.smolagents.reader import ReaderExecutor
+from agents.smolagents.reader import core as reader_core
+from core import AgentRole
+from core.a2a import (
     A2AClient,
     AgentRegistry,
     extract_data_payloads,
 )
-from a2a_research.backend.core.models import AgentRole
 
 
 class _FakeReaderAgent:

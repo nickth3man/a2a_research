@@ -8,22 +8,22 @@ from typing import cast
 import pytest
 from a2a.types import Task, TaskState
 
-from a2a_research.backend.agents.smolagents.searcher import SearcherExecutor
-from a2a_research.backend.agents.smolagents.searcher import (
+from agents.smolagents.searcher import SearcherExecutor
+from agents.smolagents.searcher import (
     core as searcher_core,
 )
-from a2a_research.backend.agents.smolagents.searcher import (
+from agents.smolagents.searcher import (
     main as searcher_main,
 )
-from a2a_research.backend.agents.smolagents.searcher.main import (
+from agents.smolagents.searcher.main import (
     SearcherBatchResult,
 )
-from a2a_research.backend.core.a2a import (
+from core import AgentRole
+from core.a2a import (
     A2AClient,
     AgentRegistry,
     extract_data_payloads,
 )
-from a2a_research.backend.core.models import AgentRole
 
 
 class _FakeSearcherAgent:

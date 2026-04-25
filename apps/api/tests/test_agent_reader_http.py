@@ -9,10 +9,9 @@ import httpx
 import pytest
 from a2a.types import Task
 
-from a2a_research.backend.agents.smolagents.reader import core as reader_core
-from a2a_research.backend.agents.smolagents.reader import main as reader_main
-from a2a_research.backend.core.a2a.client import extract_data_payloads
-from a2a_research.backend.core.models import AgentRole
+from agents.smolagents.reader import core as reader_core
+from agents.smolagents.reader import main as reader_main
+from core import AgentRole, extract_data_payloads
 from tests.http_harness import build_sdk_client, send_and_get_result
 
 
@@ -45,7 +44,7 @@ async def test_reader_http_contract(
         ),
     )
 
-    from a2a_research.backend.core.settings import settings as test_settings
+    from core import settings as test_settings
 
     monkeypatch.setattr(test_settings, "reader_url", "http://localhost:10003")
 
@@ -53,8 +52,8 @@ async def test_reader_http_contract(
     from a2a.server.request_handlers import DefaultRequestHandler
     from a2a.server.tasks import InMemoryTaskStore
 
-    import a2a_research.backend.core.a2a.cards as cards_mod
-    from a2a_research.backend.core.a2a.compat import (
+    import core.a2a.cards as cards_mod
+    from core.a2a.compat import (
         build_http_app as build_starlette_http_app,
     )
 
