@@ -300,6 +300,9 @@ jobs:
 
       - name: Start API server
         if: needs.changes.outputs.python == 'true'
+        env:
+          LLM_API_KEY: ci-placeholder
+          TAVILY_API_KEY: ci-placeholder
         run: |
           nohup uv run uvicorn entrypoints.api:app \
             --host 127.0.0.1 --port 8000 \
