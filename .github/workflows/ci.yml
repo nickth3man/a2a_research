@@ -301,8 +301,20 @@ jobs:
       - name: Start API server
         if: needs.changes.outputs.python == 'true'
         run: |
-          uv run uvicorn entrypoints.api:app --host 0.0.0.0 --port 8000 &
-          sleep 5
+          nohup uv run uvicorn entrypoints.api:app \
+            --host 127.0.0.1 --port 8000 \
+            > /tmp/uvicorn.log 2>&1 &
+          disown
+          for i in $(seq 1 30); do
+            if curl -fs http://127.0.0.1:8000/openapi.json > /dev/null; then
+              echo "API server ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API server failed to start"
+          cat /tmp/uvicorn.log
+          exit 1
 
       - name: Install pnpm
         if: needs.changes.outputs.python == 'true'
@@ -321,6 +333,15 @@ jobs:
         run: |
           pnpm install
           pnpm exec turbo run generate --filter='...[origin/main...HEAD]'
+
+      - name: Dump openapi-ts error log
+        if: failure() && needs.changes.outputs.python == 'true'
+        working-directory: packages/contracts
+        run: |
+          ls -la openapi-ts-error-*.log 2>/dev/null || true
+          cat openapi-ts-error-*.log 2>/dev/null || true
+          echo "--- uvicorn.log ---"
+          cat /tmp/uvicorn.log 2>/dev/null || true
 
   ci-gate:
     if: ${{ !cancelled() }}
