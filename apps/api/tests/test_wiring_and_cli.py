@@ -114,7 +114,9 @@ def test_launcher_main_finishes_on_keyboard_interrupt(
             m_srv.return_value = serv
             th = MagicMock()
             th.is_alive.return_value = True
-            with patch("entrypoints.launcher.threading.Thread", return_value=th):
+            with patch(
+                "entrypoints.launcher.threading.Thread", return_value=th
+            ):
                 launcher.main()
     assert serv.should_exit is True
     th.join.assert_called()

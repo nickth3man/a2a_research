@@ -42,7 +42,7 @@ ENV_FILE = _ENV_FILE
 # core.a2a.request_task does ``from core import new_task`` at module level
 # so new_task must be visible in core.__init__'s namespace before _facade
 # triggers that import chain.
-from core.a2a.proto import new_task  # noqa: E402
+from core._all import __all__  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # The import blocks live in _facade; the __all__ list lives in _all.
@@ -50,7 +50,7 @@ from core.a2a.proto import new_task  # noqa: E402
 # Import order in _facade is dependency-aware.
 # ---------------------------------------------------------------------------
 from core._facade import *  # noqa: E402, F403
-from core._all import __all__  # noqa: E402
+from core.a2a.proto import new_task  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Restore real packages for submodules that are imported directly
@@ -69,8 +69,8 @@ for _pkg in ("core.models", "core.a2a", "core.utils"):
 
 # Module-level aliases (used as ``from core import client`` etc.)
 import core.a2a.client as client  # noqa: E402
-import core.utils as utils  # noqa: E402
-import core.utils.citation_sanitize as citation_sanitize  # noqa: E402
 
 # Restore submodule module references shadowed by ``from X import Y``.
 import core.settings as _cs  # noqa: E402, F401
+import core.utils as utils  # noqa: E402
+import core.utils.citation_sanitize as citation_sanitize  # noqa: E402

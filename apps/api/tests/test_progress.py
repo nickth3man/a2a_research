@@ -163,7 +163,10 @@ def test_create_progress_reporter_uses_call_soon_threadsafe() -> None:
 
 @pytest.mark.asyncio
 async def test_emit_tool_call_and_rate_limit_substeps() -> None:
-    from core.progress.progress_emit_core import emit_rate_limit, emit_tool_call
+    from core.progress.progress_emit_core import (
+        emit_rate_limit,
+        emit_tool_call,
+    )
 
     queue: asyncio.Queue[ProgressEvent | None] = asyncio.Queue()
     Bus.register("session-tool", queue)

@@ -42,13 +42,15 @@ async def test_stream_events_happy_path_yields_result() -> None:
         return ResearchSession(id=sid, query="q", final_report="rep")
 
     t = asyncio.create_task(return_session())
-    with patch(
-        "entrypoints.streaming.drain_progress_while_running", mock_drain
+    with (
+        patch(
+            "entrypoints.streaming.drain_progress_while_running", mock_drain
+        ),
+        patch("entrypoints.streaming.get_session_task", return_value=t),
     ):
-        with patch("entrypoints.streaming.get_session_task", return_value=t):
-            chunks: list[str] = []
-            async for line in streaming.stream_events(sid):
-                chunks.append(line)
+        chunks: list[str] = []
+        async for line in streaming.stream_events(sid):
+            chunks.append(line)
     text = "".join(chunks)
     assert "result" in text
     assert "rep" in text
@@ -73,11 +75,13 @@ async def test_stream_events_resolves_error_from_failed_task() -> None:
             raise RuntimeError("workflow exploded")
 
         t = asyncio.create_task(failing_task())
-        with patch(
-            "entrypoints.streaming.drain_progress_while_running", no_events
+        with (
+            patch(
+                "entrypoints.streaming.drain_progress_while_running", no_events
+            ),
+            patch("entrypoints.streaming.get_session_task", return_value=t),
         ):
-            with patch("entrypoints.streaming.get_session_task", return_value=t):
-                out = [x async for x in streaming.stream_events(sid)]
+            out = [x async for x in streaming.stream_events(sid)]
     finally:
         if Bus.get(sid) is not None:
             Bus.unregister(sid)
@@ -111,11 +115,14 @@ async def test_stream_events_emits_error_when_session_has_error() -> None:
             return ResearchSession(id=sid, query="q", error="nope")
 
         t2 = asyncio.create_task(return_with_error())
-        with patch(
-            "entrypoints.streaming.drain_progress_while_running", one_progress
+        with (
+            patch(
+                "entrypoints.streaming.drain_progress_while_running",
+                one_progress,
+            ),
+            patch("entrypoints.streaming.get_session_task", return_value=t2),
         ):
-            with patch("entrypoints.streaming.get_session_task", return_value=t2):
-                out = [x async for x in streaming.stream_events(sid)]
+            out = [x async for x in streaming.stream_events(sid)]
     finally:
         if Bus.get(sid) is not None:
             Bus.unregister(sid)
