@@ -217,6 +217,8 @@ jobs:
       - name: Checkout repository
         if: needs.changes.outputs.frontend == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Cache Turbo builds
         if: needs.changes.outputs.frontend == 'true'
@@ -266,6 +268,8 @@ jobs:
       - name: Checkout repository
         if: needs.changes.outputs.python == 'true'
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
 
       - name: Cache Turbo builds
         if: needs.changes.outputs.python == 'true'
