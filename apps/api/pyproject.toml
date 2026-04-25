@@ -89,6 +89,9 @@ select = [
 "core/models/verification.py" = ["TC001"]
 "workflow/__main__.py" = ["T20"]
 "tests/**" = ["T20", "TCH001", "TCH002"]
+# _all.py declares __all__; symbols are defined in _facade.py and re-exported
+# via __init__.py. F822 is a static-analysis false positive for this pattern.
+"core/_all.py" = ["F822"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -152,6 +155,18 @@ warn_unused_configs = true
 show_error_codes = true
 warn_no_return = true
 disable_error_code = ["import-untyped"]
+
+# The core package uses a facade pattern: _facade.py re-exports symbols
+# that are declared in _all.py's __all__ list. mypy strict mode requires
+# implicit_reexport to understand this intentional pattern.
+[[tool.mypy.overrides]]
+module = "core"
+implicit_reexport = true
+
+[[tool.mypy.overrides]]
+module = "core._facade"
+implicit_reexport = true
+
 
 [[tool.mypy.overrides]]
 module = "core.a2a.proto"

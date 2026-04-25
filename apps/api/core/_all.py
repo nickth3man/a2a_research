@@ -7,6 +7,8 @@ __all__ = [
     # A2A cards
     "AGENT_CARDS",
     "CARD_SPECS",
+    "ENV_FILE",  # Foundation (in __init__)
+    "PROMPT_DETAIL_MAX_CHARS",  # Progress
     # A2A client
     "A2AClient",
     # Enums
@@ -28,7 +30,6 @@ __all__ = [
     "ClaimState",  # Verification
     "ClaimVerification",
     "CredibilitySignals",  # Evidence
-    "ENV_FILE",  # Foundation (in __init__)
     "ErrorCode",  # Errors
     "ErrorEnvelope",
     "ErrorSeverity",
@@ -38,7 +39,6 @@ __all__ = [
     "IndependenceGraph",
     "LLMSettings",  # Settings
     "NoveltyTracker",
-    "PROMPT_DETAIL_MAX_CHARS",  # Progress
     "Passage",
     "ProgressEvent",
     "ProgressGranularity",

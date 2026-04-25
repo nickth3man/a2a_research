@@ -136,11 +136,13 @@ async def test_stream_events_yields_error_when_no_queue() -> None:
 
     t = MagicMock()
     t.done.return_value = True
-    with patch.object(streaming, "get_session_task", return_value=t):
-        with patch("core.Bus.get", return_value=None):
-            chunks: list[str] = []
-            async for line in streaming.stream_events("no-queue"):
-                chunks.append(line)
+    with (
+        patch.object(streaming, "get_session_task", return_value=t),
+        patch("core.Bus.get", return_value=None),
+    ):
+        chunks: list[str] = []
+        async for line in streaming.stream_events("no-queue"):
+            chunks.append(line)
     text = "".join(chunks)
     assert "Session not found" in text
     assert "app-error" in text

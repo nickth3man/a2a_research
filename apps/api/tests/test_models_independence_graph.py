@@ -109,7 +109,7 @@ class TestIndependenceGraph:
         assert ig.citation_chains["chain_1"] == ["a", "b", "c"]
 
     def test_update_adds_evidence_to_syndication_clusters(self):
-        """update() populates syndication_clusters when ev.syndication_cluster_id is set."""
+        """update() populates syndication_clusters"""
         ig = IndependenceGraph()
         eu = EvidenceUnit(
             url="https://x.com",
@@ -121,7 +121,7 @@ class TestIndependenceGraph:
         assert eu.id in ig.syndication_clusters["cluster_a"]
 
     def test_update_avoids_duplicate_in_syndication_cluster(self):
-        """update() does not add duplicate evidence ids in syndication clusters."""
+        """update() does not add duplicates in syndication clusters"""
         ig = IndependenceGraph(
             syndication_clusters={"cluster_a": ["existing_id"]}
         )

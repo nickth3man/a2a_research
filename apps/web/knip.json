@@ -1,5 +1,5 @@
 {
-  "entry": ["src/index.ts", "src/main.tsx"],
+  "entry": ["src/main.tsx"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreDependencies": ["@types/*"]
 }

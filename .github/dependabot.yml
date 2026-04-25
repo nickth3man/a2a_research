@@ -1,7 +1,7 @@
 version: 2
 updates:
   - package-ecosystem: "pip"
-    directory: "/"
+    directory: "/apps/api"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -16,11 +16,7 @@ updates:
         patterns:
           - "pocketflow"
           - "pydantic*"
-          - "chromadb"
           - "openai"
-          - "anthropic"
-          - "google-genai"
-          - "ollama"
           - "rich"
       development:
         patterns:

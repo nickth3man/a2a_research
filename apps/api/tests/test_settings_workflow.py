@@ -55,7 +55,7 @@ class TestWorkflowConfigExt:
         assert e.ab_testing_weights == DEFAULT_AB_TESTING_WEIGHTS
 
     def test_ab_weights_validation(self) -> None:
-        with pytest.raises(ValidationError, match="sum to ~1.0"):
+        with pytest.raises(ValidationError, match=r"sum to ~1.0"):
             self._make({"WF_AB_TESTING_WEIGHTS": '{"a":0.1}'})
 
     def test_ext_defaults_module_constants(self) -> None:

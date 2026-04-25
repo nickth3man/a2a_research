@@ -29,7 +29,7 @@ for _pkg in _DUMMY_PKGS:
 
 from pathlib import Path  # noqa: E402
 
-from dotenv import dotenv_values  # noqa: E402
+from dotenv import dotenv_values  # noqa: E402, F401
 
 # --- Foundation symbols (MUST exist before core.settings import) ---
 # settings_validation.validate_dotenv_keys does ``from core import ENV_FILE``
@@ -42,7 +42,9 @@ ENV_FILE = _ENV_FILE
 # core.a2a.request_task does ``from core import new_task`` at module level
 # so new_task must be visible in core.__init__'s namespace before _facade
 # triggers that import chain.
-from core._all import __all__  # noqa: E402
+from core._all import (  # noqa: E402
+    __all__ as __all__,  # explicit re-export
+)
 
 # ---------------------------------------------------------------------------
 # The import blocks live in _facade; the __all__ list lives in _all.
@@ -50,7 +52,14 @@ from core._all import __all__  # noqa: E402
 # Import order in _facade is dependency-aware.
 # ---------------------------------------------------------------------------
 from core._facade import *  # noqa: E402, F403
-from core.a2a.proto import new_task  # noqa: E402
+from core.a2a.proto import (  # noqa: E402
+    new_task as new_task,  # explicit re-export
+)
+
+# request_task depends on new_task being available in core namespace
+from core.a2a.request_task import (  # noqa: E402
+    initial_task_or_new,  # noqa: F401  # explicit re-export
+)
 
 # ---------------------------------------------------------------------------
 # Restore real packages for submodules that are imported directly
@@ -68,9 +77,9 @@ for _pkg in ("core.models", "core.a2a", "core.utils"):
         __import__(_pkg)
 
 # Module-level aliases (used as ``from core import client`` etc.)
-import core.a2a.client as client  # noqa: E402
+import core.a2a.client as client  # noqa: E402, F401  # explicit re-export
 
 # Restore submodule module references shadowed by ``from X import Y``.
 import core.settings as _cs  # noqa: E402, F401
-import core.utils as utils  # noqa: E402
-import core.utils.citation_sanitize as citation_sanitize  # noqa: E402
+import core.utils as utils  # noqa: E402, F401  # explicit re-export
+import core.utils.citation_sanitize as citation_sanitize  # noqa: E402, F401  # explicit re-export

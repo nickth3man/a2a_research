@@ -34,18 +34,22 @@ def test_workflow_engine_loop_reexports() -> None:
 def test_workflow_main_usage_exits_2() -> None:
     import workflow.__main__ as wm
 
-    with patch.object(sys, "argv", ["workflow"]):
-        with pytest.raises(SystemExit) as exc:
-            wm.main()
+    with (
+        patch.object(sys, "argv", ["workflow"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        wm.main()
     assert exc.value.code == 2
 
 
 def test_workflow_main_empty_query_exits_2() -> None:
     import workflow.__main__ as wm
 
-    with patch.object(sys, "argv", ["workflow", " ", "\t"]):
-        with pytest.raises(SystemExit) as exc:
-            wm.main()
+    with (
+        patch.object(sys, "argv", ["workflow", " ", "\t"]),
+        pytest.raises(SystemExit) as exc,
+    ):
+        wm.main()
     assert exc.value.code == 2
 
 
@@ -108,15 +112,15 @@ def test_launcher_main_finishes_on_keyboard_interrupt(
 ) -> None:
     from entrypoints import launcher
 
-    with patch("entrypoints.launcher.uvicorn.Config"):
-        with patch("entrypoints.launcher.uvicorn.Server") as m_srv:
-            serv = MagicMock()
-            m_srv.return_value = serv
-            th = MagicMock()
-            th.is_alive.return_value = True
-            with patch(
-                "entrypoints.launcher.threading.Thread", return_value=th
-            ):
-                launcher.main()
+    with (
+        patch("entrypoints.launcher.uvicorn.Config"),
+        patch("entrypoints.launcher.uvicorn.Server") as m_srv,
+    ):
+        serv = MagicMock()
+        m_srv.return_value = serv
+        th = MagicMock()
+        th.is_alive.return_value = True
+        with patch("entrypoints.launcher.threading.Thread", return_value=th):
+            launcher.main()
     assert serv.should_exit is True
     th.join.assert_called()

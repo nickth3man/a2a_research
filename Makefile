@@ -13,13 +13,13 @@ dev: install ## Full dev setup: install + activate pre-commit hooks
 	@echo "Dev environment ready. Run 'make test' to verify."
 
 test: ## Run pytest suite via turbo
-	pnpm turbo run test
+	"node_modules/.bin/turbo.cmd" run test
 
 watch: ## Run pytest in watch mode (re-runs on file changes)
 	cd apps/api && uv run pytest --tb=short -q --no-header -p no:warnings -f
 
 lint: ## Run linters via turbo (ruff + eslint)
-	pnpm turbo run lint
+	"node_modules/.bin/turbo.cmd" run lint
 
 format: ## Format Python code with ruff
 	cd apps/api && uv run ruff format agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
