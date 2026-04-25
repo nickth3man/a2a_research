@@ -245,15 +245,15 @@ jobs:
 
       - name: Lint frontend
         if: needs.changes.outputs.frontend == 'true'
-        run: turbo run lint --filter='...[origin/main...HEAD]'
+        run: pnpm exec turbo run lint --filter='...[origin/main...HEAD]'
 
       - name: Build frontend
         if: needs.changes.outputs.frontend == 'true'
-        run: turbo run build --filter='...[origin/main...HEAD]'
+        run: pnpm exec turbo run build --filter='...[origin/main...HEAD]'
 
       - name: Test frontend
         if: needs.changes.outputs.frontend == 'true'
-        run: turbo run test --filter='...[origin/main...HEAD]'
+        run: pnpm exec turbo run test --filter='...[origin/main...HEAD]'
 
   contracts:
     runs-on: ubuntu-latest
@@ -316,7 +316,7 @@ jobs:
         working-directory: packages/contracts
         run: |
           pnpm install
-          turbo run generate --filter='...[origin/main...HEAD]'
+          pnpm exec turbo run generate --filter='...[origin/main...HEAD]'
 
   ci-gate:
     if: ${{ !cancelled() }}
