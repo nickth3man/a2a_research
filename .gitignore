@@ -46,6 +46,10 @@ venv.bak/
 .uv-cache/
 uv-cache/
 
+# JavaScript / frontend tooling
+node_modules/
+.turbo/
+
 # Additional IDEs
 .fleet/
 .zed/
@@ -55,6 +59,7 @@ uv-cache/
 .tox/
 .nox/
 .dmypy.json
+.sisyphus/
 
 # Windows
 *.stackdump
@@ -100,3 +105,10 @@ notes/
 # Debug / throwaway scripts (repo root only)
 /debug_*.py
 /test_monkey*.py
+
+# Local QA / browser performance artifacts (repo root only)
+/*_baseline.png
+/desktop_*.png
+/mobile_*.png
+/journey_*.png
+/performance_trace*.json*

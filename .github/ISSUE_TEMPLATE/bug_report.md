@@ -31,4 +31,3 @@ labels: bug
 - `EMBEDDING_PROVIDER` / `EMBEDDING_MODEL`:
 
 ## Additional context
-

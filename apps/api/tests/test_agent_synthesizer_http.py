@@ -1,0 +1,54 @@
+"""HTTP contract test for the Synthesizer service."""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+from a2a.types import Task
+
+from agents.pydantic_ai.synthesizer import (
+    card as synth_card,
+)
+from agents.pydantic_ai.synthesizer import (
+    main as synth_main,
+)
+from core import ReportOutput, extract_data_payloads
+from tests.http_harness import build_sdk_client, send_and_get_result
+
+
+@pytest.mark.asyncio
+async def test_synthesizer_http_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    synth_card.SYNTHESIZER_CARD.supported_interfaces[
+        0
+    ].url = "http://localhost:10005"
+
+    async def _fake_synthesize(
+        query: str,
+        claims: list[object],
+        sources: list[object],
+        *,
+        session_id: str = "",
+    ) -> ReportOutput:
+        return ReportOutput(
+            title="JWST Launch", summary="JWST launched in December 2021."
+        )
+
+    monkeypatch.setattr(synth_main, "synthesize", _fake_synthesize)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=synth_main.build_http_app()),
+        base_url="http://localhost:10005",
+    ) as http_client:
+        client = await build_sdk_client(http_client, "http://localhost:10005")
+        result = await send_and_get_result(
+            client,
+            payload={
+                "query": "When did JWST launch?",
+                "verified_claims": [],
+                "sources": [],
+            },
+        )
+    assert isinstance(result, Task)
+    assert extract_data_payloads(result)[0]["report"]["title"] == "JWST Launch"

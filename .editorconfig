@@ -9,7 +9,7 @@ trim_trailing_whitespace = true
 [*.py]
 indent_style = space
 indent_size = 4
-max_line_length = 99
+max_line_length = 79
 
 [*.{toml,yaml,yml,json}]
 indent_style = space

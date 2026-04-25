@@ -1,0 +1,17 @@
+{
+  "name": "@a2a/root",
+  "private": true,
+  "devDependencies": {
+    "turbo": "^2"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "generate": "turbo run generate",
+    "e2e": "turbo run e2e --filter=@a2a/e2e",
+    "e2e:install": "pnpm --filter @a2a/e2e e2e:install"
+  },
+  "packageManager": "pnpm@10.30.3"
+}

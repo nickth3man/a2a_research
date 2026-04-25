@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["PLAYWRIGHT_*", "E2E_*", "CI"],
+  "tasks": {
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["build"]
+    },
+    "e2e": {
+      "cache": false
+    },
+    "lint": {},
+    "generate": {
+      "cache": false
+    }
+  }
+}

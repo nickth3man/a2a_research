@@ -4,36 +4,36 @@
 	help: ## Show this help
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-install: ## Install package with uv
-	uv sync --all-groups
+install: ## Install all workspace dependencies (pnpm + uv)
+	pnpm install
+	cd apps/api && uv sync --all-groups
 
 dev: install ## Full dev setup: install + activate pre-commit hooks
-	uv run pre-commit install
+	cd apps/api && uv run pre-commit install
 	@echo "Dev environment ready. Run 'make test' to verify."
 
-test: ## Run pytest suite with coverage
-	uv run pytest
+test: ## Run pytest suite via turbo
+	"node_modules/.bin/turbo.cmd" run test
 
 watch: ## Run pytest in watch mode (re-runs on file changes)
-	uv run pytest --tb=short -q --no-header -p no:warnings -f
+	cd apps/api && uv run pytest --tb=short -q --no-header -p no:warnings -f
 
-lint: ## Run ruff linter and auto-fix issues
-	uv run ruff check --fix src/ tests/
+lint: ## Run linters via turbo (ruff + eslint)
+	"node_modules/.bin/turbo.cmd" run lint
 
-format: ## Format code with ruff
-	uv run ruff format src/ tests/
+format: ## Format Python code with ruff
+	cd apps/api && uv run ruff format agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
-format-check: ## Check formatting without modifying files
-	uv run ruff format --check src/ tests/
+format-check: ## Check Python formatting without modifying files
+	cd apps/api && uv run ruff format --check agents/ core/ entrypoints/ llm/ tools/ workflow/ tests/
 
 typecheck: ## Run mypy type checker
-	uv run mypy src/
+	cd apps/api && uv run mypy agents/ core/ entrypoints/ llm/ tools/ workflow/
 
 typecheck-ty: ## Run ty type checker
-	uv run ty check src/
+	cd apps/api && uv run ty check agents/ core/ entrypoints/ llm/ tools/ workflow/
 
 check: lint typecheck typecheck-ty format-check ## Run all quality checks (no tests)
-
 all: test check ## Run tests + all quality checks (CI-ready)
 	@echo "[OK] All checks complete"
 
@@ -43,41 +43,41 @@ clean: ## Remove build artifacts and cache directories
 	python -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('*.egg-info') if p.is_dir()]"
 
 serve: ## Start unified backend (FastAPI + all agents on port 8000)
-	uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload
+	cd apps/api && uv run uvicorn a2a_research.backend.entrypoints.api:app --host 0.0.0.0 --port 8000 --reload
 
 frontend-install: ## Install frontend dependencies
-	cd frontend && npm install
+	pnpm install
 
 frontend-dev: ## Start Vite dev server for the React frontend
-	cd frontend && npm run dev
+	cd apps/web && pnpm run dev
 
 frontend-build: ## Build production frontend bundle
-	cd frontend && npm run build
+	cd apps/web && pnpm run build
 
 frontend-lint: ## Lint frontend code
-	cd frontend && npm run lint
+	cd apps/web && pnpm run lint
 
 serve-all: ## Start all agent HTTP services on separate ports (standalone dev mode)
-	uv run python -m a2a_research.backend.entrypoints.launcher
+	cd apps/api && uv run python -m a2a_research.backend.entrypoints.launcher
 
 serve-planner: ## Start Planner HTTP service
-	uv run python -m a2a_research.backend.agents.pocketflow.planner
+	cd apps/api && uv run python -m a2a_research.backend.agents.pocketflow.planner
 
 serve-searcher: ## Start Searcher HTTP service
-	uv run python -m a2a_research.backend.agents.smolagents.searcher
+	cd apps/api && uv run python -m a2a_research.backend.agents.smolagents.searcher
 
 serve-reader: ## Start Reader HTTP service
-	uv run python -m a2a_research.backend.agents.smolagents.reader
+	cd apps/api && uv run python -m a2a_research.backend.agents.smolagents.reader
 
 serve-fact-checker: ## Start FactChecker HTTP service
-	uv run python -m a2a_research.backend.agents.langgraph.fact_checker
+	cd apps/api && uv run python -m a2a_research.backend.agents.langgraph.fact_checker
 
 serve-synthesizer: ## Start Synthesizer HTTP service
-	uv run python -m a2a_research.backend.agents.pydantic_ai.synthesizer
+	cd apps/api && uv run python -m a2a_research.backend.agents.pydantic_ai.synthesizer
 
 serve-clarifier: ## Start Clarifier HTTP service
-	uv run python -m a2a_research.backend.agents.pocketflow.clarifier
+	cd apps/api && uv run python -m a2a_research.backend.agents.pocketflow.clarifier
 
 htmlcov: ## Generate HTML coverage report
-	uv run pytest --cov=src/a2a_research --cov-report=html
+	cd apps/api && uv run pytest --cov=src/a2a_research --cov-report=html
 	@echo "HTML coverage report generated in htmlcov/index.html"
